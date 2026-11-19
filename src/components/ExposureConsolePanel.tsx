@@ -27,9 +27,14 @@ interface ExposureConsolePanelProps {
   doorClosed: boolean;
   cassetteReady: boolean;
   cassetteStepLabel: string;
+  isChestExam: boolean;
   breathHeld: boolean;
   onRequestBreathHold: () => void;
   hasProtocolAssist: boolean;
+  hasDosimeter: boolean;
+  hasTubeCooler: boolean;
+  kvpRange: [number, number];
+  masRange: [number, number];
   onAutoCalibrate: () => void;
   onExpose: () => void;
   isExposing: boolean;
@@ -50,9 +55,14 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
   doorClosed,
   cassetteReady,
   cassetteStepLabel,
+  isChestExam,
   breathHeld,
   onRequestBreathHold,
   hasProtocolAssist,
+  hasDosimeter,
+  hasTubeCooler,
+  kvpRange,
+  masRange,
   onAutoCalibrate,
   onExpose,
   isExposing,
@@ -64,8 +74,14 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
   const readyToFire = doorClosed && cassetteReady && !locked;
 
   // Approximate entrance skin dose indicator (visual clinical realism)
-  const approxDoseMs = Math.max(4, Math.round(mas * 3.5));
-  const tubeHeatPct = Math.min(92, Math.round((kvp / 130) * 32 + (mas / 50) * 28));
+  const approxDoseMs = Math.max(4, Math.round(mas * (hasTubeCooler ? 2.1 : 3.5)));
+  const rawHu = Math.round((kvp / 130) * 32 + (mas / 50) * 28);
+  const tubeHeatPct = Math.min(92, hasTubeCooler ? Math.round(rawHu * 0.5) : rawHu);
+  const doseOptimal =
+    kvp >= kvpRange[0] &&
+    kvp <= kvpRange[1] &&
+    mas >= masRange[0] &&
+    mas <= masRange[1];
 
   return (
     <aside className="pointer-events-auto fixed top-24 left-2.5 right-2.5 sm:top-auto sm:bottom-24 sm:left-5 sm:right-auto z-20 sm:w-[390px] max-h-[48dvh] sm:max-h-[78dvh] overflow-y-auto rounded-2xl border-2 border-slate-700/90 bg-gradient-to-b from-[#131C2A] via-[#0C131F] to-[#080D16] shadow-[0_20px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.08)] p-3.5 sm:p-4 space-y-3">
@@ -285,6 +301,23 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
           </span>
         </div>
 
+        {hasDosimeter && (
+          <div
+            className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold flex items-center justify-between ${
+              doseOptimal
+                ? 'border-emerald-600/60 bg-emerald-950/35 text-emerald-300'
+                : 'border-amber-600/60 bg-amber-950/35 text-amber-300'
+            }`}
+          >
+            <span>مقياس الجرعة الذكي:</span>
+            <span>
+              {doseOptimal
+                ? 'القيم مثالية للبروتوكول ✓'
+                : `اضبط (${kvpRange[0]}–${kvpRange[1]} kVp / ${masRange[0]}–${masRange[1]} mAs)`}
+            </span>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-1.5">
           {availableProjections.map((proj) => (
             <button
@@ -304,38 +337,46 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
         </div>
       </div>
 
-      {/* Intercom Speaker + Protocol Assist + Two-Stage Radiation Trigger */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onRequestBreathHold}
-          disabled={breathHeld || caseApproved}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border cursor-pointer transition-colors ${
-            breathHeld
-              ? 'bg-emerald-950/60 border-emerald-600/60 text-emerald-300'
-              : 'bg-[#121D2D] hover:bg-[#18263A] border-slate-700 text-slate-100'
-          }`}
-        >
-          {breathHeld ? (
-            <Volume2 className="w-3.5 h-3.5 shrink-0" />
-          ) : (
-            <Mic className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+      {/* Intercom Speaker (Chest exams only) + Protocol Assist */}
+      {(isChestExam || hasProtocolAssist) && (
+        <div className="flex items-center gap-2">
+          {isChestExam && (
+            <button
+              type="button"
+              onClick={onRequestBreathHold}
+              disabled={breathHeld || caseApproved}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border cursor-pointer transition-colors ${
+                breathHeld
+                  ? 'bg-emerald-950/60 border-emerald-600/60 text-emerald-300'
+                  : 'bg-[#121D2D] hover:bg-[#18263A] border-slate-700 text-slate-100'
+              }`}
+            >
+              {breathHeld ? (
+                <Volume2 className="w-3.5 h-3.5 shrink-0" />
+              ) : (
+                <Mic className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              )}
+              <span>
+                {breathHeld ? 'تم حبس النفس ✓' : 'ميكروفون: حبس النفس'}
+              </span>
+            </button>
           )}
-          <span>{breathHeld ? 'تم حبس النفس ✓' : 'ميكروفون: حبس النفس'}</span>
-        </button>
 
-        {hasProtocolAssist && (
-          <button
-            type="button"
-            onClick={onAutoCalibrate}
-            disabled={locked}
-            className="py-2 px-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 text-xs font-bold flex items-center gap-1 cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5 shrink-0" />
-            <span>ضبط ذكي</span>
-          </button>
-        )}
-      </div>
+          {hasProtocolAssist && (
+            <button
+              type="button"
+              onClick={onAutoCalibrate}
+              disabled={locked}
+              className={`py-2 px-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1 cursor-pointer ${
+                isChestExam ? '' : 'w-full'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <span>ضبط ذكي</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Physical Radiation Exposure Trigger Button */}
       <button

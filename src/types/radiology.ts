@@ -97,10 +97,18 @@ export interface CompletedCase {
 
 export type UpgradeId =
   | 'lead_shield'
+  | 'dosimeter_badge'
+  | 'thyroid_collar'
   | 'auto_processor'
+  | 'immobilization_kit'
+  | 'collimator_laser'
   | 'protocol_assist'
   | 'waiting_room'
+  | 'tube_cooler'
+  | 'dry_laser_printer'
+  | 'ai_pacs'
   | 'digital_dr'
+  | 'vip_lounge'
   | 'assistant_tech'
   | 'ct_scanner'
   | 'mri_suite';
@@ -114,6 +122,8 @@ export interface UpgradeItem {
   category: 'safety' | 'efficiency' | 'modality' | 'staff';
   benefitSummaryAr: string;
   imagePath: string;
+  requiredPatientsServed?: number;
+  comingSoon?: boolean;
 }
 
 export interface ClinicRank {

@@ -40,6 +40,7 @@ interface ClinicPCModalProps {
   // Shop props
   cash: number;
   filmDebt: number;
+  patientsServed: number;
   ownedUpgrades: UpgradeId[];
   onBuyCarton: (count: 1 | 5) => void;
   onTakeEmergencyLoan: () => void;
@@ -68,6 +69,7 @@ export const ClinicPCModal: React.FC<ClinicPCModalProps> = ({
   onRetake,
   cash,
   filmDebt,
+  patientsServed,
   ownedUpgrades,
   onBuyCarton,
   onTakeEmergencyLoan,
@@ -225,6 +227,7 @@ export const ClinicPCModal: React.FC<ClinicPCModalProps> = ({
               cash={cash}
               films={filmsRemaining}
               filmDebt={filmDebt}
+              patientsServed={patientsServed}
               ownedUpgrades={ownedUpgrades}
               onBuyCarton={onBuyCarton}
               onTakeEmergencyLoan={onTakeEmergencyLoan}

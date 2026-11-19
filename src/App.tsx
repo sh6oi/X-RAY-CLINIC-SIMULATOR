@@ -131,6 +131,8 @@ export default function App() {
   // First-Person 3D Clinical Workflow State
   const [techLocation, setTechLocation] = useState<TechLocation>('ROOM');
   const [doorClosed, setDoorClosed] = useState<boolean>(false);
+  const [ctDoorOpen, setCtDoorOpen] = useState<boolean>(false);
+  const [mriDoorOpen, setMriDoorOpen] = useState<boolean>(false);
   const [cassetteState, setCassetteState] = useState<CassetteState>('RACK');
 
   // Patient Positioning & Generator Console State
@@ -303,6 +305,10 @@ export default function App() {
   const hasAutoProc = save.ownedUpgrades.includes('auto_processor');
   const hasProtocolAssist = save.ownedUpgrades.includes('protocol_assist');
   const hasLeadShield = save.ownedUpgrades.includes('lead_shield');
+  const hasDosimeter = save.ownedUpgrades.includes('dosimeter_badge');
+  const hasTubeCooler = save.ownedUpgrades.includes('tube_cooler');
+  const hasCT = save.ownedUpgrades.includes('ct_scanner');
+  const hasMRI = save.ownedUpgrades.includes('mri_suite');
 
   // Keep queue topped up
   useEffect(() => {
@@ -329,6 +335,8 @@ export default function App() {
   );
 
   const currentRank = getClinicRank(save.totalRevenue);
+  const isChestExam = requestedExam.region === 'chest';
+  const effectiveBreathHeld = isChestExam && breathHeld;
   const isBoreScan =
     requestedExam.modality === 'CT' || requestedExam.modality === 'MRI';
   const isErect = selectedPosture.startsWith('ERECT_');
@@ -575,6 +583,44 @@ export default function App() {
           return next;
         });
         break;
+      case 'CT_DOOR':
+        if (!hasCT) {
+          soundFx.playError();
+          showToast(
+            'غرفة السيتي (المفراس CT) مغلقة 🔒 — جهاز السيتي غير متوفر للشراء حالياً وسيتوفر قريباً.'
+          );
+          return;
+        }
+        setCtDoorOpen((prev) => {
+          const next = !prev;
+          soundFx.playPurchase();
+          showToast(
+            next
+              ? 'تم فتح باب غرفة السيتي (المفراس CT) — يمكنك الدخول الآن.'
+              : 'تم إغلاق باب غرفة السيتي.'
+          );
+          return next;
+        });
+        break;
+      case 'MRI_DOOR':
+        if (!hasMRI) {
+          soundFx.playError();
+          showToast(
+            'غرفة الرنين المغناطيسي (MRI) مغلقة 🔒 — جهاز الرنين غير متوفر للشراء حالياً وسيتوفر قريباً.'
+          );
+          return;
+        }
+        setMriDoorOpen((prev) => {
+          const next = !prev;
+          soundFx.playPurchase();
+          showToast(
+            next
+              ? 'تم فتح باب غرفة الرنين المغناطيسي (MRI) — يمكنك الدخول الآن.'
+              : 'تم إغلاق باب غرفة الرنين المغناطيسي.'
+          );
+          return next;
+        });
+        break;
       case 'CONSOLE':
         if (techLocation !== 'BOOTH') {
           setTechLocation('BOOTH');
@@ -592,7 +638,7 @@ export default function App() {
   };
 
   const handleRequestBreathHold = () => {
-    if (!activePatient || breathHeld) return;
+    if (!activePatient || breathHeld || !isChestExam) return;
     setBreathHeld(true);
     soundFx.playPurchase();
     showToast('عبر الميكروفون: "خذ نفساً عميقاً واحبسه الآن..." (+$2 جودة)');
@@ -610,7 +656,7 @@ export default function App() {
       Math.round((requestedExam.masRange[0] + requestedExam.masRange[1]) / 2)
     );
     if (hasLeadShield) setShieldUsed(true);
-    setBreathHeld(true);
+    setBreathHeld(requestedExam.region === 'chest');
     if (!isBoreScan) {
       setCassetteState(
         requestedExam.recommendedPosture.startsWith('ERECT_')
@@ -662,7 +708,7 @@ export default function App() {
       kvp,
       mas,
       shieldUsed: hasLeadShield && shieldUsed,
-      patientPrepped: breathHeld,
+      patientPrepped: effectiveBreathHeld,
       ownedUpgrades: save.ownedUpgrades,
     });
 
@@ -679,9 +725,13 @@ export default function App() {
     if (exposeTimerRef.current) window.clearTimeout(exposeTimerRef.current);
     if (developTimerRef.current) window.clearTimeout(developTimerRef.current);
 
+    const exposeMs = hasTubeCooler ? 460 : 720;
     exposeTimerRef.current = window.setTimeout(() => {
       setIsExposing(false);
-      const developDelay = hasDR ? 240 : hasAutoProc ? 440 : 880;
+      const baseDevelopDelay = hasDR ? 240 : hasAutoProc ? 440 : 880;
+      const developDelay = hasTubeCooler
+        ? Math.round(baseDevelopDelay * 0.65)
+        : baseDevelopDelay;
       setIsDeveloping(true);
       setPcTab('IMAGE');
       setPcOpen(true);
@@ -693,7 +743,7 @@ export default function App() {
           soundFx.playError();
         }
       }, developDelay);
-    }, 720);
+    }, exposeMs);
   };
 
   const handleApproveAndCollect = () => {
@@ -794,7 +844,25 @@ export default function App() {
   const handleBuyUpgrade = (id: UpgradeId) => {
     if (save.ownedUpgrades.includes(id)) return;
     const upgrade = UPGRADES.find((u) => u.id === id);
-    if (!upgrade || save.cash < upgrade.cost) {
+    if (!upgrade) return;
+    if (upgrade.comingSoon) {
+      soundFx.playError();
+      showToast(
+        `${upgrade.titleAr} غير متوفر للشراء حالياً — سيتوفر قريباً.`
+      );
+      return;
+    }
+    if (
+      upgrade.requiredPatientsServed &&
+      save.patientsServed < upgrade.requiredPatientsServed
+    ) {
+      soundFx.playError();
+      showToast(
+        `هذا الخيار مقفل حالياً — يُفتح بعد فحص ${upgrade.requiredPatientsServed} مريض (${save.patientsServed}/${upgrade.requiredPatientsServed}).`
+      );
+      return;
+    }
+    if (save.cash < upgrade.cost) {
       soundFx.playError();
       return;
     }
@@ -807,7 +875,15 @@ export default function App() {
     }));
 
     if (id === 'lead_shield') setShieldUsed(true);
-    showToast(`تم تركيب ${upgrade.titleAr} بنجاح`);
+    if (id === 'ct_scanner') {
+      setCtDoorOpen(true);
+      showToast('تم تركيب جهاز المفراس (CT) وفتح باب غرفة السيتي في العيادة!');
+    } else if (id === 'mri_suite') {
+      setMriDoorOpen(true);
+      showToast('تم تركيب جهاز الرنين المغناطيسي وفتح باب غرفة الـ MRI!');
+    } else {
+      showToast(`تم تركيب ${upgrade.titleAr} بنجاح`);
+    }
   };
 
   // =========================================================================
@@ -860,9 +936,11 @@ export default function App() {
         selectedPosture={selectedPosture}
         techLocation={techLocation}
         doorClosed={doorClosed}
+        ctDoorOpen={ctDoorOpen}
+        mriDoorOpen={mriDoorOpen}
         cassetteState={cassetteState}
         shieldUsed={hasLeadShield && shieldUsed}
-        patientPrepped={breathHeld}
+        patientPrepped={effectiveBreathHeld}
         isExposing={isExposing}
         ownedUpgrades={save.ownedUpgrades}
         joystickRef={joystickRef}
@@ -1033,9 +1111,14 @@ export default function App() {
           doorClosed={doorClosed}
           cassetteReady={cassetteReady}
           cassetteStepLabel={cassetteStepLabel}
-          breathHeld={breathHeld}
+          isChestExam={isChestExam}
+          breathHeld={effectiveBreathHeld}
           onRequestBreathHold={handleRequestBreathHold}
           hasProtocolAssist={hasProtocolAssist}
+          hasDosimeter={hasDosimeter}
+          hasTubeCooler={hasTubeCooler}
+          kvpRange={requestedExam.kvpRange}
+          masRange={requestedExam.masRange}
           onAutoCalibrate={handleAutoCalibrate}
           onExpose={handleExpose}
           isExposing={isExposing}
@@ -1270,6 +1353,7 @@ export default function App() {
         }}
         cash={save.cash}
         filmDebt={save.filmDebt}
+        patientsServed={save.patientsServed}
         ownedUpgrades={save.ownedUpgrades}
         onBuyCarton={handleBuyCarton}
         onTakeEmergencyLoan={handleTakeEmergencyLoan}

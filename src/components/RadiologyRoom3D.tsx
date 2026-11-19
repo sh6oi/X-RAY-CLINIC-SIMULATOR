@@ -18,6 +18,8 @@ export type SceneTargetAction =
   | {type: 'TABLE_BUCKY'}
   | {type: 'WALL_BUCKY'}
   | {type: 'DOOR'}
+  | {type: 'CT_DOOR'}
+  | {type: 'MRI_DOOR'}
   | {type: 'CONSOLE'}
   | {type: 'PC'};
 
@@ -28,6 +30,8 @@ interface RadiologyRoom3DProps {
   selectedPosture: PatientPosture;
   techLocation: TechLocation;
   doorClosed: boolean;
+  ctDoorOpen: boolean;
+  mriDoorOpen: boolean;
   cassetteState: CassetteState;
   shieldUsed: boolean;
   patientPrepped: boolean;
@@ -142,8 +146,14 @@ function hashPatientSeed(id: string): number {
   return h >>> 0;
 }
 
-function canStandAt(x: number, z: number, doorClosed: boolean): boolean {
-  // Exam Room interior (north of partition wall)
+function canStandAt(
+  x: number,
+  z: number,
+  doorClosed: boolean,
+  canEnterCt: boolean,
+  canEnterMri: boolean
+): boolean {
+  // Main X-Ray Exam Room interior (north of partition wall)
   if (z <= 1.86) {
     if (x < -3.72 || x > 4.08 || z < -2.42) return false;
     // Avoid walking inside solid X-ray table core
@@ -153,18 +163,44 @@ function canStandAt(x: number, z: number, doorClosed: boolean): boolean {
     return true;
   }
 
-  // Doorway threshold (forgiving clearance between Exam Room and Control Booth)
+  // Partition threshold (z = 1.86..2.24): Booth Door | CT Room Door | MRI Room Door
   if (z > 1.86 && z < 2.24) {
-    if (doorClosed) return false;
-    return x >= -1.46 && x <= -0.56;
+    if (x >= -1.46 && x <= -0.56) {
+      return !doorClosed;
+    }
+    if (x >= 0.36 && x <= 1.14) {
+      return canEnterCt;
+    }
+    if (x >= 2.86 && x <= 3.64) {
+      return canEnterMri;
+    }
+    return false;
   }
 
-  // Control Booth interior (behind lead-glass window & desk)
+  // South wing rooms (z >= 2.24)
   if (z >= 2.24) {
-    if (x < -3.75 || x > -0.64 || z > 3.78) return false;
-    // Avoid clipping into booth desk (x: -3.55..-1.45, z: 2.24..3.05)
-    if (x > -3.58 && x < -1.44 && z < 3.06) return false;
-    return true;
+    // 1. Control Booth (x: -3.75 .. -0.64)
+    if (x <= -0.64) {
+      if (x < -3.75 || z > 3.78) return false;
+      if (x > -3.58 && x < -1.44 && z < 3.06) return false;
+      return true;
+    }
+
+    // 2. CT Scanner Room (x: -0.34 .. 1.82)
+    if (x >= -0.34 && x <= 1.82) {
+      if (!canEnterCt || z > 4.18) return false;
+      // Avoid walking into CT gantry / patient couch core
+      if (x >= 0.22 && x <= 1.32 && z >= 2.88) return false;
+      return true;
+    }
+
+    // 3. MRI Suite Room (x: 2.18 .. 4.26)
+    if (x >= 2.18 && x <= 4.26) {
+      if (!canEnterMri || z > 4.18) return false;
+      // Avoid walking into MRI magnet bore / couch core
+      if (x >= 2.74 && x <= 3.84 && z >= 2.88) return false;
+      return true;
+    }
   }
 
   return false;
@@ -504,6 +540,69 @@ function createDoorSignTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+function createRoomHeaderPlaqueTexture(
+  titleAr: string,
+  subtitleEn: string,
+  accentHex: string
+): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#091526';
+  ctx.fillRect(0, 0, 512, 128);
+  ctx.strokeStyle = accentHex;
+  ctx.lineWidth = 6;
+  ctx.strokeRect(5, 5, 502, 118);
+
+  ctx.fillStyle = '#F8FAFC';
+  ctx.font = 'bold 34px Tahoma, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(titleAr, 256, 58);
+
+  ctx.fillStyle = accentHex;
+  ctx.font = 'bold 21px monospace';
+  ctx.fillText(subtitleEn, 256, 98);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createDoorStatusBadgeTexture(
+  titleAr: string,
+  statusAr: string,
+  isLocked: boolean,
+  accentHex: string
+): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 384;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = isLocked ? '#1E1116' : '#0B2320';
+  ctx.fillRect(0, 0, 384, 192);
+  ctx.strokeStyle = isLocked ? '#EF4444' : '#10B981';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(6, 6, 372, 180);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 30px Tahoma, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(titleAr, 192, 66);
+
+  ctx.fillStyle = isLocked ? '#FCA5A5' : '#6EE7B7';
+  ctx.font = 'bold 24px Tahoma, Arial, sans-serif';
+  ctx.fillText(statusAr, 192, 116);
+
+  ctx.fillStyle = isLocked ? '#F87171' : accentHex;
+  ctx.font = 'bold 18px Tahoma, Arial, sans-serif';
+  ctx.fillText(isLocked ? 'اشترِ الجهاز من المتجر للفتح' : 'انقر لفتح أو إغلاق الباب', 192, 158);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function buildCassetteMesh(
   track: <T extends {dispose: () => void}>(item: T) => T,
   matBody: THREE.Material,
@@ -541,6 +640,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   selectedPosture,
   techLocation,
   doorClosed,
+  ctDoorOpen,
+  mriDoorOpen,
   cassetteState,
   shieldUsed,
   patientPrepped,
@@ -559,6 +660,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   const selectedPostureRef = useRef<PatientPosture>(selectedPosture);
   const techLocationRef = useRef<TechLocation>(techLocation);
   const doorClosedRef = useRef<boolean>(doorClosed);
+  const ctDoorOpenRef = useRef<boolean>(ctDoorOpen);
+  const mriDoorOpenRef = useRef<boolean>(mriDoorOpen);
   const cassetteStateRef = useRef<CassetteState>(cassetteState);
   const shieldUsedRef = useRef<boolean>(shieldUsed);
   const patientPreppedRef = useRef<boolean>(patientPrepped);
@@ -607,6 +710,20 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       handReachImpulseRef.current = 1.0;
     }
   }, [doorClosed]);
+
+  useEffect(() => {
+    if (ctDoorOpenRef.current !== ctDoorOpen) {
+      ctDoorOpenRef.current = ctDoorOpen;
+      handReachImpulseRef.current = 1.0;
+    }
+  }, [ctDoorOpen]);
+
+  useEffect(() => {
+    if (mriDoorOpenRef.current !== mriDoorOpen) {
+      mriDoorOpenRef.current = mriDoorOpen;
+      handReachImpulseRef.current = 1.0;
+    }
+  }, [mriDoorOpen]);
 
   useEffect(() => {
     if (cassetteStateRef.current !== cassetteState) {
@@ -817,6 +934,58 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     wallChartTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const suiteHeaderTex = track(createSuiteHeaderTexture());
     suiteHeaderTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const ctHeaderTex = track(
+      createRoomHeaderPlaqueTexture(
+        'غرفة السيتي (المفراس)',
+        'CT SCANNER SUITE · 64-SLICE',
+        '#38BDF8'
+      )
+    );
+    ctHeaderTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const mriHeaderTex = track(
+      createRoomHeaderPlaqueTexture(
+        'غرفة الرنين المغناطيسي',
+        'MRI IMAGING SUITE · 1.5 TESLA',
+        '#34D399'
+      )
+    );
+    mriHeaderTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const ctLockedBadgeTex = track(
+      createDoorStatusBadgeTexture(
+        'غرفة السيتي / المفراس',
+        'غير متوفر · قريباً 🔒',
+        true,
+        '#38BDF8'
+      )
+    );
+    ctLockedBadgeTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const ctUnlockedBadgeTex = track(
+      createDoorStatusBadgeTexture(
+        'غرفة السيتي / المفراس',
+        'متاح ومفتوح ✓',
+        false,
+        '#38BDF8'
+      )
+    );
+    ctUnlockedBadgeTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const mriLockedBadgeTex = track(
+      createDoorStatusBadgeTexture(
+        'غرفة الرنين (MRI)',
+        'غير متوفر · قريباً 🔒',
+        true,
+        '#34D399'
+      )
+    );
+    mriLockedBadgeTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const mriUnlockedBadgeTex = track(
+      createDoorStatusBadgeTexture(
+        'غرفة الرنين (MRI)',
+        'متاح ومفتوح ✓',
+        false,
+        '#34D399'
+      )
+    );
+    mriUnlockedBadgeTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
     const matFloor = track(
       new THREE.MeshStandardMaterial({
@@ -1494,6 +1663,312 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     boothGroup.add(boothBackWall);
 
     scene.add(boothGroup);
+
+    // =========================================================================
+    // 2B. ADJOINING LOCKED DIAGNOSTIC SUITES: CT SCANNER ROOM & MRI ROOM
+    // =========================================================================
+    const diagnosticSuitesGroup = new THREE.Group();
+
+    // South Partition Wall segments along z = 2.05 (x = -0.52 to x = 4.50)
+    // Door 1 Opening (CT): x = 0.30..1.20 | Door 2 Opening (MRI): x = 2.80..3.70
+    const buildPartitionPillar = (xCenter: number, width: number) => {
+      const wallSeg = new THREE.Mesh(
+        track(new THREE.BoxGeometry(width, 3.55, 0.16)),
+        matWall
+      );
+      wallSeg.position.set(xCenter, 1.775, 2.05);
+      wallSeg.receiveShadow = true;
+      diagnosticSuitesGroup.add(wallSeg);
+
+      const lowerSeg = new THREE.Mesh(
+        track(new THREE.BoxGeometry(width + 0.01, 1.05, 0.18)),
+        matWallLower
+      );
+      lowerSeg.position.set(xCenter, 0.525, 2.05);
+      diagnosticSuitesGroup.add(lowerSeg);
+    };
+
+    buildPartitionPillar(-0.11, 0.82);
+    buildPartitionPillar(2.0, 1.6);
+    buildPartitionPillar(4.1, 0.8);
+
+    // Rear & Dividing Enclosure Walls for CT & MRI Rooms
+    const suitesRearWall = new THREE.Mesh(
+      track(new THREE.BoxGeometry(5.1, 3.55, 0.18)),
+      matWall
+    );
+    suitesRearWall.position.set(2.0, 1.775, 4.45);
+    diagnosticSuitesGroup.add(suitesRearWall);
+
+    const suitesDividerWall = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.16, 3.55, 2.4)),
+      matWallLower
+    );
+    suitesDividerWall.position.set(2.0, 1.775, 3.25);
+    diagnosticSuitesGroup.add(suitesDividerWall);
+
+    // Helper to build a labeled locked/unlocked Clinical Suite Door
+    const buildSuiteDoor = (opts: {
+      hingeX: number;
+      centerX: number;
+      actionType: 'CT_DOOR' | 'MRI_DOOR';
+      headerTex: THREE.CanvasTexture;
+      lockedTex: THREE.CanvasTexture;
+      unlockedTex: THREE.CanvasTexture;
+      accentColor: number;
+    }) => {
+      const lintel = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.92, 1.4, 0.17)),
+        matWall
+      );
+      lintel.position.set(opts.centerX, 2.85, 2.05);
+      diagnosticSuitesGroup.add(lintel);
+
+      // Door Header Sign (facing North into main X-Ray Room)
+      const headerBacking = new THREE.Mesh(
+        track(new THREE.BoxGeometry(1.36, 0.36, 0.04)),
+        matChrome
+      );
+      headerBacking.position.set(opts.centerX, 2.48, 1.94);
+      diagnosticSuitesGroup.add(headerBacking);
+
+      const headerFace = new THREE.Mesh(
+        track(new THREE.PlaneGeometry(1.3, 0.31)),
+        track(
+          new THREE.MeshStandardMaterial({
+            map: opts.headerTex,
+            emissiveMap: opts.headerTex,
+            emissive: new THREE.Color(0xffffff),
+            emissiveIntensity: 0.72,
+          })
+        )
+      );
+      headerFace.rotation.y = Math.PI;
+      headerFace.position.set(opts.centerX, 2.48, 1.915);
+      diagnosticSuitesGroup.add(headerFace);
+
+      // Door Status LED Bar above lintel
+      const ledMat = track(
+        new THREE.MeshStandardMaterial({
+          color: 0xef4444,
+          emissive: 0xef4444,
+          emissiveIntensity: 0.9,
+          roughness: 0.25,
+        })
+      );
+      const statusLed = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.62, 0.045, 0.06)),
+        ledMat
+      );
+      statusLed.position.set(opts.centerX, 2.21, 1.95);
+      diagnosticSuitesGroup.add(statusLed);
+
+      // Swinging Door Pivot
+      const doorPivot = new THREE.Group();
+      doorPivot.position.set(opts.hingeX, 0, 2.05);
+
+      const slab = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.88, 2.14, 0.08)),
+        matClinicalWhite
+      );
+      slab.position.set(0.44, 1.07, 0);
+      slab.castShadow = true;
+      slab.layers.set(1);
+      slab.userData.action = {type: opts.actionType} satisfies SceneTargetAction;
+      doorPivot.add(slab);
+      interactiveMeshes.push(slab);
+
+      // Frosted Observation Window Strip on Door
+      const windowPane = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.22, 0.72, 0.092)),
+        matLeadGlass
+      );
+      windowPane.position.set(0.66, 1.48, 0);
+      doorPivot.add(windowPane);
+
+      // Chrome Handle
+      const handle = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.14, 0.035, 0.14)),
+        matChrome
+      );
+      handle.position.set(0.76, 1.02, 0);
+      doorPivot.add(handle);
+
+      // Side Vertical Accent Stripe on Door
+      const stripe = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.055, 1.98, 0.088)),
+        track(
+          new THREE.MeshStandardMaterial({
+            color: opts.accentColor,
+            emissive: opts.accentColor,
+            emissiveIntensity: 0.35,
+            roughness: 0.35,
+          })
+        )
+      );
+      stripe.position.set(0.1, 1.07, 0);
+      doorPivot.add(stripe);
+
+      // Locked & Unlocked Nameplate Badges (North face toward Exam Room)
+      const lockedBadge = new THREE.Mesh(
+        track(new THREE.PlaneGeometry(0.56, 0.28)),
+        track(
+          new THREE.MeshStandardMaterial({
+            map: opts.lockedTex,
+            emissiveMap: opts.lockedTex,
+            emissive: new THREE.Color(0xffffff),
+            emissiveIntensity: 0.48,
+          })
+        )
+      );
+      lockedBadge.rotation.y = Math.PI;
+      lockedBadge.position.set(0.36, 1.54, -0.044);
+      doorPivot.add(lockedBadge);
+
+      const unlockedBadge = new THREE.Mesh(
+        track(new THREE.PlaneGeometry(0.56, 0.28)),
+        track(
+          new THREE.MeshStandardMaterial({
+            map: opts.unlockedTex,
+            emissiveMap: opts.unlockedTex,
+            emissive: new THREE.Color(0xffffff),
+            emissiveIntensity: 0.48,
+          })
+        )
+      );
+      unlockedBadge.rotation.y = Math.PI;
+      unlockedBadge.position.set(0.36, 1.54, -0.044);
+      unlockedBadge.visible = false;
+      doorPivot.add(unlockedBadge);
+
+      diagnosticSuitesGroup.add(doorPivot);
+      return {doorPivot, slab, ledMat, lockedBadge, unlockedBadge};
+    };
+
+    const ctDoorRig = buildSuiteDoor({
+      hingeX: 0.3,
+      centerX: 0.75,
+      actionType: 'CT_DOOR',
+      headerTex: ctHeaderTex,
+      lockedTex: ctLockedBadgeTex,
+      unlockedTex: ctUnlockedBadgeTex,
+      accentColor: 0x0ea5e9,
+    });
+
+    const mriDoorRig = buildSuiteDoor({
+      hingeX: 2.8,
+      centerX: 3.25,
+      actionType: 'MRI_DOOR',
+      headerTex: mriHeaderTex,
+      lockedTex: mriLockedBadgeTex,
+      unlockedTex: mriUnlockedBadgeTex,
+      accentColor: 0x10b981,
+    });
+
+    // CT Suite Interior Equipment (inside Room 1: x ~ 0.78, z ~ 3.45)
+    const ctRoomLight = new THREE.PointLight(0xbae6fd, 1.15, 5.5);
+    ctRoomLight.position.set(0.78, 2.95, 3.25);
+    scene.add(ctRoomLight);
+
+    const ctSuiteModel = new THREE.Group();
+    ctSuiteModel.position.set(0.78, 0, 3.55);
+
+    const ctGantryBase = new THREE.Mesh(
+      track(new THREE.BoxGeometry(1.12, 0.26, 0.56)),
+      matTrim
+    );
+    ctGantryBase.position.set(0, 0.13, 0.28);
+    ctSuiteModel.add(ctGantryBase);
+
+    const ctGantryBody = new THREE.Mesh(
+      track(new THREE.TorusGeometry(0.62, 0.2, 20, 40)),
+      matClinicalWhite
+    );
+    ctGantryBody.position.set(0, 1.02, 0.28);
+    ctSuiteModel.add(ctGantryBody);
+
+    const ctBoreGlow = new THREE.Mesh(
+      track(new THREE.TorusGeometry(0.44, 0.028, 12, 36)),
+      matLedStrip
+    );
+    ctBoreGlow.position.set(0, 1.02, 0.14);
+    ctSuiteModel.add(ctBoreGlow);
+
+    const ctBedPedestal = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.44, 0.68, 0.65)),
+      matClinicalWhite
+    );
+    ctBedPedestal.position.set(0, 0.34, -0.35);
+    ctSuiteModel.add(ctBedPedestal);
+
+    const ctCouch = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.52, 0.08, 1.35)),
+      matDarkPad
+    );
+    ctCouch.position.set(0, 0.72, -0.15);
+    ctSuiteModel.add(ctCouch);
+    diagnosticSuitesGroup.add(ctSuiteModel);
+
+    // MRI Suite Interior Equipment (inside Room 2: x ~ 3.28, z ~ 3.55)
+    const mriRoomLight = new THREE.PointLight(0xa7f3d0, 1.15, 5.5);
+    mriRoomLight.position.set(3.28, 2.95, 3.25);
+    scene.add(mriRoomLight);
+
+    const mriSuiteModel = new THREE.Group();
+    mriSuiteModel.position.set(3.28, 0, 3.55);
+
+    const mriBase = new THREE.Mesh(
+      track(new THREE.BoxGeometry(1.18, 0.28, 0.92)),
+      matTrim
+    );
+    mriBase.position.set(0, 0.14, 0.25);
+    mriSuiteModel.add(mriBase);
+
+    const mriTunnel = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.76, 0.76, 0.88, 28, 1, true)),
+      matClinicalWhite
+    );
+    mriTunnel.rotation.x = Math.PI / 2;
+    mriTunnel.position.set(0, 1.04, 0.25);
+    mriSuiteModel.add(mriTunnel);
+
+    const mriFrontCollar = new THREE.Mesh(
+      track(new THREE.TorusGeometry(0.6, 0.18, 20, 40)),
+      matClinicalWhite
+    );
+    mriFrontCollar.position.set(0, 1.04, -0.18);
+    mriSuiteModel.add(mriFrontCollar);
+
+    const mriTealRing = new THREE.Mesh(
+      track(new THREE.TorusGeometry(0.44, 0.032, 12, 36)),
+      track(
+        new THREE.MeshStandardMaterial({
+          color: 0x34d399,
+          emissive: 0x10b981,
+          emissiveIntensity: 1.0,
+          roughness: 0.2,
+        })
+      )
+    );
+    mriTealRing.position.set(0, 1.04, -0.2);
+    mriSuiteModel.add(mriTealRing);
+
+    const mriCouchPedestal = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.46, 0.68, 0.56)),
+      matClinicalWhite
+    );
+    mriCouchPedestal.position.set(0, 0.34, -0.45);
+    mriSuiteModel.add(mriCouchPedestal);
+
+    const mriCouchTop = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.52, 0.08, 1.3)),
+      matDarkPad
+    );
+    mriCouchTop.position.set(0, 0.72, -0.18);
+    mriSuiteModel.add(mriCouchTop);
+    diagnosticSuitesGroup.add(mriSuiteModel);
+
+    scene.add(diagnosticSuitesGroup);
 
     // =========================================================================
     // 3. CONTROL BOOTH WORKSTATION: 3D CLINIC PC + 3D X-RAY CONSOLE
@@ -2890,18 +3365,39 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       const curSpeed = Math.hypot(velX, velZ);
       const speedNorm = Math.min(1, curSpeed / 2.65);
 
+      const hasCT = ownedUpgradesRef.current.includes('ct_scanner');
+      const hasMRI = ownedUpgradesRef.current.includes('mri_suite');
+      const canEnterCt = hasCT && ctDoorOpenRef.current;
+      const canEnterMri = hasMRI && mriDoorOpenRef.current;
+
       if (Math.abs(stepX) > 0.0001 || Math.abs(stepZ) > 0.0001) {
         const curX = camera.position.x;
         const curZ = camera.position.z;
         let nextX = curX;
         let nextZ = curZ;
 
-        if (canStandAt(curX + stepX, curZ, doorClosedRef.current)) {
+        if (
+          canStandAt(
+            curX + stepX,
+            curZ,
+            doorClosedRef.current,
+            canEnterCt,
+            canEnterMri
+          )
+        ) {
           nextX = curX + stepX;
         } else {
           velX = 0;
         }
-        if (canStandAt(nextX, curZ + stepZ, doorClosedRef.current)) {
+        if (
+          canStandAt(
+            nextX,
+            curZ + stepZ,
+            doorClosedRef.current,
+            canEnterCt,
+            canEnterMri
+          )
+        ) {
           nextZ = curZ + stepZ;
         } else {
           velZ = 0;
@@ -3019,11 +3515,39 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         delta
       );
 
-      // 3. Lead Door Swing Animation
+      // 3. Lead Door + CT Suite Door + MRI Suite Door Animations & Lock Status
       const doorGoalY = doorClosedRef.current ? 0 : -1.25;
       leadDoorPivot.rotation.y = THREE.MathUtils.damp(
         leadDoorPivot.rotation.y,
         doorGoalY,
+        7.0,
+        delta
+      );
+
+      ctDoorRig.lockedBadge.visible = !hasCT;
+      ctDoorRig.unlockedBadge.visible = hasCT;
+      ctDoorRig.ledMat.color.setHex(hasCT ? 0x10b981 : 0xef4444);
+      ctDoorRig.ledMat.emissive.setHex(hasCT ? 0x10b981 : 0xef4444);
+      ctDoorRig.slab.userData.label = hasCT
+        ? 'غرفة السيتي (المفراس CT) — انقر لفتح/إغلاق الباب'
+        : 'غرفة السيتي (المفراس CT) مغلقة 🔒 — غير متوفر حالياً (قريباً)';
+      ctDoorRig.doorPivot.rotation.y = THREE.MathUtils.damp(
+        ctDoorRig.doorPivot.rotation.y,
+        canEnterCt ? -1.25 : 0,
+        7.0,
+        delta
+      );
+
+      mriDoorRig.lockedBadge.visible = !hasMRI;
+      mriDoorRig.unlockedBadge.visible = hasMRI;
+      mriDoorRig.ledMat.color.setHex(hasMRI ? 0x10b981 : 0xef4444);
+      mriDoorRig.ledMat.emissive.setHex(hasMRI ? 0x10b981 : 0xef4444);
+      mriDoorRig.slab.userData.label = hasMRI
+        ? 'غرفة الرنين المغناطيسي (MRI) — انقر لفتح/إغلاق الباب'
+        : 'غرفة الرنين المغناطيسي (MRI) مغلقة 🔒 — غير متوفر حالياً (قريباً)';
+      mriDoorRig.doorPivot.rotation.y = THREE.MathUtils.damp(
+        mriDoorRig.doorPivot.rotation.y,
+        canEnterMri ? -1.25 : 0,
         7.0,
         delta
       );

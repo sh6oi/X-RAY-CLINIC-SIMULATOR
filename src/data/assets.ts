@@ -23,6 +23,12 @@ import shopDrSystemImg from '../assets/images/shop_dr_system_1795096862277.jpg';
 import shopCtScannerImg from '../assets/images/shop_ct_scanner_1795096861837.jpg';
 import shopMriSuiteImg from '../assets/images/shop_mri_suite_1795096862460.jpg';
 import shopAssistantTechImg from '../assets/images/shop_assistant_tech_1795097419562.jpg';
+import shopDosimeterBadgeImg from '../assets/images/shop_dosimeter_badge_1795107508606.jpg';
+import shopImmobilizationKitImg from '../assets/images/shop_immobilization_kit_1795107506694.jpg';
+import shopLaserCollimatorImg from '../assets/images/shop_laser_collimator_1795107507417.jpg';
+import shopDryPrinterImg from '../assets/images/shop_dry_printer_1795107508345.jpg';
+import shopAiPacsImg from '../assets/images/shop_ai_pacs_1795107508211.jpg';
+import shopVipLoungeImg from '../assets/images/shop_vip_lounge_1795107508465.jpg';
 
 export const ASSETS = {
   clinicRoomImg,
@@ -47,4 +53,10 @@ export const ASSETS = {
   shopCtScannerImg,
   shopMriSuiteImg,
   shopAssistantTechImg,
+  shopDosimeterBadgeImg,
+  shopImmobilizationKitImg,
+  shopLaserCollimatorImg,
+  shopDryPrinterImg,
+  shopAiPacsImg,
+  shopVipLoungeImg,
 };

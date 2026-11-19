@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   Package,
   ShoppingCart,
@@ -8,8 +8,10 @@ import {
   Users,
   Sparkles,
   AlertCircle,
+  Lock,
+  Clock,
 } from 'lucide-react';
-import type {UpgradeId} from '../types/radiology';
+import type {UpgradeId, UpgradeItem} from '../types/radiology';
 import {
   BULK_CARTON_COST,
   BULK_CARTON_SIZE,
@@ -23,6 +25,7 @@ interface ShopViewProps {
   cash: number;
   films: number;
   filmDebt: number;
+  patientsServed: number;
   ownedUpgrades: UpgradeId[];
   onBuyCarton: (count: 1 | 5) => void;
   onTakeEmergencyLoan: () => void;
@@ -35,6 +38,15 @@ const CATEGORY_ICON: Record<string, React.ReactNode> = {
   modality: <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />,
   staff: <Users className="w-4 h-4 text-amber-400 shrink-0" />,
 };
+
+const CATEGORY_FILTERS: {id: 'ALL' | UpgradeItem['category']; label: string}[] =
+  [
+    {id: 'ALL', label: 'الكل'},
+    {id: 'safety', label: 'السلامة والحماية'},
+    {id: 'efficiency', label: 'أدوات مساعدة للتقني'},
+    {id: 'modality', label: 'الأجهزة والأجنحة'},
+    {id: 'staff', label: 'الطاقم'},
+  ];
 
 const ShopImageFrame: React.FC<{
   src: string;
@@ -67,14 +79,27 @@ export const ShopView: React.FC<ShopViewProps> = ({
   cash,
   films,
   filmDebt,
+  patientsServed,
   ownedUpgrades,
   onBuyCarton,
   onTakeEmergencyLoan,
   onBuyUpgrade,
 }) => {
+  const [categoryFilter, setCategoryFilter] = useState<
+    'ALL' | UpgradeItem['category']
+  >('ALL');
+
   const hasDR = ownedUpgrades.includes('digital_dr');
   const needsEmergencyLoan =
     !hasDR && films === 0 && cash < FILM_CARTON_COST;
+
+  const visibleUpgrades = useMemo(
+    () =>
+      categoryFilter === 'ALL'
+        ? UPGRADES
+        : UPGRADES.filter((u) => u.category === categoryFilter),
+    [categoryFilter]
+  );
 
   return (
     <div className="space-y-8">
@@ -85,14 +110,20 @@ export const ShopView: React.FC<ShopViewProps> = ({
             متجر مستلزمات وتجهيزات الأشعة
           </h2>
           <p className="mt-1 text-sm text-slate-400">
-            اشترِ كراتين الأفلام للحفاظ على استمرار العمل، واستثمر أرباحك في أجهزة وتجهيزات العيادة.
+            اشترِ كراتين الأفلام والأدوات المساعدة لتقني الأشعة وتجهيزات العيادة المميزة (أقسام السيتي والرنين قريباً).
           </p>
         </div>
-        <div className="flex items-center gap-6 text-sm">
+        <div className="flex flex-wrap items-center gap-5 text-sm">
           <div>
             <span className="text-slate-400">الرصيد المتاح: </span>
             <span className="font-mono-num font-bold text-emerald-400 text-base">
               ${cash.toLocaleString('en-US')}
+            </span>
+          </div>
+          <div>
+            <span className="text-slate-400">المرضى المفحوصون: </span>
+            <span className="font-mono-num font-bold text-cyan-300 text-base">
+              {patientsServed}
             </span>
           </div>
           <div>
@@ -249,14 +280,47 @@ export const ShopView: React.FC<ShopViewProps> = ({
 
       {/* Section 2: Equipment & Clinic Upgrades */}
       <section className="space-y-4">
-        <h3 className="text-lg font-bold text-slate-100">
-          الأجهزة الطبية وترقيات العيادة
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-bold text-slate-100">
+            الأدوات المساعدة والأجهزة الطبية وترقيات العيادة
+          </h3>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {CATEGORY_FILTERS.map((c) => {
+              const active = categoryFilter === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCategoryFilter(c.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition-colors ${
+                    active
+                      ? 'bg-cyan-500 border-cyan-300 text-slate-950'
+                      : 'bg-[#121B29] border-slate-800 text-slate-300 hover:border-slate-600'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {UPGRADES.map((item) => {
+          {visibleUpgrades.map((item) => {
             const isOwned = ownedUpgrades.includes(item.id);
+            const isComingSoon = !isOwned && Boolean(item.comingSoon);
+            const requiredCount = item.requiredPatientsServed ?? 0;
+            const isPatientGated =
+              !isOwned &&
+              !isComingSoon &&
+              requiredCount > 0 &&
+              patientsServed < requiredCount;
             const canAfford = cash >= item.cost;
+            const progressPct =
+              requiredCount > 0
+                ? Math.min(100, Math.round((patientsServed / requiredCount) * 100))
+                : 100;
 
             return (
               <div
@@ -264,7 +328,11 @@ export const ShopView: React.FC<ShopViewProps> = ({
                 className={`rounded-xl border p-5 flex flex-col justify-between gap-4 transition-colors ${
                   isOwned
                     ? 'border-emerald-800/60 bg-emerald-950/15'
-                    : 'border-slate-800 bg-[#131C29]'
+                    : isComingSoon
+                      ? 'border-slate-700/80 bg-[#101824] opacity-90'
+                      : isPatientGated
+                        ? 'border-amber-700/50 bg-[#121824]'
+                        : 'border-slate-800 bg-[#131C29]'
                 }`}
               >
                 <div className="space-y-4">
@@ -275,22 +343,62 @@ export const ShopView: React.FC<ShopViewProps> = ({
                   />
 
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      {CATEGORY_ICON[item.category]}
-                      <h4 className="text-base font-bold text-white leading-snug">
-                        {item.titleAr}
-                      </h4>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {CATEGORY_ICON[item.category]}
+                        <h4 className="text-base font-bold text-white leading-snug">
+                          {item.titleAr}
+                        </h4>
+                      </div>
+                      {isComingSoon && (
+                        <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[11px] font-bold shrink-0">
+                          قريباً
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                       <span>{item.subtitleAr}</span>
                       <span aria-hidden="true">·</span>
-                      <span className="text-cyan-300">
+                      <span
+                        className={
+                          isComingSoon ? 'text-amber-300' : 'text-cyan-300'
+                        }
+                      >
                         {item.benefitSummaryAr}
                       </span>
                     </div>
                     <p className="text-xs text-slate-300/90 leading-relaxed">
                       {item.descriptionAr}
                     </p>
+
+                    {isComingSoon && (
+                      <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-2.5 flex items-center gap-2 text-[11px] font-semibold text-amber-200">
+                        <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>
+                          غير متوفر للشراء حالياً — سيتاح قريباً حتى مع توفر الرصيد
+                        </span>
+                      </div>
+                    )}
+
+                    {isPatientGated && (
+                      <div className="rounded-lg border border-amber-700/50 bg-amber-950/25 p-2.5 space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-amber-200">
+                          <span className="flex items-center gap-1">
+                            <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span>يُفتح بعد فحص {requiredCount} مريض</span>
+                          </span>
+                          <span className="font-mono-num">
+                            {patientsServed}/{requiredCount}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                          <div
+                            style={{width: `${progressPct}%`}}
+                            className="h-full bg-amber-400 transition-all"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -307,11 +415,17 @@ export const ShopView: React.FC<ShopViewProps> = ({
                   ) : (
                     <button
                       type="button"
-                      disabled={!canAfford}
+                      disabled={isComingSoon || isPatientGated || !canAfford}
                       onClick={() => onBuyUpgrade(item.id)}
                       className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer disabled:cursor-not-allowed transition-colors"
                     >
-                      {canAfford ? 'شراء وتركيب' : 'رصيد غير كافٍ'}
+                      {isComingSoon
+                        ? 'غير متوفر حالياً'
+                        : isPatientGated
+                          ? `مقفل (${patientsServed}/${requiredCount})`
+                          : canAfford
+                            ? 'شراء وتركيب'
+                            : 'رصيد غير كافٍ'}
                     </button>
                   )}
                 </div>
