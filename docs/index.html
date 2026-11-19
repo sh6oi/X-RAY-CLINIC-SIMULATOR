@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>محاكاة تقني الأشعة — عيادة التصوير الطبي</title>
+    <meta
+      name="description"
+      content="لعبة محاكاة واقعية ثلاثية الأبعاد لعمل تقني الأشعة داخل عيادة التصوير الطبي: استقبال المرضى، ضبط وضعيات التصوير والأفلام، شراء مستلزمات التصوير، وتطوير العيادة."
+    />
+    <meta property="og:title" content="محاكاة تقني الأشعة — عيادة التصوير الطبي" />
+    <meta
+      property="og:description"
+      content="لعبة محاكاة واقعية ثلاثية الأبعاد لعمل تقني الأشعة داخل عيادة التصوير الطبي."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Auto-route to prebuilt ./docs/ only when raw unbuilt index.html is served on static hosting (e.g., GitHub Pages from root branch)
+      (function () {
+        window.__RADIOLOGY_BOOT_CHECK__ = function () {
+          if (window.__RADIOLOGY_APP_MOUNTED__) return;
+          var hasRawTsxEntry = !!document.querySelector('script[src="/src/main.tsx"]');
+          if (!hasRawTsxEntry) return;
+          var target =
+            location.pathname.endsWith('/') || location.pathname.endsWith('.html')
+              ? './docs/'
+              : location.pathname + '/docs/';
+          window.location.replace(target);
+        };
+        if (location.hostname.endsWith('github.io')) {
+          document.addEventListener('DOMContentLoaded', function () {
+            if (document.querySelector('script[src="/src/main.tsx"]')) {
+              window.__RADIOLOGY_BOOT_CHECK__();
+            }
+          });
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-CEN8GLxR.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CpkPgKis.css">
+  </head>
+  <body
+    class="bg-[#070C14] text-slate-100 antialiased selection:bg-cyan-500/30 selection:text-cyan-100"
+    style="background-color:#070C14;color:#F1F5F9;margin:0;min-height:100vh;"
+  >
+    <div id="root">
+      <main
+        style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;"
+      >
+        <div
+          style="max-width:460px;width:100%;padding:28px;border-radius:16px;border:1px solid #1E293B;background-color:#0E1726;"
+        >
+          <h1
+            style="margin:0 0 8px;font-family:'Cairo',system-ui,sans-serif;font-size:22px;font-weight:800;color:#FFFFFF;"
+          >
+            عيادة الأشعة التخصصية
+          </h1>
+          <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#94A3B8;">
+            محاكاة تقني الأشعة ثلاثية الأبعاد — جاري تهيئة غرفة التصوير وتحميل المعدات الطبية...
+          </p>
+          <div
+            style="width:36px;height:36px;margin:0 auto;border-radius:9999px;border:3px solid rgba(34,211,238,0.25);border-top-color:#22D3EE;"
+          ></div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

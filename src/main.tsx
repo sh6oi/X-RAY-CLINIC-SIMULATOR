@@ -72,6 +72,8 @@ class RootErrorBoundary extends React.Component<
   }
 }
 
+(window as {__RADIOLOGY_APP_MOUNTED__?: boolean}).__RADIOLOGY_APP_MOUNTED__ = true;
+
 createRoot(document.getElementById('root')!).render(
   <RootErrorBoundary>
     <App />

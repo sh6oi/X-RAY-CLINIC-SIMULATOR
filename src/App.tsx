@@ -143,7 +143,17 @@ export default function App() {
 
   // Listen for persistent Firebase Auth session across visits/days
   useEffect(() => {
+    let settled = false;
+    const fallbackTimer = window.setTimeout(() => {
+      if (!settled) {
+        setAuthChecking(false);
+      }
+    }, 4000);
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      settled = true;
+      window.clearTimeout(fallbackTimer);
+
       if (!user) {
         setTechProfile(null);
         setScreenMode('AUTH');
@@ -168,7 +178,10 @@ export default function App() {
       setAuthChecking(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      window.clearTimeout(fallbackTimer);
+      unsubscribe();
+    };
   }, []);
 
   // Sync sound preference & debounced save
