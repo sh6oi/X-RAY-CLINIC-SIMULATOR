@@ -7,6 +7,12 @@
     --font-mono: 'IBM Plex Mono', monospace;
   }
 
+  html,
+  body {
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+
   body {
     font-family: var(--font-sans);
     background-color: #070C14;
@@ -26,11 +32,19 @@
   }
 }
 
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Precision medical range dials */
 input[type="range"].radiology-slider {
   -webkit-appearance: none;
   appearance: none;
-  height: 7px;
+  height: 8px;
   border-radius: 999px;
   background: linear-gradient(90deg, #162235 0%, #1E324B 100%);
   border: 1px solid rgba(56, 189, 248, 0.16);
@@ -40,8 +54,8 @@ input[type="range"].radiology-slider {
 input[type="range"].radiology-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #A5F3FC 0%, #06B6D4 70%);
   border: 2px solid #070C14;
@@ -56,8 +70,8 @@ input[type="range"].radiology-slider::-webkit-slider-thumb:hover {
 }
 
 input[type="range"].radiology-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: #22D3EE;
   border: 2px solid #070C14;

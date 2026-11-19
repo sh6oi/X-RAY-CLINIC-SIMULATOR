@@ -81,21 +81,44 @@ export function getLocalBackupKey(uid: string): string {
   return `radiology_clinic_save_uid_${uid}`;
 }
 
+function getProgressScore(s: Partial<ClinicSaveState> | null | undefined): number {
+  if (!s) return -1;
+  return (
+    (s.patientsServed || 0) * 10000 +
+    (s.totalRevenue || 0) * 10 +
+    (s.ownedUpgrades?.length || 0) * 500 +
+    (s.cartonsBought || 0) * 50
+  );
+}
+
+export function saveClinicProgressLocal(
+  uid: string,
+  saveState: ClinicSaveState
+): ClinicSaveState {
+  const stamped: ClinicSaveState = {
+    ...saveState,
+    updatedAt: saveState.updatedAt || Date.now(),
+  };
+  try {
+    localStorage.setItem(getLocalBackupKey(uid), JSON.stringify(stamped));
+  } catch {
+    // Ignore storage quota issues
+  }
+  return stamped;
+}
+
 export async function saveClinicProgressToCloud(
   uid: string,
   saveState: ClinicSaveState
 ): Promise<{synced: boolean}> {
-  try {
-    localStorage.setItem(getLocalBackupKey(uid), JSON.stringify(saveState));
-  } catch {
-    // Ignore storage quota issues
-  }
+  const stamped: ClinicSaveState = {
+    ...saveState,
+    updatedAt: Date.now(),
+  };
+  saveClinicProgressLocal(uid, stamped);
 
   try {
-    await set(ref(rtdb, `clinics/${uid}/save`), {
-      ...saveState,
-      updatedAt: Date.now(),
-    });
+    await set(ref(rtdb, `clinics/${uid}/save`), stamped);
     return {synced: true};
   } catch {
     return {synced: false};
@@ -106,31 +129,46 @@ export async function loadClinicProgressFromCloud(uid: string): Promise<{
   saveState: ClinicSaveState | null;
   synced: boolean;
 }> {
-  try {
-    const snap = await get(ref(rtdb, `clinics/${uid}/save`));
-    if (snap.exists()) {
-      const data = snap.val() as ClinicSaveState;
-      try {
-        localStorage.setItem(getLocalBackupKey(uid), JSON.stringify(data));
-      } catch {
-        // Ignore
-      }
-      return {saveState: data, synced: true};
-    }
-  } catch {
-    // Fallback silently to local cache
-  }
-
+  let localData: ClinicSaveState | null = null;
   try {
     const cached = localStorage.getItem(getLocalBackupKey(uid));
     if (cached) {
-      return {
-        saveState: JSON.parse(cached) as ClinicSaveState,
-        synced: false,
-      };
+      localData = JSON.parse(cached) as ClinicSaveState;
     }
   } catch {
-    // Ignore
+    localData = null;
+  }
+
+  try {
+    const snap = await get(ref(rtdb, `clinics/${uid}/save`));
+    if (snap.exists()) {
+      const cloudData = snap.val() as ClinicSaveState;
+      const cloudTime = cloudData.updatedAt || 0;
+      const localTime = localData?.updatedAt || 0;
+
+      // Keep whichever snapshot is newer or clearly holds further progress
+      if (
+        localData &&
+        (localTime > cloudTime ||
+          (localTime === cloudTime &&
+            getProgressScore(localData) > getProgressScore(cloudData)))
+      ) {
+        void set(ref(rtdb, `clinics/${uid}/save`), localData).catch(() => {});
+        return {saveState: localData, synced: true};
+      }
+
+      saveClinicProgressLocal(uid, cloudData);
+      return {saveState: cloudData, synced: true};
+    }
+  } catch {
+    // Fallback cleanly to local cache
+  }
+
+  if (localData) {
+    return {
+      saveState: localData,
+      synced: false,
+    };
   }
 
   return {saveState: null, synced: false};
@@ -155,6 +193,13 @@ export async function registerTechAccount(params: {
     await updateProfile(cred.user, {displayName: cleanName});
   }
 
+  const stampedInit: ClinicSaveState = {
+    ...params.initialSave,
+    updatedAt: Date.now(),
+  };
+
+  saveClinicProgressLocal(cred.user.uid, stampedInit);
+
   try {
     await set(ref(rtdb, `clinics/${cred.user.uid}`), {
       profile: {
@@ -162,27 +207,15 @@ export async function registerTechAccount(params: {
         email: cleanEmail,
         createdAt: Date.now(),
       },
-      save: {
-        ...params.initialSave,
-        updatedAt: Date.now(),
-      },
+      save: stampedInit,
     });
   } catch {
     // Local cache handles persistence silently if RTDB rules aren't open yet
   }
 
-  try {
-    localStorage.setItem(
-      getLocalBackupKey(cred.user.uid),
-      JSON.stringify(params.initialSave)
-    );
-  } catch {
-    // Ignore
-  }
-
   return {
     user: cred.user,
-    saveState: params.initialSave,
+    saveState: stampedInit,
   };
 }
 

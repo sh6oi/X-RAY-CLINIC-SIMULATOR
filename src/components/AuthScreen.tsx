@@ -80,8 +80,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     <div className="min-h-screen bg-[#0B111A] text-slate-100 flex flex-col">
       {/* 3-Zone Top Bar */}
       <header className="border-b border-slate-800/90 bg-[#0D1520]">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-8">
-          <span className="text-lg font-display font-bold text-white whitespace-nowrap shrink-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-4 sm:gap-8">
+          <span className="text-base sm:text-lg font-display font-bold text-white whitespace-nowrap shrink-0">
             عيادة الأشعة التخصصية
           </span>
           <div className="hidden md:flex items-center gap-6 text-sm text-slate-400">
@@ -94,17 +94,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <button
             type="button"
             onClick={() => setMode(mode === 'LOGIN' ? 'REGISTER' : 'LOGIN')}
-            className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+            className="px-3.5 sm:px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
           >
             {mode === 'LOGIN' ? 'إنشاء حساب جديد' : 'لدي حساب مسبق'}
           </button>
         </div>
       </header>
 
-      <main className="flex-1 flex items-center py-10 px-6">
-        <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+      <main className="flex-1 flex items-center py-5 sm:py-10 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch">
           {/* Form Column */}
-          <div className="lg:col-span-5 rounded-2xl border border-slate-800 bg-[#111A27] p-7 sm:p-8 flex flex-col justify-between gap-6">
+          <div className="lg:col-span-5 rounded-2xl border border-slate-800 bg-[#111A27] p-5 sm:p-8 flex flex-col justify-between gap-6">
             <div className="space-y-5">
               <div className="space-y-2">
                 <h1 className="text-2xl sm:text-3xl font-display font-bold text-white [text-wrap:balance]">
@@ -176,7 +176,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="مثال: تقني أشعة مجتبى كريم"
-                        className="w-full rounded-lg border border-slate-700 bg-[#0B111A] pr-10 pl-3.5 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+                        className="w-full rounded-lg border border-slate-700 bg-[#0B111A] pr-10 pl-3.5 py-2.5 text-base sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
                       />
                     </div>
                   </div>
@@ -199,7 +199,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@example.com"
-                      className="w-full rounded-lg border border-slate-700 bg-[#0B111A] pr-10 pl-3.5 py-2.5 text-sm text-white text-left placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+                      className="w-full rounded-lg border border-slate-700 bg-[#0B111A] pr-10 pl-3.5 py-2.5 text-base sm:text-sm text-white text-left placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
                     />
                   </div>
                 </div>
@@ -222,7 +222,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full rounded-lg border border-slate-700 bg-[#0B111A] pr-10 pl-3.5 py-2.5 text-sm text-white text-left placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+                      className="w-full rounded-lg border border-slate-700 bg-[#0B111A] pr-10 pl-3.5 py-2.5 text-base sm:text-sm text-white text-left placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
                     />
                   </div>
                 </div>

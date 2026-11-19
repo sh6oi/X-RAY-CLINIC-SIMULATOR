@@ -123,8 +123,11 @@ export interface ClinicRank {
   subtitleAr: string;
 }
 
-export type ScreenMode = 'AUTH' | 'TITLE_MENU' | 'PLAYING';
-export type WorkspaceTab = 'CLINIC' | 'SHOP' | 'LOG' | 'PROTOCOLS';
+export type TechLocation = 'ROOM' | 'BOOTH';
+export type CassetteState = 'RACK' | 'IN_HAND' | 'TABLE_BUCKY' | 'WALL_BUCKY';
+
+export type ScreenMode = 'AUTH' | 'PLAYING';
+export type WorkspaceTab = 'IMAGE' | 'LOG' | 'SHOP' | 'PROTOCOLS';
 
 export interface ClinicSaveState {
   cash: number;
@@ -137,4 +140,5 @@ export interface ClinicSaveState {
   ownedUpgrades: UpgradeId[];
   completedCases: CompletedCase[];
   soundEnabled: boolean;
+  updatedAt?: number;
 }
