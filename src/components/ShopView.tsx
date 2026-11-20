@@ -15,11 +15,13 @@ import type {UpgradeId, UpgradeItem} from '../types/radiology';
 import {
   BULK_CARTON_COST,
   BULK_CARTON_SIZE,
+  EMERGENCY_LOAN_DEBT,
   FILM_CARTON_COST,
   FILM_CARTON_IMAGE,
   FILM_CARTON_SIZE,
   UPGRADES,
 } from '../data/radiologyData';
+import {UPGRADE_EN, useLanguage} from '../i18n/translations';
 
 interface ShopViewProps {
   cash: number;
@@ -39,14 +41,21 @@ const CATEGORY_ICON: Record<string, React.ReactNode> = {
   staff: <Users className="w-4 h-4 text-amber-400 shrink-0" />,
 };
 
-const CATEGORY_FILTERS: {id: 'ALL' | UpgradeItem['category']; label: string}[] =
-  [
-    {id: 'ALL', label: 'الكل'},
-    {id: 'safety', label: 'السلامة والحماية'},
-    {id: 'efficiency', label: 'أدوات مساعدة للتقني'},
-    {id: 'modality', label: 'الأجهزة والأجنحة'},
-    {id: 'staff', label: 'الطاقم'},
-  ];
+const CATEGORY_FILTERS: {
+  id: 'ALL' | UpgradeItem['category'];
+  labelAr: string;
+  labelEn: string;
+}[] = [
+  {id: 'ALL', labelAr: 'الكل', labelEn: 'All'},
+  {id: 'safety', labelAr: 'السلامة والحماية', labelEn: 'Radiation Safety'},
+  {
+    id: 'efficiency',
+    labelAr: 'أدوات مساعدة للتقني',
+    labelEn: 'Tech Efficiency',
+  },
+  {id: 'modality', labelAr: 'الأجهزة والأجنحة', labelEn: 'Systems & Suites'},
+  {id: 'staff', labelAr: 'الطاقم', labelEn: 'Staffing'},
+];
 
 const ShopImageFrame: React.FC<{
   src: string;
@@ -85,6 +94,9 @@ export const ShopView: React.FC<ShopViewProps> = ({
   onTakeEmergencyLoan,
   onBuyUpgrade,
 }) => {
+  const {lang} = useLanguage();
+  const isAr = lang === 'ar';
+
   const [categoryFilter, setCategoryFilter] = useState<
     'ALL' | UpgradeItem['category']
   >('ALL');
@@ -101,33 +113,47 @@ export const ShopView: React.FC<ShopViewProps> = ({
     [categoryFilter]
   );
 
+  const perFilmCost = (FILM_CARTON_COST / FILM_CARTON_SIZE).toFixed(2);
+  const perBulkFilmCost = (BULK_CARTON_COST / BULK_CARTON_SIZE).toFixed(2);
+  const bulkSavings = FILM_CARTON_COST * 5 - BULK_CARTON_COST;
+
   return (
     <div className="space-y-8">
       {/* Header Summary */}
       <div className="flex flex-wrap items-end justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-white">
-            متجر مستلزمات وتجهيزات الأشعة
+            {isAr
+              ? 'متجر مستلزمات وتجهيزات الأشعة'
+              : 'Radiology Equipment & Supplies Shop'}
           </h2>
           <p className="mt-1 text-sm text-slate-400">
-            اشترِ كراتين الأفلام والأدوات المساعدة لتقني الأشعة وتجهيزات العيادة المميزة (أقسام السيتي والرنين قريباً).
+            {isAr
+              ? 'اشترِ كراتين الأفلام والأدوات المساعدة لتقني الأشعة وتجهيزات العيادة، أو طوّر جهازك إلى DR للاستغناء عن قارئ الكاسيت CR.'
+              : 'Purchase X-ray film cartons, technologist tools, and clinic upgrades — or upgrade to Digital DR to bypass the CR cassette reader.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-5 text-sm">
           <div>
-            <span className="text-slate-400">الرصيد المتاح: </span>
+            <span className="text-slate-400">
+              {isAr ? 'الرصيد المتاح: ' : 'Available Cash: '}
+            </span>
             <span className="font-mono-num font-bold text-emerald-400 text-base">
               ${cash.toLocaleString('en-US')}
             </span>
           </div>
           <div>
-            <span className="text-slate-400">المرضى المفحوصون: </span>
+            <span className="text-slate-400">
+              {isAr ? 'المرضى المفحوصون: ' : 'Patients Served: '}
+            </span>
             <span className="font-mono-num font-bold text-cyan-300 text-base">
               {patientsServed}
             </span>
           </div>
           <div>
-            <span className="text-slate-400">مخزون الأفلام: </span>
+            <span className="text-slate-400">
+              {isAr ? 'مخزون الأفلام: ' : 'Film Stock: '}
+            </span>
             <span
               className={`font-mono-num font-bold text-base ${
                 hasDR
@@ -137,7 +163,13 @@ export const ShopView: React.FC<ShopViewProps> = ({
                     : 'text-slate-100'
               }`}
             >
-              {hasDR ? 'رقمي غير محدود' : `${films} فيلم`}
+              {hasDR
+                ? isAr
+                  ? 'رقمي غير محدود (DR)'
+                  : 'Unlimited Digital (DR)'
+                : isAr
+                  ? `${films} فيلم`
+                  : `${films} films`}
             </span>
           </div>
         </div>
@@ -150,10 +182,14 @@ export const ShopView: React.FC<ShopViewProps> = ({
             <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
               <h3 className="text-sm font-bold text-amber-200">
-                توريد طارئ للأفلام من المستودع الطبي
+                {isAr
+                  ? 'توريد طارئ للأفلام من المستودع الطبي'
+                  : 'Emergency Film Supply Credit'}
               </h3>
               <p className="mt-1 text-xs text-amber-100/80 leading-relaxed">
-                نفدت جميع أفلامك ولا تملك $100 حالياً لشراء كرتون كامل. يمكنك طلب حزمة طوارئ (10 أفلام أشعة) وتُسدد قيمتها ($50) تلقائياً من عوائد المرضى القادمين.
+                {isAr
+                  ? `نفدت جميع أفلامك ولا تملك $${FILM_CARTON_COST} حالياً لشراء كرتون كامل. يمكنك طلب حزمة طوارئ (10 أفلام أشعة) وتُسدد قيمتها ($${EMERGENCY_LOAN_DEBT}) تلقائياً من عوائد المرضى القادمين.`
+                  : `You ran out of films and don't have $${FILM_CARTON_COST} for a full carton. Request an emergency 10-film pack ($${EMERGENCY_LOAN_DEBT} deferred credit deducted automatically from upcoming patients).`}
               </p>
             </div>
           </div>
@@ -162,14 +198,20 @@ export const ShopView: React.FC<ShopViewProps> = ({
             onClick={onTakeEmergencyLoan}
             className="px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm whitespace-nowrap shrink-0 cursor-pointer transition-colors"
           >
-            استلام 10 أفلام طارئة (آجل $50)
+            {isAr
+              ? `استلام 10 أفلام طارئة (آجل $${EMERGENCY_LOAN_DEBT})`
+              : `Get 10 Emergency Films ($${EMERGENCY_LOAN_DEBT} Credit)`}
           </button>
         </div>
       )}
 
       {filmDebt > 0 && (
         <div className="rounded-lg border border-slate-800 bg-[#131C29] px-4 py-3 text-xs text-amber-300 flex items-center justify-between">
-          <span>مستحقات آجل للموزع الطبي سيتم خصمها تدريجياً من الفحوصات:</span>
+          <span>
+            {isAr
+              ? 'مستحقات آجل للموزع الطبي سيتم خصمها تدريجياً من الفحوصات:'
+              : 'Outstanding distributor credit to be deducted gradually:'}
+          </span>
           <span className="font-mono-num font-bold">${filmDebt}</span>
         </div>
       )}
@@ -178,21 +220,23 @@ export const ShopView: React.FC<ShopViewProps> = ({
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-100">
-            أفلام التصوير الإشعاعي
+            {isAr ? 'أفلام التصوير الإشعاعي (CR)' : 'CR X-Ray Film Packs'}
           </h3>
           {hasDR && (
             <span className="text-xs text-cyan-300">
-              تم تفعيل التصوير الرقمي DR — لا حاجة للأفلام التقليدية
+              {isAr
+                ? 'تم تفعيل التصوير الرقمي DR — لا حاجة للأفلام أو قارئ CR'
+                : 'Digital DR Active — Films & CR Reader no longer required'}
             </span>
           )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Standard 20-Film Carton ($100) */}
+          {/* Standard 20-Film Carton */}
           <div className="rounded-xl border border-slate-800 bg-[#131C29] p-5 flex flex-col justify-between gap-4">
             <ShopImageFrame
               src={FILM_CARTON_IMAGE}
-              alt="كرتون أفلام أشعة سينية 20 فيلم"
+              alt={isAr ? 'كرتون أفلام أشعة سينية 20 فيلم' : '20 X-Ray Film Carton'}
               fallbackIcon={<Package className="w-7 h-7 text-cyan-400" />}
             />
 
@@ -200,12 +244,18 @@ export const ShopView: React.FC<ShopViewProps> = ({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h4 className="text-base font-bold text-white">
-                    كرتون أفلام أشعة (20 فيلم)
+                    {isAr
+                      ? `كرتون أفلام أشعة (${FILM_CARTON_SIZE} فيلم)`
+                      : `Standard Film Carton (${FILM_CARTON_SIZE} Films)`}
                   </h4>
                   <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-                    <span>20 فيلم أشعة سينية</span>
+                    <span>
+                      {isAr ? `${FILM_CARTON_SIZE} فيلم أشعة سينية` : `${FILM_CARTON_SIZE} X-ray sheets`}
+                    </span>
                     <span aria-hidden="true">·</span>
-                    <span>$5 لكل فيلم</span>
+                    <span>
+                      {isAr ? `$${perFilmCost} لكل فيلم` : `$${perFilmCost} per film`}
+                    </span>
                   </div>
                 </div>
                 <span className="font-mono-num text-lg font-bold text-emerald-400 shrink-0">
@@ -213,7 +263,9 @@ export const ShopView: React.FC<ShopViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                الكرتون القياسي المعتمد في العيادات؛ يحقق صافي ربح $200 عند تصوير 20 مريضاً بنجاح ($300 إيرادات - $100 تكلفة).
+                {isAr
+                  ? `الكرتون القياسي لكاسيت الـ CR في العيادات؛ يحقق أرباحاً مضاعفة عند إتمام 20 فحصاً بدقة.`
+                  : 'Standard CR cassette film carton for daily imaging; generates strong clinic profit when exams succeed on the first shot.'}
               </p>
             </div>
 
@@ -226,17 +278,21 @@ export const ShopView: React.FC<ShopViewProps> = ({
               <ShoppingCart className="w-4 h-4 shrink-0" />
               <span>
                 {hasDR
-                  ? 'غير مطلوب مع جهاز DR'
-                  : `شراء كرتون (${FILM_CARTON_SIZE} فيلم) — $${FILM_CARTON_COST}`}
+                  ? isAr
+                    ? 'غير مطلوب مع جهاز DR'
+                    : 'Not needed with DR'
+                  : isAr
+                    ? `شراء كرتون (${FILM_CARTON_SIZE} فيلم) — $${FILM_CARTON_COST}`
+                    : `Buy Carton (${FILM_CARTON_SIZE} Films) — $${FILM_CARTON_COST}`}
               </span>
             </button>
           </div>
 
-          {/* Bulk 5-Carton Pack ($450) */}
+          {/* Bulk 5-Carton Pack */}
           <div className="rounded-xl border border-slate-800 bg-[#131C29] p-5 flex flex-col justify-between gap-4">
             <ShopImageFrame
               src={FILM_CARTON_IMAGE}
-              alt="حزمة جملة 5 كراتين أفلام أشعة"
+              alt={isAr ? 'حزمة جملة 5 كراتين أفلام أشعة' : '5-Carton Bulk Pack'}
               fallbackIcon={<Package className="w-7 h-7 text-slate-300" />}
             />
 
@@ -244,12 +300,18 @@ export const ShopView: React.FC<ShopViewProps> = ({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h4 className="text-base font-bold text-white">
-                    حزمة جملة (5 كراتين · 100 فيلم)
+                    {isAr
+                      ? `حزمة جملة (5 كراتين · ${BULK_CARTON_SIZE} فيلم)`
+                      : `Bulk Pack (5 Cartons · ${BULK_CARTON_SIZE} Films)`}
                   </h4>
                   <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-                    <span>100 فيلم</span>
+                    <span>
+                      {isAr ? `${BULK_CARTON_SIZE} فيلم` : `${BULK_CARTON_SIZE} films`}
+                    </span>
                     <span aria-hidden="true">·</span>
-                    <span>توفير $50</span>
+                    <span>
+                      {isAr ? `توفير $${bulkSavings}` : `Save $${bulkSavings}`}
+                    </span>
                   </div>
                 </div>
                 <span className="font-mono-num text-lg font-bold text-emerald-400 shrink-0">
@@ -257,7 +319,9 @@ export const ShopView: React.FC<ShopViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                توريد اقتصادي مخصص للعيادات المزدحمة؛ يغنيك عن إعادة الطلب المتكرر ويخفض تكلفة الفيلم إلى $4.50.
+                {isAr
+                  ? `توريد اقتصادي مخصص للعيادات المزدحمة؛ يخفض تكلفة الفيلم إلى $${perBulkFilmCost} ويقلل حاجتك لإعادة الطلب.`
+                  : `Cost-effective bulk pack for busy clinics, lowering unit cost to $${perBulkFilmCost} per film.`}
               </p>
             </div>
 
@@ -270,8 +334,12 @@ export const ShopView: React.FC<ShopViewProps> = ({
               <ShoppingCart className="w-4 h-4 shrink-0" />
               <span>
                 {hasDR
-                  ? 'غير مطلوب مع جهاز DR'
-                  : `شراء 5 كراتين (${BULK_CARTON_SIZE} فيلم) — $${BULK_CARTON_COST}`}
+                  ? isAr
+                    ? 'غير مطلوب مع جهاز DR'
+                    : 'Not needed with DR'
+                  : isAr
+                    ? `شراء 5 كراتين (${BULK_CARTON_SIZE} فيلم) — $${BULK_CARTON_COST}`
+                    : `Buy 5 Cartons (${BULK_CARTON_SIZE} Films) — $${BULK_CARTON_COST}`}
               </span>
             </button>
           </div>
@@ -282,7 +350,9 @@ export const ShopView: React.FC<ShopViewProps> = ({
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-bold text-slate-100">
-            الأدوات المساعدة والأجهزة الطبية وترقيات العيادة
+            {isAr
+              ? 'الأدوات المساعدة والأجهزة الطبية وترقيات العيادة'
+              : 'Technologist Tools, Systems & Clinic Upgrades'}
           </h3>
 
           <div className="flex flex-wrap items-center gap-1.5">
@@ -299,7 +369,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
                       : 'bg-[#121B29] border-slate-800 text-slate-300 hover:border-slate-600'
                   }`}
                 >
-                  {c.label}
+                  {isAr ? c.labelAr : c.labelEn}
                 </button>
               );
             })}
@@ -322,6 +392,12 @@ export const ShopView: React.FC<ShopViewProps> = ({
                 ? Math.min(100, Math.round((patientsServed / requiredCount) * 100))
                 : 100;
 
+            const enCopy = UPGRADE_EN[item.id];
+            const title = isAr ? item.titleAr : enCopy.title;
+            const subtitle = isAr ? item.subtitleAr : item.titleAr;
+            const benefit = isAr ? item.benefitSummaryAr : enCopy.benefit;
+            const description = isAr ? item.descriptionAr : enCopy.description;
+
             return (
               <div
                 key={item.id}
@@ -338,7 +414,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
                 <div className="space-y-4">
                   <ShopImageFrame
                     src={item.imagePath}
-                    alt={item.titleAr}
+                    alt={title}
                     fallbackIcon={CATEGORY_ICON[item.category]}
                   />
 
@@ -347,35 +423,37 @@ export const ShopView: React.FC<ShopViewProps> = ({
                       <div className="flex items-center gap-2 min-w-0">
                         {CATEGORY_ICON[item.category]}
                         <h4 className="text-base font-bold text-white leading-snug">
-                          {item.titleAr}
+                          {title}
                         </h4>
                       </div>
                       {isComingSoon && (
                         <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[11px] font-bold shrink-0">
-                          قريباً
+                          {isAr ? 'قريباً' : 'Soon'}
                         </span>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                      <span>{item.subtitleAr}</span>
+                      <span>{subtitle}</span>
                       <span aria-hidden="true">·</span>
                       <span
                         className={
                           isComingSoon ? 'text-amber-300' : 'text-cyan-300'
                         }
                       >
-                        {item.benefitSummaryAr}
+                        {benefit}
                       </span>
                     </div>
                     <p className="text-xs text-slate-300/90 leading-relaxed">
-                      {item.descriptionAr}
+                      {description}
                     </p>
 
                     {isComingSoon && (
                       <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-2.5 flex items-center gap-2 text-[11px] font-semibold text-amber-200">
                         <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                         <span>
-                          غير متوفر للشراء حالياً — سيتاح قريباً حتى مع توفر الرصيد
+                          {isAr
+                            ? 'غير متوفر للشراء حالياً — سيتاح قريباً حتى مع توفر الرصيد'
+                            : 'Currently unavailable for purchase — coming soon'}
                         </span>
                       </div>
                     )}
@@ -385,7 +463,11 @@ export const ShopView: React.FC<ShopViewProps> = ({
                         <div className="flex items-center justify-between text-[11px] font-semibold text-amber-200">
                           <span className="flex items-center gap-1">
                             <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span>يُفتح بعد فحص {requiredCount} مريض</span>
+                            <span>
+                              {isAr
+                                ? `يُفتح بعد فحص ${requiredCount} مريض`
+                                : `Unlocks after ${requiredCount} patients`}
+                            </span>
                           </span>
                           <span className="font-mono-num">
                             {patientsServed}/{requiredCount}
@@ -410,7 +492,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
                   {isOwned ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
                       <Check className="w-4 h-4 shrink-0" />
-                      <span>تم التركيب في العيادة</span>
+                      <span>{isAr ? 'تم التركيب في العيادة' : 'Installed'}</span>
                     </span>
                   ) : (
                     <button
@@ -420,12 +502,20 @@ export const ShopView: React.FC<ShopViewProps> = ({
                       className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer disabled:cursor-not-allowed transition-colors"
                     >
                       {isComingSoon
-                        ? 'غير متوفر حالياً'
+                        ? isAr
+                          ? 'غير متوفر حالياً'
+                          : 'Unavailable'
                         : isPatientGated
-                          ? `مقفل (${patientsServed}/${requiredCount})`
+                          ? isAr
+                            ? `مقفل (${patientsServed}/${requiredCount})`
+                            : `Locked (${patientsServed}/${requiredCount})`
                           : canAfford
-                            ? 'شراء وتركيب'
-                            : 'رصيد غير كافٍ'}
+                            ? isAr
+                              ? 'شراء وتركيب'
+                              : 'Buy & Install'
+                            : isAr
+                              ? 'رصيد غير كافٍ'
+                              : 'Insufficient Cash'}
                     </button>
                   )}
                 </div>

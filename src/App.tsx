@@ -8,9 +8,11 @@ import {
   DoorOpen,
   Film,
   Hand,
+  Languages,
   LogOut,
   Monitor,
   Package,
+  ScanLine,
   Shield,
   Sliders,
   UserCheck,
@@ -35,16 +37,23 @@ import type {
 import {
   BULK_CARTON_COST,
   BULK_CARTON_SIZE,
+  EMERGENCY_LOAN_DEBT,
   FILM_CARTON_COST,
   FILM_CARTON_SIZE,
-  POSTURE_SHORT_AR,
-  REGION_LABELS_AR,
   UPGRADES,
   evaluateExposure,
   generatePatient,
   getClinicRank,
   getExamById,
 } from './data/radiologyData';
+import {
+  POSTURE_SHORT_I18N,
+  RANK_TITLES_I18N,
+  REGION_LABELS_I18N,
+  REGION_SHORT_I18N,
+  UPGRADE_EN,
+  useLanguage,
+} from './i18n/translations';
 import {
   auth,
   loadClinicProgressFromCloud,
@@ -61,6 +70,7 @@ import {
 import {ClinicPCModal} from './components/ClinicPCModal';
 import {ExposureConsolePanel} from './components/ExposureConsolePanel';
 import {VirtualJoystick} from './components/VirtualJoystick';
+import {DesignerCredit} from './components/DesignerCredit';
 import {soundFx} from './utils/soundFx';
 
 const INITIAL_SAVE: ClinicSaveState = {
@@ -98,15 +108,15 @@ function buildStarterQueue(upgrades: UpgradeId[]): PatientCase[] {
   ];
 }
 
-const POSTURE_OPTIONS: {id: PatientPosture; label: string}[] = [
-  {id: 'ERECT_PA', label: 'واقف PA'},
-  {id: 'ERECT_AP', label: 'واقف AP'},
-  {id: 'ERECT_LEFT_LAT', label: 'واقف يسار'},
-  {id: 'ERECT_RIGHT_LAT', label: 'واقف يمين'},
-  {id: 'SUPINE', label: 'على الظهر'},
-  {id: 'PRONE', label: 'على البطن'},
-  {id: 'TABLE_LEFT_LAT', label: 'طاولة يسار'},
-  {id: 'TABLE_RIGHT_LAT', label: 'طاولة يمين'},
+const POSTURE_KEYS: PatientPosture[] = [
+  'ERECT_PA',
+  'ERECT_AP',
+  'ERECT_LEFT_LAT',
+  'ERECT_RIGHT_LAT',
+  'SUPINE',
+  'PRONE',
+  'TABLE_LEFT_LAT',
+  'TABLE_RIGHT_LAT',
 ];
 
 const REGION_OPTIONS: BodyRegion[] = [
@@ -120,6 +130,9 @@ const REGION_OPTIONS: BodyRegion[] = [
 ];
 
 export default function App() {
+  const {lang, toggleLang} = useLanguage();
+  const isAr = lang === 'ar';
+
   const [authChecking, setAuthChecking] = useState<boolean>(true);
   const [techProfile, setTechProfile] = useState<TechProfile | null>(null);
   const [screenMode, setScreenMode] = useState<ScreenMode>('AUTH');
@@ -134,6 +147,7 @@ export default function App() {
   const [ctDoorOpen, setCtDoorOpen] = useState<boolean>(false);
   const [mriDoorOpen, setMriDoorOpen] = useState<boolean>(false);
   const [cassetteState, setCassetteState] = useState<CassetteState>('RACK');
+  const [crExposedPending, setCrExposedPending] = useState<boolean>(false);
 
   // Patient Positioning & Generator Console State
   const [selectedRegion, setSelectedRegion] = useState<BodyRegion>('chest');
@@ -146,12 +160,13 @@ export default function App() {
   const [shieldUsed, setShieldUsed] = useState<boolean>(false);
   const [breathHeld, setBreathHeld] = useState<boolean>(false);
 
-  // Exposure, Developing & Case Approval
+  // Exposure, Developing, Patient Speech & Case Approval
   const [isExposing, setIsExposing] = useState<boolean>(false);
   const [isDeveloping, setIsDeveloping] = useState<boolean>(false);
   const [currentEvaluation, setCurrentEvaluation] =
     useState<ScanEvaluation | null>(null);
   const [caseApproved, setCaseApproved] = useState<boolean>(false);
+  const [patientSpeech, setPatientSpeech] = useState<string | null>(null);
 
   // Control Booth Console Drawer & Clinic PC Modal
   const [consoleOpen, setConsoleOpen] = useState<boolean>(true);
@@ -165,10 +180,13 @@ export default function App() {
   const exposeTimerRef = useRef<number | null>(null);
   const developTimerRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
+  const speechTimerRef = useRef<number | null>(null);
   const cloudSyncTimerRef = useRef<number | null>(null);
   const hydratedUidRef = useRef<string | null>(null);
   const latestSaveRef = useRef<ClinicSaveState>(save);
   const latestUidRef = useRef<string | null>(null);
+  const pendingCrEvalRef = useRef<ScanEvaluation | null>(null);
+  const moveCountRef = useRef<number>(0);
 
   latestSaveRef.current = save;
   latestUidRef.current = techProfile?.uid ?? null;
@@ -178,8 +196,59 @@ export default function App() {
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     toastTimerRef.current = window.setTimeout(() => {
       setToastMsg(null);
-    }, 3800);
+    }, 4000);
   }, []);
+
+  const triggerPatientSpeech = useCallback(
+    (msgAr: string, msgEn: string, durationMs = 6500) => {
+      setPatientSpeech(isAr ? msgAr : msgEn);
+      if (speechTimerRef.current) window.clearTimeout(speechTimerRef.current);
+      speechTimerRef.current = window.setTimeout(() => {
+        setPatientSpeech(null);
+      }, durationMs);
+    },
+    [isAr]
+  );
+
+  const triggerEvaluationSpeech = useCallback(
+    (ev: ScanEvaluation) => {
+      if (ev.success) {
+        triggerPatientSpeech(
+          'ممتاز! فحص سريع ومريح، شكراً جزيلاً لك!',
+          'Great job! Smooth and comfortable scan, thank you!'
+        );
+        return;
+      }
+      switch (ev.reasonCode) {
+        case 'WRONG_REGION':
+          triggerPatientSpeech(
+            'مهلاً! لماذا صوّرت هذا المكان؟ ألمي ليس هنا!',
+            'Hey! Why did you scan there? That is not where it hurts!'
+          );
+          break;
+        case 'WRONG_POSTURE':
+        case 'WRONG_PROJECTION':
+          triggerPatientSpeech(
+            'أشعر أن وضعيتي كانت خاطئة.. هل سنعيد التصوير؟',
+            'That posture felt wrong... do we have to retake it?'
+          );
+          break;
+        case 'UNDEREXPOSED':
+          triggerPatientSpeech(
+            'الصورة باهتة جداً! ألم تكن الجرعة ضعيفة؟',
+            'The scan came out faint! Was the exposure too low?'
+          );
+          break;
+        case 'OVEREXPOSED':
+          triggerPatientSpeech(
+            'يا إلهي! هذه جرعة أشعة قوية جداً، احترقت الصورة!',
+            'Whoa! That radiation dose was way too high!'
+          );
+          break;
+      }
+    },
+    [triggerPatientSpeech]
+  );
 
   // Stamp updatedAt on every state mutation and persist synchronously to localStorage
   const commitSaveUpdate = useCallback(
@@ -219,7 +288,7 @@ export default function App() {
 
       const profile: TechProfile = {
         uid: user.uid,
-        name: user.displayName || user.email?.split('@')[0] || 'تقني الأشعة',
+        name: user.displayName || user.email?.split('@')[0] || 'Radiographer',
         email: user.email || '',
       };
       setTechProfile(profile);
@@ -277,6 +346,7 @@ export default function App() {
       if (exposeTimerRef.current) window.clearTimeout(exposeTimerRef.current);
       if (developTimerRef.current) window.clearTimeout(developTimerRef.current);
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+      if (speechTimerRef.current) window.clearTimeout(speechTimerRef.current);
       if (cloudSyncTimerRef.current)
         window.clearTimeout(cloudSyncTimerRef.current);
     };
@@ -335,6 +405,8 @@ export default function App() {
   );
 
   const currentRank = getClinicRank(save.totalRevenue);
+  const rankTitle =
+    RANK_TITLES_I18N[lang][currentRank.id] || currentRank.titleAr;
   const isChestExam = requestedExam.region === 'chest';
   const effectiveBreathHeld = isChestExam && breathHeld;
   const isBoreScan =
@@ -343,7 +415,8 @@ export default function App() {
   const requiredCassetteSlot: CassetteState = isErect
     ? 'WALL_BUCKY'
     : 'TABLE_BUCKY';
-  const cassetteReady = isBoreScan || cassetteState === requiredCassetteSlot;
+  const cassetteReady =
+    hasDR || isBoreScan || cassetteState === requiredCassetteSlot;
 
   const availableProjections: ProjectionType[] = useMemo(() => {
     const base: ProjectionType[] = ['PA', 'AP', 'LATERAL'];
@@ -352,13 +425,28 @@ export default function App() {
     return base;
   }, [save.ownedUpgrades]);
 
+  const registerPatientMovement = () => {
+    moveCountRef.current += 1;
+    if (moveCountRef.current === 3) {
+      triggerPatientSpeech(
+        'هل أنت مدرك ما تفعل؟ دوّختني من كثرة التحريك!',
+        'Do you know what you are doing? You are making me dizzy moving me so much!'
+      );
+    } else if (moveCountRef.current >= 5 && moveCountRef.current % 2 === 1) {
+      triggerPatientSpeech(
+        'رجاءً استقر على وضعية واحدة، تعبت من الحركة!',
+        'Please pick one posture, I am getting tired of moving!'
+      );
+    }
+  };
+
   const handleAuthenticated = (result: AuthResult) => {
     const profile: TechProfile = {
       uid: result.user.uid,
       name:
         result.user.displayName ||
         result.user.email?.split('@')[0] ||
-        'تقني الأشعة',
+        'Radiographer',
       email: result.user.email || '',
     };
     const restored = sanitizeSaveState(result.saveState);
@@ -382,27 +470,65 @@ export default function App() {
     setScreenMode('AUTH');
   };
 
-  const handleSelectPosture = (posture: PatientPosture) => {
-    if (isDeveloping || isExposing || caseApproved) return;
+  const handleSelectRegion = (region: BodyRegion) => {
+    if (isDeveloping || isExposing || caseApproved || crExposedPending) return;
     if (techLocation !== 'ROOM') {
-      showToast('ادخل غرفة الفحص أولاً لتغيير وضعية المريض.');
+      showToast(
+        isAr
+          ? 'ادخل غرفة الفحص أولاً لتحديد موضع التصوير على المريض.'
+          : 'Enter the exam room first to position the patient region.'
+      );
       return;
+    }
+    if (region !== selectedRegion) {
+      registerPatientMovement();
+    }
+    setSelectedRegion(region);
+    soundFx.playPurchase();
+    showToast(
+      isAr
+        ? `تم توجيه الأشعة نحو: ${REGION_LABELS_I18N.ar[region]}`
+        : `Tube aligned to: ${REGION_LABELS_I18N.en[region]}`
+    );
+  };
+
+  const handleSelectPosture = (posture: PatientPosture) => {
+    if (isDeveloping || isExposing || caseApproved || crExposedPending) return;
+    if (techLocation !== 'ROOM') {
+      showToast(
+        isAr
+          ? 'ادخل غرفة الفحص أولاً لتغيير وضعية المريض.'
+          : 'Enter the exam room first to reposition the patient.'
+      );
+      return;
+    }
+    if (posture !== selectedPosture) {
+      registerPatientMovement();
     }
     setSelectedPosture(posture);
 
-    // If cassette was in previous slot type, return to hand so tech places it in matching bucky
     if (
+      !hasDR &&
       posture.startsWith('ERECT_') &&
       cassetteState === 'TABLE_BUCKY'
     ) {
       setCassetteState('IN_HAND');
-      showToast('تم إخراج الكاسيت بيدك — ضعه الآن في الحامل الواقف (البكي).');
+      showToast(
+        isAr
+          ? 'تم إخراج الكاسيت بيدك — ضعه الآن في الحامل الواقف (البكي).'
+          : 'Cassette returned to hand — insert it into the Wall Bucky.'
+      );
     } else if (
+      !hasDR &&
       !posture.startsWith('ERECT_') &&
       cassetteState === 'WALL_BUCKY'
     ) {
       setCassetteState('IN_HAND');
-      showToast('تم إخراج الكاسيت بيدك — ضعه الآن تحت الطاولة.');
+      showToast(
+        isAr
+          ? 'تم إخراج الكاسيت بيدك — ضعه الآن تحت الطاولة.'
+          : 'Cassette returned to hand — insert it into the Table Bucky.'
+      );
     }
 
     if (isBoreScan) return;
@@ -463,19 +589,39 @@ export default function App() {
     if (techLocation === 'ROOM') {
       setTechLocation('BOOTH');
       setDoorClosed(true);
-      setConsoleOpen(true);
+      setConsoleOpen(!crExposedPending && cassetteState !== 'EXPOSED_IN_HAND');
       soundFx.playPurchase();
-      showToast('خرجت إلى غرفة التحكم وأغلقت الباب الرصاصي خلفك.');
+      showToast(
+        isAr
+          ? cassetteState === 'EXPOSED_IN_HAND'
+            ? 'عدت إلى غرفة التحكم — أدخل الكاسيت الآن في جهاز قارئ CR!'
+            : 'خرجت إلى غرفة التحكم وأغلقت الباب الرصاصي خلفك.'
+          : cassetteState === 'EXPOSED_IN_HAND'
+            ? 'Back in Control Booth — insert cassette into the CR Reader!'
+            : 'Entered Control Booth and closed the lead door.'
+      );
     } else if (!doorClosed) {
       setDoorClosed(true);
-      setConsoleOpen(true);
+      setConsoleOpen(!crExposedPending && cassetteState !== 'EXPOSED_IN_HAND');
       soundFx.playPurchase();
-      showToast('تم إغلاق الباب الرصاصي — يمكنك الآن إطلاق الجرعة.');
+      showToast(
+        isAr
+          ? 'تم إغلاق الباب الرصاصي — يمكنك الآن إطلاق الجرعة.'
+          : 'Lead door closed — ready for exposure.'
+      );
     } else {
       setDoorClosed(false);
       setTechLocation('ROOM');
       soundFx.playPurchase();
-      showToast('فتحت الباب ودخلت إلى غرفة الفحص.');
+      showToast(
+        isAr
+          ? crExposedPending
+            ? 'دخلت غرفة الفحص — اسحب الكاسيت المصوّر من البكي.'
+            : 'فتحت الباب ودخلت إلى غرفة الفحص.'
+          : crExposedPending
+            ? 'Entered Exam Room — retrieve the exposed cassette from the Bucky.'
+            : 'Opened lead door and entered the Exam Room.'
+      );
     }
   };
 
@@ -483,24 +629,48 @@ export default function App() {
     (loc: TechLocation) => {
       setTechLocation(loc);
       if (loc === 'BOOTH') {
-        showToast('دخلت غرفة التحكم — أغلق الباب الرصاصي قبل إطلاق الأشعة.');
+        showToast(
+          isAr
+            ? 'دخلت غرفة التحكم — أغلق الباب الرصاصي قبل إطلاق الأشعة.'
+            : 'Entered Control Booth — close the lead door before exposing.'
+        );
       } else {
-        showToast('دخلت إلى غرفة الفحص.');
+        showToast(isAr ? 'دخلت إلى غرفة الفحص.' : 'Entered the Exam Room.');
       }
     },
-    [showToast]
+    [showToast, isAr]
   );
 
   const handlePickUpCassette = () => {
-    if (techLocation !== 'ROOM') {
-      showToast('ادخل غرفة الفحص أولاً لأخذ الكاسيت.');
+    if (hasDR) {
+      showToast(
+        isAr
+          ? 'النظام الرقمي DR مفعّل — لا حاجة للكاسيت أو قارئ CR!'
+          : 'Digital DR is active — no cassette needed!'
+      );
       return;
     }
-    if (cassetteState === 'IN_HAND') {
+    if (techLocation !== 'ROOM') {
       showToast(
-        isErect
-          ? 'الكاسيت في يدك — انقر على الحامل الواقف (البكي) لإدخاله.'
-          : 'الكاسيت في يدك — انقر على درج الطاولة لإدخال الكاسيت.'
+        isAr
+          ? 'ادخل غرفة الفحص أولاً لأخذ الكاسيت.'
+          : 'Enter the exam room first to pick up the cassette.'
+      );
+      return;
+    }
+    if (cassetteState === 'IN_HAND' || cassetteState === 'EXPOSED_IN_HAND') {
+      showToast(
+        cassetteState === 'EXPOSED_IN_HAND'
+          ? isAr
+            ? 'الكاسيت المصوّر في يدك — عد لغرفة التحكم وأدخله في قارئ CR.'
+            : 'Exposed cassette in hand — return to booth and insert into CR Reader.'
+          : isErect
+            ? isAr
+              ? 'الكاسيت في يدك — انقر على الحامل الواقف (البكي) لإدخاله.'
+              : 'Cassette in hand — click Wall Bucky to insert.'
+            : isAr
+              ? 'الكاسيت في يدك — انقر على درج الطاولة لإدخال الكاسيت.'
+              : 'Cassette in hand — click Table Bucky to insert.'
       );
       return;
     }
@@ -508,59 +678,194 @@ export default function App() {
     soundFx.playPurchase();
     showToast(
       isErect
-        ? 'أخذت الكاسيت بيدك — ضعه الآن داخل الحامل الواقف (البكي).'
-        : 'أخذت الكاسيت بيدك — ضعه الآن داخل الدرج تحت الطاولة.'
+        ? isAr
+          ? 'أخذت الكاسيت بيدك — ضعه الآن داخل الحامل الواقف (البكي).'
+          : 'Picked up cassette — insert it into the Wall Bucky.'
+        : isAr
+          ? 'أخذت الكاسيت بيدك — ضعه الآن داخل الدرج تحت الطاولة.'
+          : 'Picked up cassette — insert it into the under-table Bucky.'
+    );
+  };
+
+  const handleRetrieveExposedCassette = () => {
+    if (techLocation !== 'ROOM') {
+      showToast(
+        isAr
+          ? 'ادخل غرفة الفحص أولاً لسحب الكاسيت المصوّر.'
+          : 'Enter the exam room first to retrieve the exposed cassette.'
+      );
+      return;
+    }
+    setCassetteState('EXPOSED_IN_HAND');
+    soundFx.playPurchase();
+    showToast(
+      isAr
+        ? 'أخذت الكاسيت المصوّر! عد إلى غرفة التحكم وأدخله في جهاز قارئ الكاسيت (CR).'
+        : 'Retrieved exposed cassette! Go to the control booth and insert it into the CR Reader.'
     );
   };
 
   const handleInsertTableBucky = () => {
+    if (crExposedPending && cassetteState === 'TABLE_BUCKY') {
+      handleRetrieveExposedCassette();
+      return;
+    }
     if (techLocation !== 'ROOM') {
-      showToast('ادخل غرفة الفحص لوضع الكاسيت تحت الطاولة.');
+      showToast(
+        isAr
+          ? 'ادخل غرفة الفحص لوضع الكاسيت تحت الطاولة.'
+          : 'Enter the exam room to insert the cassette under the table.'
+      );
       return;
     }
     if (cassetteState === 'RACK') {
-      showToast('خذ الكاسيت من الحامل الجانبي أولاً.');
+      showToast(
+        isAr
+          ? 'خذ الكاسيت من الحامل الجانبي أولاً.'
+          : 'Pick up the cassette from the side rack first.'
+      );
+      return;
+    }
+    if (cassetteState === 'EXPOSED_IN_HAND') {
+      showToast(
+        isAr
+          ? 'هذا الكاسيت مصوّر! اذهب لغرفة التحكم وأدخله في قارئ CR.'
+          : 'This cassette is already exposed — take it to the CR Reader!'
+      );
       return;
     }
     if (isErect) {
       soundFx.playError();
-      showToast('المريض واقف! ضع الكاسيت في الحامل الواقف (البكي) وليس تحت الطاولة.');
+      showToast(
+        isAr
+          ? 'المريض واقف! ضع الكاسيت في الحامل الواقف (البكي) وليس تحت الطاولة.'
+          : 'Patient is standing! Insert cassette into the Wall Bucky.'
+      );
       return;
     }
     setCassetteState('TABLE_BUCKY');
     soundFx.playPurchase();
-    showToast('تم إدخال الكاسيت تحت الطاولة بنجاح.');
+    showToast(
+      isAr
+        ? 'تم إدخال الكاسيت تحت الطاولة بنجاح.'
+        : 'Cassette inserted into Table Bucky.'
+    );
   };
 
   const handleInsertWallBucky = () => {
+    if (crExposedPending && cassetteState === 'WALL_BUCKY') {
+      handleRetrieveExposedCassette();
+      return;
+    }
     if (techLocation !== 'ROOM') {
-      showToast('ادخل غرفة الفحص لوضع الكاسيت في الحامل الواقف.');
+      showToast(
+        isAr
+          ? 'ادخل غرفة الفحص لوضع الكاسيت في الحامل الواقف.'
+          : 'Enter the exam room to place the cassette in the Wall Bucky.'
+      );
       return;
     }
     if (cassetteState === 'RACK') {
-      showToast('خذ الكاسيت من الحامل الجانبي أولاً.');
+      showToast(
+        isAr
+          ? 'خذ الكاسيت من الحامل الجانبي أولاً.'
+          : 'Pick up the cassette from the side rack first.'
+      );
+      return;
+    }
+    if (cassetteState === 'EXPOSED_IN_HAND') {
+      showToast(
+        isAr
+          ? 'هذا الكاسيت مصوّر! اذهب لغرفة التحكم وأدخله في قارئ CR.'
+          : 'This cassette is already exposed — take it to the CR Reader!'
+      );
       return;
     }
     if (!isErect) {
       soundFx.playError();
-      showToast('المريض مستلقٍ على الطاولة! أدخل الكاسيت تحت الطاولة.');
+      showToast(
+        isAr
+          ? 'المريض مستلقٍ على الطاولة! أدخل الكاسيت تحت الطاولة.'
+          : 'Patient is on the table! Insert cassette into the Table Bucky.'
+      );
       return;
     }
     setCassetteState('WALL_BUCKY');
     soundFx.playPurchase();
-    showToast('تم تثبيت الكاسيت داخل الحامل الواقف (البكي) بنجاح.');
+    showToast(
+      isAr
+        ? 'تم تثبيت الكاسيت داخل الحامل الواقف (البكي) بنجاح.'
+        : 'Cassette locked into Wall Bucky.'
+    );
+  };
+
+  const handleInsertCrReader = () => {
+    if (isDeveloping || isExposing) return;
+    if (hasDR) {
+      showToast(
+        isAr
+          ? 'لديك نظام DR رقمي — الصور تنتقل مباشرة للكمبيوتر دون قارئ CR!'
+          : 'Digital DR active — radiographs transfer straight to PC!'
+      );
+      return;
+    }
+    if (!crExposedPending || !pendingCrEvalRef.current) {
+      soundFx.playError();
+      showToast(
+        isAr
+          ? 'لا يوجد كاسيت مصوّر حالياً لقراءته. صوّر المريض أولاً ثم اسحب الكاسيت.'
+          : 'No exposed cassette to scan yet. Expose the patient and retrieve the cassette first.'
+      );
+      return;
+    }
+    if (cassetteState !== 'EXPOSED_IN_HAND') {
+      soundFx.playError();
+      showToast(
+        isAr
+          ? 'اذهب لغرفة الفحص واسحب الكاسيت المصوّر من البكي بيدك أولاً!'
+          : 'Go to the exam room and pick up the exposed cassette from the Bucky first!'
+      );
+      return;
+    }
+
+    if (techLocation !== 'BOOTH') {
+      setTechLocation('BOOTH');
+    }
+
+    const evalRes = pendingCrEvalRef.current;
+    setCassetteState('IN_CR_READER');
+    setCrExposedPending(false);
+    setIsDeveloping(true);
+    setConsoleOpen(false);
+    soundFx.playPurchase();
+    showToast(
+      isAr
+        ? 'جاري مسح الكاسيت داخل قارئ CR وتحويل الصورة للحاسوب...'
+        : 'Scanning CR cassette & transferring image to Clinic PC...'
+    );
+
+    const baseDelay = hasAutoProc ? 720 : 1450;
+    const scanDelay = hasTubeCooler ? Math.round(baseDelay * 0.65) : baseDelay;
+
+    if (developTimerRef.current) window.clearTimeout(developTimerRef.current);
+    developTimerRef.current = window.setTimeout(() => {
+      pendingCrEvalRef.current = null;
+      setIsDeveloping(false);
+      setCassetteState('RACK');
+      setCurrentEvaluation(evalRes);
+      setPcTab('IMAGE');
+      setPcOpen(true);
+      triggerEvaluationSpeech(evalRes);
+      if (!evalRes.success) {
+        soundFx.playError();
+      }
+    }, scanDelay);
   };
 
   const handleSceneInteract = (action: SceneTargetAction) => {
     switch (action.type) {
       case 'REGION':
-        if (techLocation !== 'ROOM') {
-          showToast('ادخل غرفة الفحص لتحديد موضع التصوير على المريض.');
-          return;
-        }
-        setSelectedRegion(action.region);
-        soundFx.playPurchase();
-        showToast(`تم توجيه الأشعة نحو: ${REGION_LABELS_AR[action.region]}`);
+        handleSelectRegion(action.region);
         break;
       case 'CASSETTE_RACK':
         handlePickUpCassette();
@@ -571,23 +876,47 @@ export default function App() {
       case 'WALL_BUCKY':
         handleInsertWallBucky();
         break;
+      case 'CR_READER':
+        handleInsertCrReader();
+        break;
       case 'DOOR':
         setDoorClosed((prev) => {
           const next = !prev;
           soundFx.playPurchase();
           showToast(
             next
-              ? 'تم إغلاق الباب الرصاصي.'
-              : 'تم فتح الباب الرصاصي — يمكنك المرور الآن.'
+              ? isAr
+                ? 'تم إغلاق الباب الرصاصي.'
+                : 'Lead door closed.'
+              : isAr
+                ? 'تم فتح الباب الرصاصي — يمكنك المرور الآن.'
+                : 'Lead door opened — you may pass.'
           );
           return next;
         });
         break;
+      case 'WAITING_DOOR': {
+        soundFx.playPurchase();
+        const waitingList = queue.filter((p) => p.id !== activePatient?.id);
+        const nextPatient = waitingList[0];
+        showToast(
+          nextPatient
+            ? isAr
+              ? `صالة الانتظار: المريض القادم ${nextPatient.nameAr} (عدد المنتظرين: ${waitingList.length})`
+              : `Waiting Room: Next patient ${nextPatient.nameAr} (${waitingList.length} waiting)`
+            : isAr
+              ? 'صالة الانتظار فارغة حالياً.'
+              : 'Waiting Room is currently empty.'
+        );
+        break;
+      }
       case 'CT_DOOR':
         if (!hasCT) {
           soundFx.playError();
           showToast(
-            'غرفة السيتي (المفراس CT) مغلقة 🔒 — جهاز السيتي غير متوفر للشراء حالياً وسيتوفر قريباً.'
+            isAr
+              ? 'غرفة السيتي (المفراس CT) مغلقة 🔒 — جهاز السيتي غير متوفر للشراء حالياً وسيتوفر قريباً.'
+              : 'CT Scanner Suite locked 🔒 — currently unavailable (Coming Soon).'
           );
           return;
         }
@@ -596,8 +925,12 @@ export default function App() {
           soundFx.playPurchase();
           showToast(
             next
-              ? 'تم فتح باب غرفة السيتي (المفراس CT) — يمكنك الدخول الآن.'
-              : 'تم إغلاق باب غرفة السيتي.'
+              ? isAr
+                ? 'تم فتح باب غرفة السيتي (المفراس CT).'
+                : 'CT Suite door opened.'
+              : isAr
+                ? 'تم إغلاق باب غرفة السيتي.'
+                : 'CT Suite door closed.'
           );
           return next;
         });
@@ -606,7 +939,9 @@ export default function App() {
         if (!hasMRI) {
           soundFx.playError();
           showToast(
-            'غرفة الرنين المغناطيسي (MRI) مغلقة 🔒 — جهاز الرنين غير متوفر للشراء حالياً وسيتوفر قريباً.'
+            isAr
+              ? 'غرفة الرنين المغناطيسي (MRI) مغلقة 🔒 — جهاز الرنين غير متوفر للشراء حالياً وسيتوفر قريباً.'
+              : 'MRI Suite locked 🔒 — currently unavailable (Coming Soon).'
           );
           return;
         }
@@ -615,8 +950,12 @@ export default function App() {
           soundFx.playPurchase();
           showToast(
             next
-              ? 'تم فتح باب غرفة الرنين المغناطيسي (MRI) — يمكنك الدخول الآن.'
-              : 'تم إغلاق باب غرفة الرنين المغناطيسي.'
+              ? isAr
+                ? 'تم فتح باب غرفة الرنين المغناطيسي (MRI).'
+                : 'MRI Suite door opened.'
+              : isAr
+                ? 'تم إغلاق باب غرفة الرنين المغناطيسي.'
+                : 'MRI Suite door closed.'
           );
           return next;
         });
@@ -641,7 +980,15 @@ export default function App() {
     if (!activePatient || breathHeld || !isChestExam) return;
     setBreathHeld(true);
     soundFx.playPurchase();
-    showToast('عبر الميكروفون: "خذ نفساً عميقاً واحبسه الآن..." (+$2 جودة)');
+    triggerPatientSpeech(
+      'تم... سأكتم نفسي الآن حتى تنتهي.',
+      'Okay... holding my breath steady now.'
+    );
+    showToast(
+      isAr
+        ? 'عبر الميكروفون: "خذ نفساً عميقاً واحبسه الآن..." (+$2 جودة)'
+        : 'Intercom: "Take a deep breath and hold it..." (+$2 quality)'
+    );
   };
 
   const handleAutoCalibrate = () => {
@@ -657,23 +1004,37 @@ export default function App() {
     );
     if (hasLeadShield) setShieldUsed(true);
     setBreathHeld(requestedExam.region === 'chest');
-    if (!isBoreScan) {
+    if (!isBoreScan && !hasDR) {
       setCassetteState(
         requestedExam.recommendedPosture.startsWith('ERECT_')
           ? 'WALL_BUCKY'
           : 'TABLE_BUCKY'
       );
     }
-    showToast(`تم ضبط بروتوكول ${requestedExam.titleAr} تلقائياً`);
+    showToast(
+      isAr
+        ? `تم ضبط بروتوكول ${requestedExam.titleAr} تلقائياً`
+        : `Auto-calibrated ${requestedExam.titleEn}`
+    );
   };
 
   const handleExpose = () => {
-    if (!activePatient || isDeveloping || isExposing || caseApproved) return;
+    if (
+      !activePatient ||
+      isDeveloping ||
+      isExposing ||
+      caseApproved ||
+      crExposedPending
+    ) {
+      return;
+    }
 
     if (techLocation !== 'BOOTH' || !doorClosed) {
       soundFx.playError();
       showToast(
-        'سلامة إشعاعية: يجب الخروج لغرفة التحكم وإغلاق الباب الرصاصي قبل إطلاق الجرعة!'
+        isAr
+          ? 'سلامة إشعاعية: يجب الخروج لغرفة التحكم وإغلاق الباب الرصاصي قبل إطلاق الجرعة!'
+          : 'Radiation Safety: Return to the Control Booth and close the lead door first!'
       );
       return;
     }
@@ -682,8 +1043,12 @@ export default function App() {
       soundFx.playError();
       showToast(
         isErect
-          ? 'تأكد من وضع الكاسيت داخل الحامل الواقف (البكي) قبل التصوير!'
-          : 'تأكد من إدخال الكاسيت داخل درج الطاولة قبل التصوير!'
+          ? isAr
+            ? 'تأكد من وضع الكاسيت داخل الحامل الواقف (البكي) قبل التصوير!'
+            : 'Insert the CR cassette into the Wall Bucky before exposing!'
+          : isAr
+            ? 'تأكد من إدخال الكاسيت داخل درج الطاولة قبل التصوير!'
+            : 'Insert the CR cassette into the Table Bucky before exposing!'
       );
       return;
     }
@@ -691,7 +1056,11 @@ export default function App() {
     const needsPhysicalFilm = requestedExam.modality === 'XRAY' && !hasDR;
     if (needsPhysicalFilm && save.films <= 0) {
       soundFx.playError();
-      showToast('نفدت أفلام الأشعة! افتح الحاسوب لشراء كرتون أفلام.');
+      showToast(
+        isAr
+          ? 'نفدت أفلام الأشعة! افتح الحاسوب لشراء كرتون أفلام.'
+          : 'Out of X-Ray films! Open Clinic PC to buy a film carton.'
+      );
       setPcTab('SHOP');
       setPcOpen(true);
       return;
@@ -728,21 +1097,36 @@ export default function App() {
     const exposeMs = hasTubeCooler ? 460 : 720;
     exposeTimerRef.current = window.setTimeout(() => {
       setIsExposing(false);
-      const baseDevelopDelay = hasDR ? 240 : hasAutoProc ? 440 : 880;
-      const developDelay = hasTubeCooler
-        ? Math.round(baseDevelopDelay * 0.65)
-        : baseDevelopDelay;
-      setIsDeveloping(true);
-      setPcTab('IMAGE');
-      setPcOpen(true);
 
-      developTimerRef.current = window.setTimeout(() => {
-        setIsDeveloping(false);
-        setCurrentEvaluation(evaluation);
-        if (!evaluation.success) {
-          soundFx.playError();
-        }
-      }, developDelay);
+      // Digital DR (or Bore scan): transfers instantaneously straight to Clinic PC!
+      if (hasDR || isBoreScan) {
+        const baseDelay = hasDR ? 240 : 480;
+        const developDelay = hasTubeCooler
+          ? Math.round(baseDelay * 0.65)
+          : baseDelay;
+        setIsDeveloping(true);
+        setPcTab('IMAGE');
+        setPcOpen(true);
+
+        developTimerRef.current = window.setTimeout(() => {
+          setIsDeveloping(false);
+          setCurrentEvaluation(evaluation);
+          triggerEvaluationSpeech(evaluation);
+          if (!evaluation.success) {
+            soundFx.playError();
+          }
+        }, developDelay);
+      } else {
+        // Initial CR Cassette Workflow: go retrieve cassette from Bucky -> CR Reader in Booth!
+        pendingCrEvalRef.current = evaluation;
+        setCrExposedPending(true);
+        setConsoleOpen(false);
+        showToast(
+          isAr
+            ? 'تم التصوير على كاسيت CR! افتح الباب، اذهب لأخذ الكاسيت من غرفة الفحص ثم أدخله في قارئ CR هنا.'
+            : 'CR Cassette Exposed! Enter exam room to retrieve cassette, then insert it into the CR Reader here.'
+        );
+      }
     }, exposeMs);
   };
 
@@ -766,7 +1150,7 @@ export default function App() {
       id: `case-${Date.now()}`,
       patientNameAr: activePatient.nameAr,
       patientAvatarPath: activePatient.avatarPath,
-      examTitleAr: requestedExam.titleAr,
+      examTitleAr: isAr ? requestedExam.titleAr : requestedExam.titleEn,
       examImagePath: requestedExam.imagePath,
       modality: requestedExam.modality,
       findingAr: activePatient.findingAr,
@@ -791,8 +1175,12 @@ export default function App() {
     setPcOpen(false);
     showToast(
       debtRepayment > 0
-        ? `تم اعتماد الصورة وتحصيل $${gross} (سُدّد $${debtRepayment}). اضغط "انتهاء الفحص" لاستقبال المريض التالي.`
-        : `تم اعتماد الصورة واستلام $${gross}. اضغط "انتهاء الفحص" لاستقبال المريض التالي.`
+        ? isAr
+          ? `تم اعتماد الصورة وتحصيل $${gross} (سُدّد $${debtRepayment}). اضغط "انتهاء الفحص" لاستقبال المريض التالي.`
+          : `Approved & earned $${gross} ($${debtRepayment} credit repaid). Press Finish Exam for next patient.`
+        : isAr
+          ? `تم اعتماد الصورة واستلام $${gross}. اضغط "انتهاء الفحص" لاستقبال المريض التالي.`
+          : `Approved & collected $${gross}. Press Finish Exam for the next patient.`
     );
   };
 
@@ -802,13 +1190,21 @@ export default function App() {
     setQueue((prev) => prev.filter((p) => p.id !== activePatient.id));
     setActivePatientId(null);
     setCurrentEvaluation(null);
+    pendingCrEvalRef.current = null;
+    setCrExposedPending(false);
     setCaseApproved(false);
     setBreathHeld(false);
     setCassetteState('RACK');
     setDoorClosed(false);
     setTechLocation('ROOM');
+    moveCountRef.current = 0;
+    setPatientSpeech(null);
     soundFx.playPurchase();
-    showToast('غادر المريض غرفة الفحص ودخل المريض التالي.');
+    showToast(
+      isAr
+        ? 'غادر المريض غرفة الفحص ودخل المريض التالي.'
+        : 'Patient departed — next patient entered the room.'
+    );
   };
 
   const handleBuyCarton = (count: 1 | 5) => {
@@ -817,7 +1213,9 @@ export default function App() {
 
     if (save.cash < cost) {
       soundFx.playError();
-      showToast('الرصيد الحالي لا يكفي لشراء هذا العرض.');
+      showToast(
+        isAr ? 'الرصيد الحالي لا يكفي لشراء هذا العرض.' : 'Insufficient cash.'
+      );
       return;
     }
 
@@ -828,7 +1226,11 @@ export default function App() {
       films: prev.films + filmsToAdd,
       cartonsBought: prev.cartonsBought + count,
     }));
-    showToast(`تمت إضافة ${filmsToAdd} فيلم أشعة إلى مخزون العيادة`);
+    showToast(
+      isAr
+        ? `تمت إضافة ${filmsToAdd} فيلم أشعة إلى مخزون العيادة`
+        : `Added ${filmsToAdd} X-ray films to inventory`
+    );
   };
 
   const handleTakeEmergencyLoan = () => {
@@ -836,19 +1238,26 @@ export default function App() {
     commitSaveUpdate((prev) => ({
       ...prev,
       films: prev.films + 10,
-      filmDebt: prev.filmDebt + 50,
+      filmDebt: prev.filmDebt + EMERGENCY_LOAN_DEBT,
     }));
-    showToast('تم استلام 10 أفلام طوارئ (آجل $50)');
+    showToast(
+      isAr
+        ? `تم استلام 10 أفلام طوارئ (آجل $${EMERGENCY_LOAN_DEBT})`
+        : `Received 10 emergency films ($${EMERGENCY_LOAN_DEBT} credit)`
+    );
   };
 
   const handleBuyUpgrade = (id: UpgradeId) => {
     if (save.ownedUpgrades.includes(id)) return;
     const upgrade = UPGRADES.find((u) => u.id === id);
     if (!upgrade) return;
+    const upTitle = isAr ? upgrade.titleAr : UPGRADE_EN[id].title;
     if (upgrade.comingSoon) {
       soundFx.playError();
       showToast(
-        `${upgrade.titleAr} غير متوفر للشراء حالياً — سيتوفر قريباً.`
+        isAr
+          ? `${upTitle} غير متوفر للشراء حالياً — سيتوفر قريباً.`
+          : `${upTitle} is currently unavailable — Coming Soon.`
       );
       return;
     }
@@ -858,7 +1267,9 @@ export default function App() {
     ) {
       soundFx.playError();
       showToast(
-        `هذا الخيار مقفل حالياً — يُفتح بعد فحص ${upgrade.requiredPatientsServed} مريض (${save.patientsServed}/${upgrade.requiredPatientsServed}).`
+        isAr
+          ? `هذا الخيار مقفل حالياً — يُفتح بعد فحص ${upgrade.requiredPatientsServed} مريض (${save.patientsServed}/${upgrade.requiredPatientsServed}).`
+          : `Locked — unlocks after ${upgrade.requiredPatientsServed} patients (${save.patientsServed}/${upgrade.requiredPatientsServed}).`
       );
       return;
     }
@@ -875,14 +1286,31 @@ export default function App() {
     }));
 
     if (id === 'lead_shield') setShieldUsed(true);
+    if (id === 'digital_dr') {
+      setCrExposedPending(false);
+      pendingCrEvalRef.current = null;
+      setCassetteState('RACK');
+    }
     if (id === 'ct_scanner') {
       setCtDoorOpen(true);
-      showToast('تم تركيب جهاز المفراس (CT) وفتح باب غرفة السيتي في العيادة!');
+      showToast(
+        isAr
+          ? 'تم تركيب جهاز المفراس (CT) وفتح باب غرفة السيتي في العيادة!'
+          : 'CT Scanner installed & suite unlocked!'
+      );
     } else if (id === 'mri_suite') {
       setMriDoorOpen(true);
-      showToast('تم تركيب جهاز الرنين المغناطيسي وفتح باب غرفة الـ MRI!');
+      showToast(
+        isAr
+          ? 'تم تركيب جهاز الرنين المغناطيسي وفتح باب غرفة الـ MRI!'
+          : '1.5T MRI Suite installed & unlocked!'
+      );
     } else {
-      showToast(`تم تركيب ${upgrade.titleAr} بنجاح`);
+      showToast(
+        isAr
+          ? `تم تركيب ${upTitle} بنجاح`
+          : `Installed ${upTitle} successfully`
+      );
     }
   };
 
@@ -894,7 +1322,9 @@ export default function App() {
       <div className="min-h-screen bg-[#09111C] text-slate-100 flex flex-col items-center justify-center gap-4">
         <div className="w-10 h-10 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
         <p className="text-sm text-slate-300">
-          جاري استرجاع حساب تقني الأشعة وتجهيز الغرفة...
+          {isAr
+            ? 'جاري استرجاع حساب تقني الأشعة وتجهيز الغرفة...'
+            : 'Restoring radiographer account & preparing 3D suite...'}
         </p>
       </div>
     );
@@ -917,20 +1347,53 @@ export default function App() {
   // =========================================================================
   const lowFilmsWarning = !hasDR && save.films <= 5;
   const cassetteStepLabel = isBoreScan
-    ? 'جهاز مقطعي/رنين جاهز'
-    : cassetteState === 'RACK'
-      ? 'الكاسيت على الحامل'
-      : cassetteState === 'IN_HAND'
-        ? 'الكاسيت في يدك'
-        : cassetteState === 'TABLE_BUCKY'
-          ? 'الكاسيت تحت الطاولة'
-          : 'الكاسيت في البكي الواقف';
+    ? isAr
+      ? 'جهاز مقطعي/رنين جاهز'
+      : 'CT/MRI Gantry Ready'
+    : hasDR
+      ? isAr
+        ? 'لوح رقمي DR جاهز'
+        : 'Digital DR Panel Ready'
+      : cassetteState === 'EXPOSED_IN_HAND'
+        ? isAr
+          ? 'كاسيت مصوّر بيدك (أدخله في CR)'
+          : 'Exposed Cassette (Insert in CR)'
+        : cassetteState === 'IN_CR_READER'
+          ? isAr
+            ? 'جاري قراءة الكاسيت في CR...'
+            : 'Reading in CR Digitizer...'
+          : cassetteState === 'RACK'
+            ? isAr
+              ? 'الكاسيت على الحامل'
+              : 'Cassette on Rack'
+            : cassetteState === 'IN_HAND'
+              ? isAr
+                ? 'الكاسيت في يدك'
+                : 'Cassette in Hand'
+              : cassetteState === 'TABLE_BUCKY'
+                ? crExposedPending
+                  ? isAr
+                    ? 'اسحب الكاسيت المصوّر من الطاولة'
+                    : 'Retrieve exposed cassette from Table'
+                  : isAr
+                    ? 'الكاسيت تحت الطاولة'
+                    : 'Cassette in Table Bucky'
+                : crExposedPending
+                  ? isAr
+                    ? 'اسحب الكاسيت المصوّر من البكي الواقف'
+                    : 'Retrieve exposed cassette from Wall Bucky'
+                  : isAr
+                    ? 'الكاسيت في البكي الواقف'
+                    : 'Cassette in Wall Bucky';
 
   return (
     <div className="relative w-screen h-dvh overflow-hidden bg-[#09111C] text-slate-100 select-none">
-      {/* FULL-SCREEN 3D RADIOLOGY CLINIC (FIRST-PERSON HANDS) */}
+      {/* FULL-SCREEN 3D RADIOLOGY CLINIC */}
       <RadiologyRoom3D
         patient={activePatient}
+        waitingPatients={queue
+          .filter((p) => p.id !== activePatient?.id)
+          .slice(0, 4)}
         requestedExam={requestedExam}
         selectedRegion={selectedRegion}
         selectedPosture={selectedPosture}
@@ -939,19 +1402,24 @@ export default function App() {
         ctDoorOpen={ctDoorOpen}
         mriDoorOpen={mriDoorOpen}
         cassetteState={cassetteState}
+        crExposedPending={crExposedPending}
+        isDeveloping={isDeveloping}
+        hasDR={hasDR}
         shieldUsed={hasLeadShield && shieldUsed}
         patientPrepped={effectiveBreathHeld}
         isExposing={isExposing}
+        patientSpeech={patientSpeech}
+        language={lang}
         ownedUpgrades={save.ownedUpgrades}
         joystickRef={joystickRef}
         onTechZoneChange={handleTechZoneChange}
         onSceneInteract={handleSceneInteract}
       />
 
-      {/* TOP BAR HUD (SOLID DARK PANELS — NO BACKDROP-BLUR OVER WEBGL) */}
-      <header className="pointer-events-none fixed top-0 inset-x-0 z-20 p-2 sm:p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start justify-between gap-2 sm:gap-3">
-        {/* Top-Right Telemetry & Account Bar */}
-        <div className="pointer-events-auto flex flex-wrap items-center justify-between sm:justify-start gap-1.5 sm:gap-3 rounded-xl border border-slate-800 bg-[#08101C]/95 px-2.5 sm:px-3.5 py-1.5 sm:py-2 shadow-xl">
+      {/* TOP BAR HUD */}
+      <header className="hud-header-bar pointer-events-none fixed top-0 inset-x-0 z-20 p-1.5 sm:p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start justify-between gap-1.5 sm:gap-3">
+        {/* Telemetry & Account Bar */}
+        <div className="hud-telemetry-card pointer-events-auto flex flex-wrap items-center justify-between sm:justify-start gap-1.5 sm:gap-2.5 rounded-xl border border-slate-800 bg-[#08101C]/95 px-2.5 sm:px-3.5 py-1.5 sm:py-2 shadow-xl">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-1 text-emerald-400 font-mono-num font-bold text-xs sm:text-sm">
               <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
@@ -970,7 +1438,15 @@ export default function App() {
               }`}
             >
               <Film className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span>{hasDR ? 'رقمي DR' : `${save.films} فيلم`}</span>
+              <span>
+                {hasDR
+                  ? isAr
+                    ? 'رقمي DR'
+                    : 'DR Digital'
+                  : isAr
+                    ? `${save.films} فيلم`
+                    : `${save.films} films`}
+              </span>
             </div>
 
             <span className="text-slate-700">|</span>
@@ -985,10 +1461,20 @@ export default function App() {
 
           <span className="hidden md:inline text-xs text-slate-300 font-medium">
             {techProfile.name} ·{' '}
-            <span className="text-cyan-300">{currentRank.titleAr}</span>
+            <span className="text-cyan-300">{rankTitle}</span>
           </span>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={toggleLang}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-cyan-300 text-[11px] font-bold cursor-pointer transition-colors"
+              title={isAr ? 'Switch to English' : 'التبديل إلى العربية'}
+            >
+              <Languages className="w-3.5 h-3.5 shrink-0" />
+              <span>{isAr ? 'EN' : 'عربي'}</span>
+            </button>
+
             <button
               type="button"
               onClick={() =>
@@ -997,7 +1483,15 @@ export default function App() {
                   soundEnabled: !prev.soundEnabled,
                 }))
               }
-              title={save.soundEnabled ? 'كتم الصوت' : 'تفعيل الصوت'}
+              title={
+                save.soundEnabled
+                  ? isAr
+                    ? 'كتم الصوت'
+                    : 'Mute Sound'
+                  : isAr
+                    ? 'تفعيل الصوت'
+                    : 'Enable Sound'
+              }
               className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors"
             >
               {save.soundEnabled ? (
@@ -1013,37 +1507,40 @@ export default function App() {
                 setPcTab(currentEvaluation ? 'IMAGE' : 'LOG');
                 setPcOpen(true);
               }}
-              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 text-[11px] sm:text-xs font-semibold cursor-pointer transition-colors"
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 text-[11px] sm:text-xs font-semibold cursor-pointer transition-colors"
             >
               <Monitor className="w-3.5 h-3.5 shrink-0" />
-              <span>الحاسوب</span>
+              <span>{isAr ? 'الحاسوب' : 'PC'}</span>
             </button>
 
             <button
               type="button"
               onClick={() => void handleLogout()}
-              title="تسجيل الخروج"
-              className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] sm:text-xs cursor-pointer transition-colors"
+              title={isAr ? 'تسجيل الخروج' : 'Logout'}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] sm:text-xs cursor-pointer transition-colors"
             >
               <LogOut className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">خروج</span>
+              <span className="hidden sm:inline">
+                {isAr ? 'خروج' : 'Exit'}
+              </span>
             </button>
           </div>
         </div>
 
-        {/* Top-Left Active Patient Request Card (Compact on phones) */}
+        {/* Active Patient Request Card */}
         {activePatient && (
-          <div className="pointer-events-auto rounded-xl border border-slate-800 bg-[#08101C]/95 p-2 sm:p-3 shadow-xl sm:max-w-sm w-full sm:w-auto flex items-center gap-2.5 sm:gap-3">
+          <div className="hud-patient-card pointer-events-auto rounded-xl border border-slate-800 bg-[#08101C]/95 p-1.5 sm:p-3 shadow-xl sm:max-w-sm w-full sm:w-auto flex items-center gap-2 sm:gap-3">
             <img
               src={activePatient.avatarPath}
               alt={activePatient.nameAr}
               referrerPolicy="no-referrer"
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-slate-700 shrink-0"
+              className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg object-cover border border-slate-700 shrink-0"
             />
-            <div className="min-w-0 flex-1 space-y-0.5 text-[11px] sm:text-xs">
+            <div className="min-w-0 flex-1 space-y-0.5 text-[10.5px] sm:text-xs">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-bold text-white truncate">
-                  {activePatient.nameAr} ({activePatient.age} سنة)
+                  {activePatient.nameAr} ({activePatient.age}{' '}
+                  {isAr ? 'سنة' : 'y'})
                 </span>
                 <span className="font-mono-num font-bold text-emerald-400 shrink-0">
                   $
@@ -1053,10 +1550,11 @@ export default function App() {
                 </span>
               </div>
               <div className="text-cyan-300 font-semibold truncate">
-                المطلوب: {requestedExam.titleAr}
+                {isAr ? 'المطلوب: ' : 'Order: '}
+                {isAr ? requestedExam.titleAr : requestedExam.titleEn}
               </div>
               <div className="text-slate-400 truncate">
-                {POSTURE_SHORT_AR[requestedExam.recommendedPosture]} ·{' '}
+                {POSTURE_SHORT_I18N[lang][requestedExam.recommendedPosture]} ·{' '}
                 <span className="font-mono-num text-slate-300">
                   {requestedExam.kvpRange[0]}–{requestedExam.kvpRange[1]} kVp /{' '}
                   {requestedExam.masRange[0]}–{requestedExam.masRange[1]} mAs
@@ -1067,14 +1565,21 @@ export default function App() {
         )}
       </header>
 
+      {/* PERMANENT DESIGNER CREDIT & INSTAGRAM LINK */}
+      <DesignerCredit variant="floating" />
+
       {/* LOW FILMS QUICK WARNING STRIP */}
       {lowFilmsWarning && (
-        <div className="pointer-events-auto fixed top-28 sm:top-20 right-2.5 sm:right-4 z-20 rounded-xl border border-amber-600/70 bg-[#1B1308]/95 px-3 py-1.5 sm:px-3.5 sm:py-2 flex items-center gap-2 text-[11px] sm:text-xs text-amber-200 shadow-lg">
+        <div className="pointer-events-auto fixed top-[116px] sm:top-20 right-2.5 sm:right-4 z-20 rounded-xl border border-amber-600/70 bg-[#1B1308]/95 px-2.5 py-1 sm:px-3.5 sm:py-2 flex items-center gap-2 text-[11px] sm:text-xs text-amber-200 shadow-lg">
           <Package className="w-3.5 h-3.5 text-amber-400 shrink-0" />
           <span>
             {save.films === 0
-              ? 'نفدت الأفلام!'
-              : `تبقّى ${save.films} أفلام`}
+              ? isAr
+                ? 'نفدت الأفلام!'
+                : 'Out of films!'
+              : isAr
+                ? `تبقّى ${save.films} أفلام`
+                : `${save.films} films left`}
           </span>
           <button
             type="button"
@@ -1084,14 +1589,14 @@ export default function App() {
             }}
             className="px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer"
           >
-            المتجر
+            {isAr ? 'المتجر' : 'Shop'}
           </button>
         </div>
       )}
 
       {/* TOAST FEEDBACK */}
       {toastMsg && (
-        <div className="pointer-events-none fixed top-28 sm:top-20 left-1/2 -translate-x-1/2 z-30 rounded-xl border border-cyan-600/70 bg-[#081523]/95 px-3.5 py-2 text-[11px] sm:text-sm font-semibold text-cyan-100 flex items-center gap-2 shadow-2xl max-w-[92vw]">
+        <div className="pointer-events-none fixed top-[116px] sm:top-20 left-1/2 -translate-x-1/2 z-30 rounded-xl border border-cyan-600/70 bg-[#081523]/95 px-3.5 py-2 text-[11px] sm:text-sm font-semibold text-cyan-100 flex items-center gap-2 shadow-2xl max-w-[92vw]">
           <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
           <span>{toastMsg}</span>
         </div>
@@ -1111,6 +1616,8 @@ export default function App() {
           doorClosed={doorClosed}
           cassetteReady={cassetteReady}
           cassetteStepLabel={cassetteStepLabel}
+          crPendingScan={crExposedPending}
+          hasDR={hasDR}
           isChestExam={isChestExam}
           breathHeld={effectiveBreathHeld}
           onRequestBreathHold={handleRequestBreathHold}
@@ -1128,69 +1635,73 @@ export default function App() {
         />
       )}
 
-      {/* VIRTUAL JOYSTICK CIRCLE (Optimized Mobile Left-Thumb Walk + Right-Thumb Look) */}
+      {/* VIRTUAL JOYSTICK CIRCLE */}
       {!pcOpen && (
         <div
-          className={`pointer-events-auto fixed left-3 sm:left-auto sm:right-6 sm:bottom-6 z-20 ${
+          className={`hud-joystick-wrap pointer-events-auto fixed left-2.5 sm:left-auto sm:right-6 sm:bottom-6 z-20 ${
             techLocation === 'ROOM' && !caseApproved
-              ? 'bottom-[156px]'
-              : 'bottom-20'
+              ? 'bottom-[138px]'
+              : 'bottom-16'
           }`}
         >
           <VirtualJoystick
             joystickRef={joystickRef}
             label={
               techLocation === 'BOOTH'
-                ? 'تحريك التقني (التحكم)'
-                : 'تحريك التقني'
+                ? isAr
+                  ? 'تحريك التقني (التحكم)'
+                  : 'Move (Control)'
+                : isAr
+                  ? 'تحريك التقني'
+                  : 'Move Tech'
             }
           />
         </div>
       )}
 
-      {/* BOTTOM FIRST-PERSON WORKFLOW DOCK (Mobile-friendly scrollable chips & action bar) */}
-      <footer className="pointer-events-none fixed bottom-0 inset-x-0 z-20 px-2 pt-1.5 pb-[max(0.55rem,env(safe-area-inset-bottom))] sm:p-4 flex flex-col items-center gap-1.5 sm:gap-2">
-        {/* Inside Exam Room: Quick Positioning & Cassette Controls */}
-        {techLocation === 'ROOM' && !caseApproved && (
-          <div className="pointer-events-auto max-w-5xl w-full rounded-2xl border border-slate-800 bg-[#08101C]/95 px-2.5 sm:px-3 py-1.5 sm:py-2 shadow-2xl flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-1 sm:gap-2.5">
+      {/* BOTTOM FIRST-PERSON WORKFLOW DOCK */}
+      <footer className="hud-bottom-dock pointer-events-none fixed bottom-0 inset-x-0 z-20 px-2 pt-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] sm:p-4 flex flex-col items-center gap-1 sm:gap-2">
+        {/* Inside Exam Room: Quick Positioning & Region Controls */}
+        {techLocation === 'ROOM' && !caseApproved && !crExposedPending && (
+          <div className="pointer-events-auto max-w-5xl w-full rounded-2xl border border-slate-800 bg-[#08101C]/95 px-2 sm:px-3 py-1 sm:py-2 shadow-2xl flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-1 sm:gap-2.5">
             {/* Postures */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full">
-              <span className="text-[11px] text-slate-400 shrink-0 ml-1">
-                الوضعية:
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
+              <span className="text-[10.5px] sm:text-[11px] text-slate-400 shrink-0 mx-1">
+                {isAr ? 'الوضعية:' : 'Posture:'}
               </span>
-              {POSTURE_OPTIONS.map((p) => (
+              {POSTURE_KEYS.map((pKey) => (
                 <button
-                  key={p.id}
+                  key={pKey}
                   type="button"
-                  onClick={() => handleSelectPosture(p.id)}
-                  className={`px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
-                    selectedPosture === p.id
+                  onClick={() => handleSelectPosture(pKey)}
+                  className={`px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-[10.5px] sm:text-[11px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                    selectedPosture === pKey
                       ? 'bg-cyan-500 text-slate-950'
                       : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300'
                   }`}
                 >
-                  {p.label}
+                  {POSTURE_SHORT_I18N[lang][pKey]}
                 </button>
               ))}
             </div>
 
             {/* Regions + Lead Shield */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full">
-              <span className="text-[11px] text-slate-400 shrink-0 ml-1">
-                المنطقة:
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
+              <span className="text-[10.5px] sm:text-[11px] text-slate-400 shrink-0 mx-1">
+                {isAr ? 'المنطقة:' : 'Region:'}
               </span>
               {REGION_OPTIONS.map((reg) => (
                 <button
                   key={reg}
                   type="button"
-                  onClick={() => setSelectedRegion(reg)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                  onClick={() => handleSelectRegion(reg)}
+                  className={`px-2 py-1 sm:px-2.5 rounded-md text-[10.5px] sm:text-[11px] font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
                     selectedRegion === reg
                       ? 'bg-sky-500/25 border border-sky-400 text-sky-200'
                       : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
                   }`}
                 >
-                  {REGION_LABELS_AR[reg].split(' ')[0]}
+                  {REGION_SHORT_I18N[lang][reg]}
                 </button>
               ))}
 
@@ -1198,14 +1709,22 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShieldUsed((v) => !v)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap shrink-0 cursor-pointer border ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10.5px] sm:text-[11px] font-semibold whitespace-nowrap shrink-0 cursor-pointer border ${
                     shieldUsed
                       ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300'
                       : 'bg-slate-900 border-slate-700 text-slate-400'
                   }`}
                 >
                   <Shield className="w-3 h-3 shrink-0" />
-                  <span>{shieldUsed ? 'الدرع ✓' : 'درع الحماية'}</span>
+                  <span>
+                    {shieldUsed
+                      ? isAr
+                        ? 'الدرع ✓'
+                        : 'Shield ✓'
+                      : isAr
+                        ? 'درع الحماية'
+                        : 'Lead Shield'}
+                  </span>
                 </button>
               )}
             </div>
@@ -1213,30 +1732,55 @@ export default function App() {
         )}
 
         {/* Primary Clinical Step Action Bar */}
-        <div className="pointer-events-auto max-w-full rounded-2xl border border-slate-700/80 bg-[#08101C]/95 px-2.5 sm:px-4 py-2 shadow-2xl flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <div className="pointer-events-auto max-w-full rounded-2xl border border-slate-700/80 bg-[#08101C]/95 px-2.5 sm:px-4 py-1.5 sm:py-2 shadow-2xl flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
           {caseApproved ? (
             <button
               type="button"
               onClick={handleFinishExamAndNextPatient}
-              className="flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+              className="flex items-center gap-2 px-5 sm:px-6 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm whitespace-nowrap shrink-0 cursor-pointer transition-colors"
             >
               <UserCheck className="w-4 h-4 shrink-0" />
-              <span>انتهاء الفحص — استقبال المريض التالي</span>
+              <span>
+                {isAr
+                  ? 'انتهاء الفحص — استقبال المريض التالي'
+                  : 'Finish Exam — Next Patient'}
+              </span>
             </button>
           ) : techLocation === 'ROOM' ? (
             <>
-              {!isBoreScan && cassetteState === 'RACK' && (
+              {!hasDR &&
+                !isBoreScan &&
+                crExposedPending &&
+                (cassetteState === 'TABLE_BUCKY' ||
+                  cassetteState === 'WALL_BUCKY') && (
+                  <button
+                    type="button"
+                    onClick={handleRetrieveExposedCassette}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    <Hand className="w-4 h-4 shrink-0" />
+                    <span>
+                      {isAr
+                        ? 'سحب الكاسيت المصوّر لقارئ CR'
+                        : 'Pick Up Exposed Cassette'}
+                    </span>
+                  </button>
+                )}
+
+              {!hasDR && !isBoreScan && cassetteState === 'RACK' && (
                 <button
                   type="button"
                   onClick={handlePickUpCassette}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                 >
                   <Hand className="w-4 h-4 shrink-0" />
-                  <span>أخذ الكاسيت بيدك</span>
+                  <span>
+                    {isAr ? 'أخذ الكاسيت بيدك' : 'Pick Up Cassette'}
+                  </span>
                 </button>
               )}
 
-              {!isBoreScan && cassetteState === 'IN_HAND' && (
+              {!hasDR && !isBoreScan && cassetteState === 'IN_HAND' && (
                 <button
                   type="button"
                   onClick={
@@ -1247,13 +1791,17 @@ export default function App() {
                   <Hand className="w-4 h-4 shrink-0" />
                   <span>
                     {isErect
-                      ? 'وضع الكاسيت في البكي الواقف'
-                      : 'إدخال الكاسيت تحت الطاولة'}
+                      ? isAr
+                        ? 'وضع الكاسيت في البكي الواقف'
+                        : 'Insert in Wall Bucky'
+                      : isAr
+                        ? 'إدخال الكاسيت تحت الطاولة'
+                        : 'Insert in Table Bucky'}
                   </span>
                 </button>
               )}
 
-              {cassetteReady && (
+              {cassetteReady && !crExposedPending && (
                 <span className="text-[11px] sm:text-xs font-semibold text-emerald-300 px-1.5 whitespace-nowrap shrink-0">
                   ✓ {cassetteStepLabel}
                 </span>
@@ -1263,24 +1811,51 @@ export default function App() {
                 type="button"
                 onClick={handleToggleDoorAndBooth}
                 className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
-                  cassetteReady
-                    ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                  cassetteState === 'EXPOSED_IN_HAND'
+                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                    : cassetteReady && !crExposedPending
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
                 }`}
               >
                 <DoorClosed className="w-4 h-4 shrink-0" />
-                <span>الخروج وإغلاق الباب</span>
+                <span>
+                  {cassetteState === 'EXPOSED_IN_HAND'
+                    ? isAr
+                      ? 'العودة لقارئ CR بالتحكم'
+                      : 'Return to CR Reader'
+                    : isAr
+                      ? 'الخروج وإغلاق الباب'
+                      : 'Exit & Close Door'}
+                </span>
               </button>
             </>
           ) : (
             <>
+              {!hasDR && cassetteState === 'EXPOSED_IN_HAND' && (
+                <button
+                  type="button"
+                  onClick={handleInsertCrReader}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                >
+                  <ScanLine className="w-4 h-4 shrink-0" />
+                  <span>
+                    {isAr
+                      ? 'إدخال الكاسيت في قارئ CR'
+                      : 'Insert into CR Reader'}
+                  </span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleToggleDoorAndBooth}
                 className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-semibold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
-                  !doorClosed
+                  crExposedPending && cassetteState !== 'EXPOSED_IN_HAND'
                     ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                    : !doorClosed
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
                 }`}
               >
                 {doorClosed ? (
@@ -1289,20 +1864,38 @@ export default function App() {
                   <DoorClosed className="w-4 h-4 shrink-0" />
                 )}
                 <span>
-                  {doorClosed
-                    ? 'العودة لغرفة الفحص'
-                    : 'إغلاق الباب الرصاصي'}
+                  {crExposedPending && cassetteState !== 'EXPOSED_IN_HAND'
+                    ? isAr
+                      ? 'اذهب لأخذ الكاسيت من الغرفة'
+                      : 'Get Exposed Cassette'
+                    : doorClosed
+                      ? isAr
+                        ? 'العودة لغرفة الفحص'
+                        : 'Return to Room'
+                      : isAr
+                        ? 'إغلاق الباب الرصاصي'
+                        : 'Close Lead Door'}
                 </span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setConsoleOpen((v) => !v)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-cyan-600/40 text-cyan-200 font-semibold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
-              >
-                <Sliders className="w-4 h-4 shrink-0" />
-                <span>{consoleOpen ? 'إخفاء اللوحة' : 'لوحة التعريض'}</span>
-              </button>
+              {!crExposedPending && cassetteState !== 'EXPOSED_IN_HAND' && (
+                <button
+                  type="button"
+                  onClick={() => setConsoleOpen((v) => !v)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-cyan-600/40 text-cyan-200 font-semibold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                >
+                  <Sliders className="w-4 h-4 shrink-0" />
+                  <span>
+                    {consoleOpen
+                      ? isAr
+                        ? 'إخفاء اللوحة'
+                        : 'Hide Console'
+                      : isAr
+                        ? 'لوحة التعريض'
+                        : 'Show Console'}
+                  </span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -1313,7 +1906,9 @@ export default function App() {
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
               >
                 <Monitor className="w-4 h-4 shrink-0" />
-                <span>الحاسوب (View & Mask)</span>
+                <span>
+                  {isAr ? 'الحاسوب (View & Mask)' : 'Clinic PC'}
+                </span>
               </button>
 
               {currentEvaluation && !currentEvaluation.success && (
@@ -1323,7 +1918,7 @@ export default function App() {
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                 >
                   <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />
-                  <span>المريض التالي</span>
+                  <span>{isAr ? 'المريض التالي' : 'Next Patient'}</span>
                 </button>
               )}
             </>
@@ -1331,7 +1926,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* CLINIC COMPUTER WORKSTATION MODAL (IMAGE EDITOR, PREVIOUS PATIENTS, SHOP, PROTOCOLS) */}
+      {/* CLINIC COMPUTER WORKSTATION MODAL */}
       <ClinicPCModal
         isOpen={pcOpen}
         activeTab={pcTab}
@@ -1349,6 +1944,8 @@ export default function App() {
         onApproveAndCollect={handleApproveAndCollect}
         onRetake={() => {
           setCurrentEvaluation(null);
+          pendingCrEvalRef.current = null;
+          setCrExposedPending(false);
           setConsoleOpen(true);
         }}
         cash={save.cash}

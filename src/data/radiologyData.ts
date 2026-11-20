@@ -36,9 +36,10 @@ export const CT_SCAN_IMAGE = ASSETS.ctChestImg;
 export const MRI_SCAN_IMAGE = ASSETS.mriLumbarImg;
 
 export const FILM_CARTON_SIZE = 20;
-export const FILM_CARTON_COST = 100;
+export const FILM_CARTON_COST = 150;
 export const BULK_CARTON_SIZE = 100;
-export const BULK_CARTON_COST = 450;
+export const BULK_CARTON_COST = 650;
+export const EMERGENCY_LOAN_DEBT = 75;
 
 export const REGION_LABELS_AR: Record<BodyRegion, string> = {
   head: 'الرأس والجمجمة',
@@ -679,7 +680,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Lead Apron & Gonadal Shield',
     descriptionAr:
       'توفير دروع الرصاص الواقية للمرضى أثناء التصوير يرفع التقييم الطبي ويضيف $3 مكافأة جودة لكل فحص.',
-    cost: 80,
+    cost: 180,
     category: 'safety',
     benefitSummaryAr: '+$3 مكافأة أمان وجودة لكل مريض',
     imagePath: ASSETS.shopLeadApronImg,
@@ -690,7 +691,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Digital Personal Dosimeter',
     descriptionAr:
       'يعرض لك مؤشر توافق الجرعة الفوري في لوحة التحكم قبل إطلاق الأشعة لتجنب تلف الأفلام ويضيف $2 أمان.',
-    cost: 140,
+    cost: 320,
     category: 'safety',
     benefitSummaryAr: 'مؤشر توافق kVp/mAs + $2 أمان',
     imagePath: ASSETS.shopDosimeterBadgeImg,
@@ -701,7 +702,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Thyroid Collar & Lead Eyewear',
     descriptionAr:
       'حماية تخصصية إضافية للرقبة والعينين من الإشعاع المشتت ترفع معايير السلامة وتضيف $3 لكل فحص.',
-    cost: 190,
+    cost: 420,
     category: 'safety',
     benefitSummaryAr: '+$3 مكافأة سلامة إشعاعية',
     imagePath: ASSETS.shopDosimeterBadgeImg,
@@ -711,10 +712,10 @@ export const UPGRADES: UpgradeItem[] = [
     titleAr: 'ماكينة تحميض أفلام آلية',
     subtitleAr: 'Automatic Film Processor',
     descriptionAr:
-      'تحميض سريع للأفلام خلال 0.5 ثانية بدلاً من التحميض اليدوي، مع وضوح تشخيصي أعلى.',
-    cost: 220,
+      'يسرّع قراءة الكاسيت في جهاز CR ويحسن التباين التشخيصي مع إضافة $2 مكافأة دقة.',
+    cost: 550,
     category: 'efficiency',
-    benefitSummaryAr: 'تحميض فوري + $2 مكافأة دقة',
+    benefitSummaryAr: 'قراءة أسرع للكاسيت + $2 مكافأة دقة',
     imagePath: ASSETS.shopAutoProcessorImg,
   },
   {
@@ -723,7 +724,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Positioning Wedges & Pads',
     descriptionAr:
       'يمنع اهتزاز المريض ويوسّع هامش التسامح في قيم kVp و mAs لتقليل إعادة التصوير مع $3 جودة.',
-    cost: 280,
+    cost: 680,
     category: 'efficiency',
     benefitSummaryAr: 'توسيع هامش kVp/mAs + $3 جودة',
     imagePath: ASSETS.shopImmobilizationKitImg,
@@ -734,7 +735,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Precision Laser Collimator',
     descriptionAr:
       'تحديد ليزري متقاطع لحقل الأشعة يقلل التشتت الإشعاعي ويرفع التقييم التشخيصي بمقدار $3.',
-    cost: 320,
+    cost: 820,
     category: 'efficiency',
     benefitSummaryAr: 'تحديد ليزري دقيق + $3 جودة',
     imagePath: ASSETS.shopLaserCollimatorImg,
@@ -745,7 +746,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Protocol Auto-Calibration',
     descriptionAr:
       'يُضيف زر ضبط تلقائي لقيم kVp و mAs والوضعية الصحيحة بنقرة واحدة لتقليل هدر الأفلام.',
-    cost: 350,
+    cost: 950,
     category: 'efficiency',
     benefitSummaryAr: 'زر ضبط تلقائي يمنع تلف الأفلام',
     imagePath: ASSETS.shopDrSystemImg,
@@ -756,7 +757,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Waiting Room Expansion',
     descriptionAr:
       'زيادة سعة قائمة الانتظار من 3 إلى 6 مرضى مع استقطاب تحويلات طبية أكثر للعيادة.',
-    cost: 450,
+    cost: 1200,
     category: 'efficiency',
     benefitSummaryAr: 'سعة 6 مرضى في قائمة الانتظار',
     imagePath: ASSETS.clinicReceptionImg,
@@ -766,8 +767,8 @@ export const UPGRADES: UpgradeItem[] = [
     titleAr: 'نظام تبريد أنبوب الأشعة الفائق',
     subtitleAr: 'High-Capacity Tube Cooling',
     descriptionAr:
-      'يخفض حرارة أنبوب الأشعة ويسرّع دورة التعريض والتحميض بنسبة 40% مع $2 كفاءة لكل حالة.',
-    cost: 480,
+      'يخفض حرارة أنبوب الأشعة ويسرّع دورة التعريض وقراءة CR بنسبة 40% مع $2 كفاءة لكل حالة.',
+    cost: 1450,
     category: 'efficiency',
     benefitSummaryAr: 'سرعة تصوير مضاعفة + $2 كفاءة',
     imagePath: ASSETS.shopLaserCollimatorImg,
@@ -778,7 +779,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Dry Laser Medical Imager',
     descriptionAr:
       'طباعة طبية فائقة التباين للنتائج والأقراص للمرضى ترفع عائد كل فحص بمقدار $4.',
-    cost: 620,
+    cost: 1850,
     category: 'efficiency',
     benefitSummaryAr: '+$4 رسوم طباعة وتقرير لكل فحص',
     imagePath: ASSETS.shopDryPrinterImg,
@@ -789,7 +790,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Dual-Monitor AI PACS Suite',
     descriptionAr:
       'محطة قراءة طبية مزدوجة تساعدك على ضبط التباين والتشخيص بدقة عالية وتضيف $5 لكل فحص.',
-    cost: 850,
+    cost: 2400,
     category: 'efficiency',
     benefitSummaryAr: '+$5 مكافأة دقة تشخيصية متقدمة',
     imagePath: ASSETS.shopAiPacsImg,
@@ -799,10 +800,10 @@ export const UPGRADES: UpgradeItem[] = [
     titleAr: 'جهاز الأشعة الرقمي (DR)',
     subtitleAr: 'Digital Radiography Flat-Panel',
     descriptionAr:
-      'التحول للتصوير الرقمي المباشر! لا استهلاك لأفلام الأشعة بعد الآن، ورفع سعر الأشعة السينية إلى $25.',
-    cost: 1200,
+      'التحول من نظام CR إلى التصوير الرقمي المباشر DR! لا حاجة لقارئ الكاسيت بعد الآن ولا استهلاك للأفلام — تنتقل الصورة مباشرة للحاسوب ويرتفع سعر الفحص إلى $25.',
+    cost: 3200,
     category: 'modality',
-    benefitSummaryAr: 'بدون استهلاك أفلام + سعر الفحص $25',
+    benefitSummaryAr: 'إرسال فوري للحاسوب بدون قارئ CR + $25',
     imagePath: ASSETS.shopDrSystemImg,
   },
   {
@@ -811,7 +812,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'VIP Patient Comfort Lounge',
     descriptionAr:
       'تجهيز صالة راحة فاخرة للمراجعين بإضاءة هادئة وضيافة طبية ترفع دخل العيادة بمقدار $8 لكل فحص.',
-    cost: 1400,
+    cost: 3800,
     category: 'modality',
     benefitSummaryAr: '+$8 عائد ضيافة وجودة VIP لكل فحص',
     imagePath: ASSETS.shopVipLoungeImg,
@@ -822,7 +823,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: '64-Slice CT Scanner Suite',
     descriptionAr:
       'جهاز التصوير المقطعي الحلزوني (64 شريحة) لغرفة السيتي — هذا الجهاز غير متوفر للشراء حالياً وسيتوفر قريباً.',
-    cost: 4500,
+    cost: 8500,
     category: 'modality',
     benefitSummaryAr: 'غير متوفر حالياً — سيتوفر قريباً',
     imagePath: ASSETS.shopCtScannerImg,
@@ -834,7 +835,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: '1.5T MRI Imaging Suite',
     descriptionAr:
       'منظومة الرنين المغناطيسي لغرفة الـ MRI — هذا الجهاز غير متوفر للشراء حالياً وسيتوفر قريباً.',
-    cost: 9500,
+    cost: 16000,
     category: 'modality',
     benefitSummaryAr: 'غير متوفر حالياً — سيتوفر قريباً',
     imagePath: ASSETS.shopMriSuiteImg,
@@ -846,7 +847,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Assistant Radiographer (Master Unlock)',
     descriptionAr:
       'خيار متقدم يفتح فقط بعد خدمة 500 مريض! تقني مساعد يدير حالات إضافية ويدر دخلاً تلقائياً مستمراً.',
-    cost: 1800,
+    cost: 4500,
     category: 'staff',
     benefitSummaryAr: 'يُفتح بعد فحص 500 مريض · دخل تلقائي',
     imagePath: ASSETS.shopAssistantTechImg,

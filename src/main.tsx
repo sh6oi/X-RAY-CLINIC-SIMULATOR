@@ -1,6 +1,7 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import {LanguageProvider} from './i18n/translations.tsx';
 import './index.css';
 
 interface ErrorBoundaryState {
@@ -76,6 +77,8 @@ class RootErrorBoundary extends React.Component<
 
 createRoot(document.getElementById('root')!).render(
   <RootErrorBoundary>
-    <App />
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
   </RootErrorBoundary>
 );

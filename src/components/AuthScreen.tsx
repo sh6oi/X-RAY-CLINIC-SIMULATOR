@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {
   AlertTriangle,
+  Languages,
   Lock,
   LogIn,
   Mail,
@@ -9,6 +10,8 @@ import {
 } from 'lucide-react';
 import {
   CLINIC_ROOM_IMAGE,
+  FILM_CARTON_COST,
+  FILM_CARTON_SIZE,
   PATIENT_AVATARS,
   REGION_SCAN_IMAGES,
 } from '../data/radiologyData';
@@ -19,6 +22,8 @@ import {
   type AuthResult,
 } from '../firebase';
 import type {ClinicSaveState} from '../types/radiology';
+import {useLanguage} from '../i18n/translations';
+import {DesignerCredit} from './DesignerCredit';
 
 interface AuthScreenProps {
   initialSave: ClinicSaveState;
@@ -29,6 +34,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   initialSave,
   onAuthenticated,
 }) => {
+  const {lang, toggleLang} = useLanguage();
+  const isAr = lang === 'ar';
+
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('REGISTER');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -42,15 +50,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setErrorMsg(null);
 
     if (mode === 'REGISTER' && name.trim().length < 2) {
-      setErrorMsg('يرجى إدخال الاسم الكامل لتقني الأشعة (حرفين على الأقل).');
+      setErrorMsg(
+        isAr
+          ? 'يرجى إدخال الاسم الكامل لتقني الأشعة (حرفين على الأقل).'
+          : 'Please enter the radiographer full name (at least 2 characters).'
+      );
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      setErrorMsg('يرجى إدخال بريد إلكتروني صحيح.');
+      setErrorMsg(
+        isAr
+          ? 'يرجى إدخال بريد إلكتروني صحيح.'
+          : 'Please enter a valid email address.'
+      );
       return;
     }
     if (password.length < 6) {
-      setErrorMsg('كلمة المرور يجب أن تتكون من 6 أحرف على الأقل.');
+      setErrorMsg(
+        isAr
+          ? 'كلمة المرور يجب أن تتكون من 6 أحرف على الأقل.'
+          : 'Password must be at least 6 characters long.'
+      );
       return;
     }
 
@@ -77,45 +97,79 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#0B111A] text-slate-100 flex flex-col">
-      {/* 3-Zone Top Bar */}
+    <div className="min-h-dvh bg-[#0B111A] text-slate-100 flex flex-col">
+      {/* Top Bar */}
       <header className="border-b border-slate-800/90 bg-[#0D1520]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-4 sm:gap-8">
-          <span className="text-base sm:text-lg font-display font-bold text-white whitespace-nowrap shrink-0">
-            عيادة الأشعة التخصصية
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-8">
+          <span className="text-sm sm:text-lg font-display font-bold text-white whitespace-nowrap shrink-0">
+            {isAr
+              ? 'عيادة الأشعة التخصصية'
+              : 'Specialized Radiology Clinic'}
           </span>
-          <div className="hidden md:flex items-center gap-6 text-sm text-slate-400">
-            <span>حفظ سحابي تلقائي للتقدم</span>
+          <div className="hidden lg:flex items-center gap-6 text-sm text-slate-400">
+            <span>
+              {isAr ? 'حفظ سحابي تلقائي للتقدم' : 'Auto cloud progress saving'}
+            </span>
             <span aria-hidden="true">·</span>
-            <span>فحوصات الصدر والعمود الفقري</span>
+            <span>
+              {isAr
+                ? 'نظام CR ثم التطوير إلى DR'
+                : 'CR Cassette & Digital DR Workflow'}
+            </span>
             <span aria-hidden="true">·</span>
-            <span>تجهيزات CT و MRI</span>
+            <span>
+              {isAr ? 'محاكاة ثلاثية الأبعاد' : '3D Clinic Simulation'}
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={() => setMode(mode === 'LOGIN' ? 'REGISTER' : 'LOGIN')}
-            className="px-3.5 sm:px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
-          >
-            {mode === 'LOGIN' ? 'إنشاء حساب جديد' : 'لدي حساب مسبق'}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={toggleLang}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-colors"
+            >
+              <Languages className="w-3.5 h-3.5 shrink-0" />
+              <span>{isAr ? 'English' : 'العربية'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode(mode === 'LOGIN' ? 'REGISTER' : 'LOGIN')}
+              className="px-3 sm:px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs whitespace-nowrap cursor-pointer transition-colors"
+            >
+              {mode === 'LOGIN'
+                ? isAr
+                  ? 'إنشاء حساب جديد'
+                  : 'Create Account'
+                : isAr
+                  ? 'لدي حساب مسبق'
+                  : 'Sign In'}
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 flex items-center py-5 sm:py-10 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch">
+      <main className="flex-1 flex items-center py-4 sm:py-8 px-3 sm:px-6">
+        <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 items-stretch">
           {/* Form Column */}
-          <div className="lg:col-span-5 rounded-2xl border border-slate-800 bg-[#111A27] p-5 sm:p-8 flex flex-col justify-between gap-6">
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <h1 className="text-2xl sm:text-3xl font-display font-bold text-white [text-wrap:balance]">
+          <div className="lg:col-span-5 rounded-2xl border border-slate-800 bg-[#111A27] p-4 sm:p-8 flex flex-col justify-between gap-5">
+            <div className="space-y-4 sm:space-y-5">
+              <div className="space-y-1.5 sm:space-y-2">
+                <h1 className="text-xl sm:text-3xl font-display font-bold text-white [text-wrap:balance]">
                   {mode === 'REGISTER'
-                    ? 'إنشاء حساب تقني الأشعة'
-                    : 'تسجيل الدخول إلى عيادتك'}
+                    ? isAr
+                      ? 'إنشاء حساب تقني الأشعة'
+                      : 'Create Radiographer Account'
+                    : isAr
+                      ? 'تسجيل الدخول إلى عيادتك'
+                      : 'Sign In to Your Clinic'}
                 </h1>
-                <p className="text-sm text-slate-400 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
                   {mode === 'REGISTER'
-                    ? 'سجّل اسمك وبريدك الإلكتروني ليتم حفظ رصيدك والأفلام والأجهزة في السحابة والعودة لها في أي وقت.'
-                    : 'أدخل بريدك الإلكتروني وكلمة المرور لاستعادة عيادتك وإكمال التقدم من حيث توقفت.'}
+                    ? isAr
+                      ? 'سجّل اسمك وبريدك الإلكتروني ليتم حفظ رصيدك والأفلام والأجهزة في السحابة والعودة لها في أي وقت.'
+                      : 'Register with your name and email so your cash, films, and clinic equipment stay saved in the cloud.'
+                    : isAr
+                      ? 'أدخل بريدك الإلكتروني وكلمة المرور لاستعادة عيادتك وإكمال التقدم من حيث توقفت.'
+                      : 'Enter your email and password to restore your clinic and continue where you left off.'}
                 </p>
               </div>
 
@@ -133,7 +187,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  إنشاء حساب جديد
+                  {isAr ? 'إنشاء حساب جديد' : 'Register'}
                 </button>
                 <button
                   type="button"
@@ -147,7 +201,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  تسجيل الدخول
+                  {isAr ? 'تسجيل الدخول' : 'Sign In'}
                 </button>
               </div>
 
@@ -158,25 +212,35 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
                 {mode === 'REGISTER' && (
                   <div className="space-y-1.5">
                     <label
                       htmlFor="tech-name"
                       className="block text-xs font-medium text-slate-300"
                     >
-                      الاسم الكامل
+                      {isAr ? 'الاسم الكامل' : 'Full Name'}
                     </label>
                     <div className="relative">
-                      <User className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <User
+                        className={`w-4 h-4 text-slate-500 absolute top-1/2 -translate-y-1/2 pointer-events-none ${
+                          isAr ? 'right-3.5' : 'left-3.5'
+                        }`}
+                      />
                       <input
                         id="tech-name"
                         type="text"
                         required
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="مثال: تقني أشعة مجتبى كريم"
-                        className="w-full rounded-lg border border-slate-700 bg-[#0B111A] pr-10 pl-3.5 py-2.5 text-base sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+                        placeholder={
+                          isAr
+                            ? 'مثال: تقني أشعة مجتبى كريم'
+                            : 'e.g., Tech Mojtaba Kareem'
+                        }
+                        className={`w-full rounded-lg border border-slate-700 bg-[#0B111A] py-2.5 text-base sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 ${
+                          isAr ? 'pr-10 pl-3.5' : 'pl-10 pr-3.5'
+                        }`}
                       />
                     </div>
                   </div>
@@ -187,10 +251,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     htmlFor="tech-email"
                     className="block text-xs font-medium text-slate-300"
                   >
-                    البريد الإلكتروني
+                    {isAr ? 'البريد الإلكتروني' : 'Email Address'}
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Mail
+                      className={`w-4 h-4 text-slate-500 absolute top-1/2 -translate-y-1/2 pointer-events-none ${
+                        isAr ? 'right-3.5' : 'left-3.5'
+                      }`}
+                    />
                     <input
                       id="tech-email"
                       type="email"
@@ -199,7 +267,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@example.com"
-                      className="w-full rounded-lg border border-slate-700 bg-[#0B111A] pr-10 pl-3.5 py-2.5 text-base sm:text-sm text-white text-left placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+                      className={`w-full rounded-lg border border-slate-700 bg-[#0B111A] py-2.5 text-base sm:text-sm text-white text-left placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 ${
+                        isAr ? 'pr-10 pl-3.5' : 'pl-10 pr-3.5'
+                      }`}
                     />
                   </div>
                 </div>
@@ -209,10 +279,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     htmlFor="tech-password"
                     className="block text-xs font-medium text-slate-300"
                   >
-                    كلمة المرور
+                    {isAr ? 'كلمة المرور' : 'Password'}
                   </label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Lock
+                      className={`w-4 h-4 text-slate-500 absolute top-1/2 -translate-y-1/2 pointer-events-none ${
+                        isAr ? 'right-3.5' : 'left-3.5'
+                      }`}
+                    />
                     <input
                       id="tech-password"
                       type="password"
@@ -222,7 +296,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full rounded-lg border border-slate-700 bg-[#0B111A] pr-10 pl-3.5 py-2.5 text-base sm:text-sm text-white text-left placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+                      className={`w-full rounded-lg border border-slate-700 bg-[#0B111A] py-2.5 text-base sm:text-sm text-white text-left placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 ${
+                        isAr ? 'pr-10 pl-3.5' : 'pl-10 pr-3.5'
+                      }`}
                     />
                   </div>
                 </div>
@@ -233,34 +309,55 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   className="w-full py-3 px-5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed transition-colors"
                 >
                   {loading ? (
-                    <span>جاري الاتصال بقاعدة البيانات...</span>
+                    <span>
+                      {isAr
+                        ? 'جاري الاتصال بقاعدة البيانات...'
+                        : 'Connecting to database...'}
+                    </span>
                   ) : mode === 'REGISTER' ? (
                     <>
                       <UserPlus className="w-4 h-4 shrink-0" />
-                      <span>إنشاء الحساب وبدء العيادة</span>
+                      <span>
+                        {isAr
+                          ? 'إنشاء الحساب وبدء العيادة'
+                          : 'Create Account & Start Clinic'}
+                      </span>
                     </>
                   ) : (
                     <>
                       <LogIn className="w-4 h-4 shrink-0" />
-                      <span>تسجيل الدخول ومتابعة التقدم</span>
+                      <span>
+                        {isAr
+                          ? 'تسجيل الدخول ومتابعة التقدم'
+                          : 'Sign In & Continue'}
+                      </span>
                     </>
                   )}
                 </button>
               </form>
             </div>
 
-            <div className="pt-4 border-t border-slate-800 text-xs text-slate-400 leading-relaxed">
-              تُحفظ بيانات جلستك تلقائياً؛ عند العودة بعد أيام ستبقى مسجلاً أو يمكنك الدخول بنفس البريد لاسترجاع رصيدك والأفلام والتجهيزات.
+            <div className="pt-3 border-t border-slate-800 space-y-3">
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {isAr
+                  ? 'تُحفظ بيانات جلستك تلقائياً؛ عند العودة بعد أيام ستبقى مسجلاً أو يمكنك الدخول بنفس البريد لاسترجاع رصيدك والأفلام والتجهيزات.'
+                  : 'Your clinic session saves automatically; sign in anytime with the same email to restore your funds, films, and upgrades.'}
+              </p>
+              <DesignerCredit variant="footer" />
             </div>
           </div>
 
           {/* Visual Showcase Column */}
           <div className="lg:col-span-7 rounded-2xl border border-slate-800 bg-[#0E1622] overflow-hidden flex flex-col justify-between">
-            <div className="relative flex-1 min-h-[260px] bg-slate-900 overflow-hidden">
+            <div className="relative flex-1 min-h-[200px] sm:min-h-[260px] bg-slate-900 overflow-hidden">
               {!heroError ? (
                 <img
                   src={CLINIC_ROOM_IMAGE}
-                  alt="غرفة الأشعة الطبية التخصصية"
+                  alt={
+                    isAr
+                      ? 'غرفة الأشعة الطبية التخصصية'
+                      : 'Radiology Imaging Suite'
+                  }
                   referrerPolicy="no-referrer"
                   onError={() => setHeroError(true)}
                   className="w-full h-full object-cover"
@@ -272,21 +369,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </div>
 
             {/* Preview Strip: Patients & Scans */}
-            <div className="p-6 space-y-4 border-t border-slate-800/80">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>عيادة متكاملة لاستقبال المرضى وفحص الصور الإشعاعية</span>
+            <div className="p-4 sm:p-6 space-y-3 sm:space-y-4 border-t border-slate-800/80">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                <span>
+                  {isAr
+                    ? 'عيادة متكاملة لاستقبال المرضى وفحص الصور الإشعاعية'
+                    : 'Complete 3D imaging clinic for patient positioning and CR/DR workflows'}
+                </span>
                 <span className="font-mono-num text-cyan-300">
-                  $15 / فحص · $100 / كرتون 20 فيلم
+                  {isAr
+                    ? `$15 / فحص · $${FILM_CARTON_COST} / كرتون ${FILM_CARTON_SIZE} فيلم`
+                    : `$15 / Exam · $${FILM_CARTON_COST} / ${FILM_CARTON_SIZE}-Film Carton`}
                 </span>
               </div>
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
                 {[
-                  {src: PATIENT_AVATARS.manYoung, alt: 'مريض شاب'},
-                  {src: PATIENT_AVATARS.womanYoung, alt: 'مريضة شابة'},
-                  {src: REGION_SCAN_IMAGES.chest, alt: 'أشعة الصدر'},
-                  {src: REGION_SCAN_IMAGES.cervical, alt: 'أشعة الفقرات العنقية'},
-                  {src: REGION_SCAN_IMAGES.hand, alt: 'أشعة اليد'},
-                  {src: PATIENT_AVATARS.manSenior, alt: 'مريض مسن'},
+                  {src: PATIENT_AVATARS.manYoung, alt: isAr ? 'مريض شاب' : 'Patient'},
+                  {src: PATIENT_AVATARS.womanYoung, alt: isAr ? 'مريضة شابة' : 'Patient'},
+                  {src: REGION_SCAN_IMAGES.chest, alt: isAr ? 'أشعة الصدر' : 'Chest X-Ray'},
+                  {src: REGION_SCAN_IMAGES.cervical, alt: isAr ? 'أشعة الفقرات العنقية' : 'Cervical X-Ray'},
+                  {src: REGION_SCAN_IMAGES.hand, alt: isAr ? 'أشعة اليد' : 'Hand X-Ray'},
+                  {src: PATIENT_AVATARS.manSenior, alt: isAr ? 'مريض مسن' : 'Senior Patient'},
                 ].map((thumb, idx) => (
                   <div
                     key={idx}

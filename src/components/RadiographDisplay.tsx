@@ -21,10 +21,15 @@ import type {
 } from '../types/radiology';
 import {
   CT_SCAN_IMAGE,
+  FILM_CARTON_COST,
   MRI_SCAN_IMAGE,
-  REGION_LABELS_AR,
   REGION_SCAN_IMAGES,
 } from '../data/radiologyData';
+import {
+  MODALITY_LABELS_I18N,
+  REGION_LABELS_I18N,
+  useLanguage,
+} from '../i18n/translations';
 
 interface RadiographDisplayProps {
   patient: PatientCase;
@@ -43,15 +48,86 @@ type ViewPresetId = 'STANDARD' | 'LUNG' | 'BONE' | 'SOFT';
 
 const VIEW_PRESETS: {
   id: ViewPresetId;
-  label: string;
+  labelAr: string;
+  labelEn: string;
   brightness: number;
   contrast: number;
 }[] = [
-  {id: 'STANDARD', label: 'قياسي (View)', brightness: 108, contrast: 112},
-  {id: 'LUNG', label: 'نافذة الرئة', brightness: 122, contrast: 132},
-  {id: 'BONE', label: 'نافذة العظام', brightness: 94, contrast: 158},
-  {id: 'SOFT', label: 'أنسجة رخوة', brightness: 114, contrast: 96},
+  {
+    id: 'STANDARD',
+    labelAr: 'قياسي (View)',
+    labelEn: 'Standard',
+    brightness: 108,
+    contrast: 112,
+  },
+  {
+    id: 'LUNG',
+    labelAr: 'نافذة الرئة',
+    labelEn: 'Lung Window',
+    brightness: 122,
+    contrast: 132,
+  },
+  {
+    id: 'BONE',
+    labelAr: 'نافذة العظام',
+    labelEn: 'Bone Window',
+    brightness: 94,
+    contrast: 158,
+  },
+  {
+    id: 'SOFT',
+    labelAr: 'أنسجة رخوة',
+    labelEn: 'Soft Tissue',
+    brightness: 114,
+    contrast: 96,
+  },
 ];
+
+function getEvaluationText(
+  evaluation: ScanEvaluation,
+  lang: 'ar' | 'en',
+  regionLabel: string
+): {title: string; feedback: string} {
+  if (lang === 'ar') {
+    return {title: evaluation.titleAr, feedback: evaluation.feedbackAr};
+  }
+  switch (evaluation.reasonCode) {
+    case 'OPTIMAL':
+      return {
+        title: 'Diagnostic Quality Image',
+        feedback: `Excellent image contrast and anatomical alignment for ${regionLabel}.`,
+      };
+    case 'WRONG_REGION':
+      return {
+        title: 'Wrong Anatomical Region',
+        feedback: `You imaged ${regionLabel}, but the requested region does not match the patient's exam.`,
+      };
+    case 'WRONG_POSTURE':
+      return {
+        title: 'Incorrect Patient Posture',
+        feedback:
+          'Patient positioning does not match the clinical protocol (Erect vs. Table). Reposition and retake.',
+      };
+    case 'WRONG_PROJECTION':
+      return {
+        title: 'Projection Mismatch',
+        feedback:
+          'The chosen patient posture/projection does not match the requested radiographic view.',
+      };
+    case 'UNDEREXPOSED':
+      return {
+        title: 'Underexposed Image (Low mAs/kVp)',
+        feedback:
+          'Insufficient beam penetration caused a faint, noisy image. Increase kVp or mAs and repeat.',
+      };
+    case 'OVEREXPOSED':
+      return {
+        title: 'Overexposed Image (Excess Dose)',
+        feedback:
+          'Excessive exposure darkened the radiograph. Lower kVp or mAs to protect diagnostic detail.',
+      };
+  }
+}
 
 export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
   patient,
@@ -65,6 +141,9 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
   onRetake,
   onGoToShop,
 }) => {
+  const {lang} = useLanguage();
+  const isAr = lang === 'ar';
+
   // View Controls
   const [viewPreset, setViewPreset] = useState<ViewPresetId>('STANDARD');
   const [brightnessPct, setBrightnessPct] = useState(108);
@@ -85,6 +164,11 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
       : requestedExam.modality === 'MRI'
         ? MRI_SCAN_IMAGE
         : REGION_SCAN_IMAGES[evaluation.targetRegionScanned];
+
+  const regionLabel =
+    REGION_LABELS_I18N[lang][evaluation.targetRegionScanned];
+  const modalityLabel = MODALITY_LABELS_I18N[lang][requestedExam.modality];
+  const evalText = getEvaluationText(evaluation, lang, regionLabel);
 
   const handleSelectViewPreset = (preset: (typeof VIEW_PRESETS)[number]) => {
     setViewPreset(preset.id);
@@ -118,7 +202,6 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
   const outOfFilms =
     !hasDR && requestedExam.modality === 'XRAY' && filmsRemaining <= 0;
 
-  // Shutter mask inset percentage from viewport borders
   const maskInsetPct = shutterMaskEnabled
     ? Math.max(0, (100 - maskAperturePct) / 2)
     : 0;
@@ -136,10 +219,10 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
           />
           <div className="min-w-0">
             <div className="text-sm font-bold text-white truncate">
-              {patient.nameAr} · {REGION_LABELS_AR[evaluation.targetRegionScanned]}
+              {patient.nameAr} · {regionLabel}
             </div>
             <div className="text-[11px] text-slate-400">
-              {requestedExam.modalityLabelAr} · {kvp} kVp · {mas} mAs
+              {modalityLabel} · {kvp} kVp · {mas} mAs
             </div>
           </div>
         </div>
@@ -157,7 +240,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                   : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700'
               }`}
             >
-              {preset.label}
+              {isAr ? preset.labelAr : preset.labelEn}
             </button>
           ))}
         </div>
@@ -168,7 +251,6 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
         {/* LEFT/TOP: Illuminated Radiograph View + Collimation Mask Viewport */}
         <div className="lg:col-span-7 rounded-xl border border-slate-800 bg-[#08101C] p-3 sm:p-4 flex flex-col items-center gap-3">
           <div className="relative w-full max-w-[440px] aspect-square rounded-xl bg-[#04080F] border-2 border-cyan-900/60 overflow-hidden flex items-center justify-center shadow-[0_0_45px_rgba(34,211,238,0.12)]">
-            {/* Transformed Radiograph Layer */}
             <div
               className="w-full h-full flex items-center justify-center transition-transform duration-200"
               style={{
@@ -178,13 +260,12 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
             >
               <img
                 src={imageSrc}
-                alt={`صورة أشعة ${REGION_LABELS_AR[evaluation.targetRegionScanned]}`}
+                alt={regionLabel}
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-contain"
               />
             </div>
 
-            {/* Collimation Shutter Mask Layer */}
             {shutterMaskEnabled && (
               <div
                 className="pointer-events-none absolute inset-0 transition-all duration-150"
@@ -206,12 +287,11 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
               </div>
             )}
 
-            {/* DICOM Overlay & Crosshair Mask Layer */}
             {overlayMaskEnabled && (
               <>
                 <div className="pointer-events-none absolute top-2.5 right-3 z-10 text-[11px] font-mono-num text-cyan-200 text-right leading-relaxed bg-[#040912]/70 px-2 py-1 rounded">
                   <div>{patient.nameAr}</div>
-                  <div>{REGION_LABELS_AR[evaluation.targetRegionScanned]}</div>
+                  <div>{regionLabel}</div>
                 </div>
                 <div className="pointer-events-none absolute top-2.5 left-3 z-10 text-[11px] font-mono-num text-cyan-200 text-left leading-relaxed bg-[#040912]/70 px-2 py-1 rounded">
                   <div>{kvp} kVp</div>
@@ -235,7 +315,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 type="button"
                 onClick={() => setZoomPct((z) => Math.max(100, z - 20))}
                 className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
-                aria-label="تصغير"
+                aria-label={isAr ? 'تصغير' : 'Zoom Out'}
               >
                 <ZoomOut className="w-3.5 h-3.5" />
               </button>
@@ -246,7 +326,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 type="button"
                 onClick={() => setZoomPct((z) => Math.min(220, z + 20))}
                 className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
-                aria-label="تكبير"
+                aria-label={isAr ? 'تكبير' : 'Zoom In'}
               >
                 <ZoomIn className="w-3.5 h-3.5" />
               </button>
@@ -259,7 +339,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
               >
                 <RotateCw className="w-3.5 h-3.5" />
-                <span>تدوير</span>
+                <span>{isAr ? 'تدوير' : 'Rotate'}</span>
               </button>
               <button
                 type="button"
@@ -271,7 +351,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 }`}
               >
                 <FlipHorizontal2 className="w-3.5 h-3.5" />
-                <span>انعكاس</span>
+                <span>{isAr ? 'انعكاس' : 'Flip'}</span>
               </button>
               <button
                 type="button"
@@ -283,7 +363,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 }`}
               >
                 <Contrast className="w-3.5 h-3.5" />
-                <span>عكس</span>
+                <span>{isAr ? 'عكس' : 'Invert'}</span>
               </button>
             </div>
           </div>
@@ -296,21 +376,21 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
             <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
               <div className="flex items-center gap-2 text-xs font-bold text-white">
                 <SlidersHorizontal className="w-4 h-4 text-cyan-400 shrink-0" />
-                <span>التحكم بالعرض (View)</span>
+                <span>{isAr ? 'التحكم بالعرض (View)' : 'View Controls'}</span>
               </div>
               <button
                 type="button"
                 onClick={handleResetViewAndMask}
                 className="text-[11px] text-cyan-400 hover:text-cyan-300 cursor-pointer"
               >
-                إعادة ضبط
+                {isAr ? 'إعادة ضبط' : 'Reset'}
               </button>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <label htmlFor="img-brightness" className="text-slate-300">
-                  السطوع (Brightness)
+                  {isAr ? 'السطوع (Brightness)' : 'Brightness'}
                 </label>
                 <span className="font-mono-num text-cyan-300 font-semibold">
                   {brightnessPct}%
@@ -330,7 +410,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <label htmlFor="img-contrast" className="text-slate-300">
-                  التباين (Contrast)
+                  {isAr ? 'التباين (Contrast)' : 'Contrast'}
                 </label>
                 <span className="font-mono-num text-cyan-300 font-semibold">
                   {contrastPct}%
@@ -352,7 +432,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
           <section className="rounded-xl border border-slate-800 bg-[#0D1624] p-4 space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-white pb-2 border-b border-slate-800/80">
               <Scan className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span>التحكم بالقناع (Mask)</span>
+              <span>{isAr ? 'التحكم بالقناع (Mask)' : 'Collimation Mask'}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -366,7 +446,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 }`}
               >
                 <Maximize2 className="w-3.5 h-3.5 shrink-0" />
-                <span>قناع التحديد</span>
+                <span>{isAr ? 'قناع التحديد' : 'Shutter Mask'}</span>
               </button>
 
               <button
@@ -383,17 +463,21 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 ) : (
                   <EyeOff className="w-3.5 h-3.5 shrink-0" />
                 )}
-                <span>بيانات القناع</span>
+                <span>{isAr ? 'بيانات القناع' : 'DICOM Overlay'}</span>
               </button>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <label htmlFor="mask-aperture" className="text-slate-300">
-                  فتحة قناع الحقل (Mask Aperture)
+                  {isAr ? 'فتحة قناع الحقل (Mask Aperture)' : 'Mask Aperture'}
                 </label>
                 <span className="font-mono-num text-cyan-300 font-semibold">
-                  {shutterMaskEnabled ? `${maskAperturePct}%` : 'مفتوح'}
+                  {shutterMaskEnabled
+                    ? `${maskAperturePct}%`
+                    : isAr
+                      ? 'مفتوح'
+                      : 'Open'}
                 </span>
               </div>
               <input
@@ -430,21 +514,21 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                       evaluation.success ? 'text-emerald-300' : 'text-amber-300'
                     }`}
                   >
-                    {evaluation.titleAr}
+                    {evalText.title}
                   </h4>
                   {evaluation.filmConsumed > 0 && (
                     <span className="text-[11px] font-mono-num text-slate-400 shrink-0">
-                      -1 فيلم
+                      {isAr ? '-1 فيلم' : '-1 Film'}
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  {evaluation.feedbackAr}
+                  {evalText.feedback}
                 </p>
                 {evaluation.success && (
                   <p className="pt-1.5 text-xs text-emerald-200 border-t border-emerald-800/50">
                     <span className="font-bold text-emerald-400">
-                      التشخيص:{' '}
+                      {isAr ? 'التشخيص: ' : 'Finding: '}
                     </span>
                     {patient.findingAr}
                   </p>
@@ -458,7 +542,9 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 onClick={onApproveAndCollect}
                 className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors"
               >
-                <span>اعتماد الصورة واستلام</span>
+                <span>
+                  {isAr ? 'اعتماد الصورة واستلام' : 'Approve & Collect'}
+                </span>
                 <span className="font-mono-num">${evaluation.totalEarned}</span>
               </button>
             ) : outOfFilms ? (
@@ -467,7 +553,9 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 onClick={onGoToShop}
                 className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm cursor-pointer transition-colors"
               >
-                نفدت الأفلام — اذهب للمتجر لشراء كرتون ($100)
+                {isAr
+                  ? `نفدت الأفلام — اذهب للمتجر لشراء كرتون ($${FILM_CARTON_COST})`
+                  : `Out of Films — Go to Shop ($${FILM_CARTON_COST})`}
               </button>
             ) : (
               <button
@@ -476,7 +564,11 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 className="w-full py-3 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors"
               >
                 <RotateCcw className="w-4 h-4 shrink-0" />
-                <span>تعديل الإعدادات وإعادة التصوير</span>
+                <span>
+                  {isAr
+                    ? 'تعديل الإعدادات وإعادة التصوير'
+                    : 'Adjust Settings & Retake'}
+                </span>
               </button>
             )}
           </section>

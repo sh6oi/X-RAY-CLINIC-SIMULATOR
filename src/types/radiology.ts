@@ -133,8 +133,16 @@ export interface ClinicRank {
   subtitleAr: string;
 }
 
+export type Language = 'ar' | 'en';
+
 export type TechLocation = 'ROOM' | 'BOOTH';
-export type CassetteState = 'RACK' | 'IN_HAND' | 'TABLE_BUCKY' | 'WALL_BUCKY';
+export type CassetteState =
+  | 'RACK'
+  | 'IN_HAND'
+  | 'TABLE_BUCKY'
+  | 'WALL_BUCKY'
+  | 'EXPOSED_IN_HAND'
+  | 'IN_CR_READER';
 
 export type ScreenMode = 'AUTH' | 'PLAYING';
 export type WorkspaceTab = 'IMAGE' | 'LOG' | 'SHOP' | 'PROTOCOLS';

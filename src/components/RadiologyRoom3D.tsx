@@ -5,19 +5,23 @@ import type {
   BodyRegion,
   CassetteState,
   ExamProtocol,
+  Language,
   PatientCase,
   PatientPosture,
   TechLocation,
   UpgradeId,
 } from '../types/radiology';
-import {CLINIC_ROOM_IMAGE, REGION_LABELS_AR} from '../data/radiologyData';
+import {CLINIC_ROOM_IMAGE} from '../data/radiologyData';
+import {REGION_LABELS_I18N} from '../i18n/translations';
 
 export type SceneTargetAction =
   | {type: 'REGION'; region: BodyRegion}
   | {type: 'CASSETTE_RACK'}
   | {type: 'TABLE_BUCKY'}
   | {type: 'WALL_BUCKY'}
+  | {type: 'CR_READER'}
   | {type: 'DOOR'}
+  | {type: 'WAITING_DOOR'}
   | {type: 'CT_DOOR'}
   | {type: 'MRI_DOOR'}
   | {type: 'CONSOLE'}
@@ -25,6 +29,7 @@ export type SceneTargetAction =
 
 interface RadiologyRoom3DProps {
   patient: PatientCase | null;
+  waitingPatients?: PatientCase[];
   requestedExam: ExamProtocol;
   selectedRegion: BodyRegion;
   selectedPosture: PatientPosture;
@@ -33,9 +38,14 @@ interface RadiologyRoom3DProps {
   ctDoorOpen: boolean;
   mriDoorOpen: boolean;
   cassetteState: CassetteState;
+  crExposedPending: boolean;
+  isDeveloping: boolean;
+  hasDR: boolean;
   shieldUsed: boolean;
   patientPrepped: boolean;
   isExposing: boolean;
+  patientSpeech: string | null;
+  language: Language;
   ownedUpgrades: UpgradeId[];
   joystickRef: React.MutableRefObject<{x: number; y: number}>;
   onTechZoneChange?: (loc: TechLocation) => void;
@@ -136,6 +146,8 @@ const _camGoalTarget = new THREE.Vector3();
 const _pointerNdc = new THREE.Vector2();
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
+const _headWorldPos = new THREE.Vector3();
+const _headProj = new THREE.Vector3();
 
 function hashPatientSeed(id: string): number {
   let h = 2166136261;
@@ -151,27 +163,46 @@ function canStandAt(
   z: number,
   doorClosed: boolean,
   canEnterCt: boolean,
-  canEnterMri: boolean
+  canEnterMri: boolean,
+  canEnterWaiting: boolean
 ): boolean {
-  // Main X-Ray Exam Room interior (north of partition wall)
-  if (z <= 1.86) {
-    if (x < -3.72 || x > 4.08 || z < -2.42) return false;
-    // Avoid walking inside solid X-ray table core
-    if (Math.abs(x) < 1.48 && Math.abs(z) < 0.56) return false;
-    // Avoid cassette rack cabinet
-    if (x < -1.16 && z < -1.5) return false;
+  // Patient Waiting Room (north of waiting glass wall, z < -5.0)
+  if (z < -5.0) {
+    if (!canEnterWaiting) return false;
+    if (x < -4.95 || x > 0.9 || z < -8.42) return false;
+    // Avoid waiting room bench & reception desk
+    if (z <= -6.82 && x >= -4.05 && x <= -0.15) return false;
+    if (x < -4.15 && z < -5.85) return false;
     return true;
   }
 
-  // Partition threshold (z = 1.86..2.24): Booth Door | CT Room Door | MRI Room Door
+  // North Waiting Room door threshold (z = -5.0 .. -4.60)
+  if (z >= -5.0 && z < -4.6) {
+    if (x >= -2.72 && x <= -1.52) {
+      return canEnterWaiting;
+    }
+    return false;
+  }
+
+  // Enlarged Main X-Ray Exam Room interior (-4.60 <= z <= 1.86, -5.05 <= x <= 7.05)
+  if (z <= 1.86) {
+    if (x < -5.05 || x > 7.05 || z < -4.6) return false;
+    // Avoid walking inside solid X-ray table core
+    if (Math.abs(x) < 1.48 && Math.abs(z) < 0.56) return false;
+    // Avoid cassette storage rack at (-3.20, -1.55)
+    if (x >= -3.72 && x <= -2.68 && z >= -1.94 && z <= -1.16) return false;
+    return true;
+  }
+
+  // South Partition threshold (z = 1.86..2.24): Booth Door | CT Suite Door | MRI Suite Door
   if (z > 1.86 && z < 2.24) {
     if (x >= -1.46 && x <= -0.56) {
       return !doorClosed;
     }
-    if (x >= 0.36 && x <= 1.14) {
+    if (x >= -0.14 && x <= 0.94) {
       return canEnterCt;
     }
-    if (x >= 2.86 && x <= 3.64) {
+    if (x >= 3.62 && x <= 4.7) {
       return canEnterMri;
     }
     return false;
@@ -179,26 +210,27 @@ function canStandAt(
 
   // South wing rooms (z >= 2.24)
   if (z >= 2.24) {
-    // 1. Control Booth (x: -3.75 .. -0.64)
+    // 1. Expanded Control Booth (x: -5.05 .. -0.64, z: 2.24 .. 4.02)
     if (x <= -0.64) {
-      if (x < -3.75 || z > 3.78) return false;
-      if (x > -3.58 && x < -1.44 && z < 3.06) return false;
+      if (x < -5.05 || z > 4.02) return false;
+      // Desk core
+      if (x >= -5.1 && x <= -1.62 && z < 3.12) return false;
       return true;
     }
 
-    // 2. CT Scanner Room (x: -0.34 .. 1.82)
-    if (x >= -0.34 && x <= 1.82) {
-      if (!canEnterCt || z > 4.18) return false;
-      // Avoid walking into CT gantry / patient couch core
-      if (x >= 0.22 && x <= 1.32 && z >= 2.88) return false;
+    // 2. Monumental CT Scanner Suite (x: -0.34 .. 3.24, z: 2.24 .. 7.42)
+    if (x >= -0.34 && x <= 3.24) {
+      if (!canEnterCt || z > 7.42) return false;
+      // Avoid walking into colossal CT gantry & patient couch core
+      if (x >= 0.14 && x <= 2.82 && z >= 3.3 && z <= 6.15) return false;
       return true;
     }
 
-    // 3. MRI Suite Room (x: 2.18 .. 4.26)
-    if (x >= 2.18 && x <= 4.26) {
-      if (!canEnterMri || z > 4.18) return false;
-      // Avoid walking into MRI magnet bore / couch core
-      if (x >= 2.74 && x <= 3.84 && z >= 2.88) return false;
+    // 3. Monumental MRI Suite (x: 3.64 .. 7.12, z: 2.24 .. 7.42)
+    if (x >= 3.64 && x <= 7.12) {
+      if (!canEnterMri || z > 7.42) return false;
+      // Avoid walking into colossal MRI cryogenic bore & couch core
+      if (x >= 4.08 && x <= 6.74 && z >= 3.2 && z <= 6.45) return false;
       return true;
     }
   }
@@ -278,7 +310,7 @@ function createTileFloorTexture(): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(6, 6);
+  tex.repeat.set(9, 9);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
@@ -449,42 +481,128 @@ function createDetectorPanelTexture(): THREE.CanvasTexture {
 
 function createPcScreenTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 320;
+  canvas.width = 1024;
+  canvas.height = 640;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#07111E';
-  ctx.fillRect(0, 0, 512, 320);
-  ctx.fillStyle = '#0F223A';
-  ctx.fillRect(0, 0, 512, 40);
-  ctx.fillStyle = '#38BDF8';
-  ctx.font = 'bold 20px sans-serif';
-  ctx.fillText('PACS WORKSTATION · CLINIC PC', 20, 27);
-  // Left image frame
-  ctx.strokeStyle = '#22D3EE';
+  ctx.fillStyle = '#060E1A';
+  ctx.fillRect(0, 0, 1024, 640);
+
+  // Top PACS Toolbar
+  ctx.fillStyle = '#0E1F36';
+  ctx.fillRect(0, 0, 1024, 64);
+  ctx.fillStyle = '#22D3EE';
+  ctx.fillRect(0, 62, 1024, 3);
+  ctx.fillStyle = '#E0F2FE';
+  ctx.font = 'bold 26px sans-serif';
+  ctx.fillText('CLINIC PACS · 5MP DIAGNOSTIC WORKSTATION', 26, 42);
+  ctx.fillStyle = '#10B981';
+  ctx.fillRect(830, 16, 170, 32);
+  ctx.fillStyle = '#052E16';
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText('DICOM ONLINE', 848, 38);
+
+  // Left Thumbnail Column
+  ctx.fillStyle = '#0A1628';
+  ctx.fillRect(20, 82, 150, 536);
+  ctx.strokeStyle = '#1E3A5F';
   ctx.lineWidth = 2;
-  ctx.strokeRect(20, 56, 200, 236);
-  ctx.fillStyle = '#0A192C';
-  ctx.fillRect(22, 58, 196, 232);
-  // Stylized chest x-ray preview inside PC monitor
-  ctx.strokeStyle = 'rgba(226,232,240,0.85)';
-  ctx.lineWidth = 3;
-  for (let r = 0; r < 5; r++) {
+  ctx.strokeRect(20, 82, 150, 536);
+  [0, 1, 2].forEach((i) => {
+    const ty = 98 + i * 168;
+    ctx.fillStyle = i === 0 ? '#112A46' : '#0D1E34';
+    ctx.fillRect(34, ty, 122, 146);
+    ctx.strokeStyle = i === 0 ? '#38BDF8' : '#334155';
+    ctx.strokeRect(34, ty, 122, 146);
+    ctx.strokeStyle = 'rgba(226,232,240,0.75)';
     ctx.beginPath();
-    ctx.ellipse(120, 115 + r * 26, 56 - r * 3, 12, 0, 0, Math.PI * 2);
+    ctx.ellipse(95, ty + 68, 36 - i * 4, 48 - i * 5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  // Center Active High-Contrast Radiograph Viewport
+  ctx.fillStyle = '#030811';
+  ctx.fillRect(190, 82, 470, 536);
+  ctx.strokeStyle = '#0EA5E9';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(190, 82, 470, 536);
+
+  const chestGrad = ctx.createRadialGradient(425, 330, 30, 425, 330, 210);
+  chestGrad.addColorStop(0, 'rgba(226, 232, 240, 0.32)');
+  chestGrad.addColorStop(0.65, 'rgba(56, 189, 248, 0.14)');
+  chestGrad.addColorStop(1, 'rgba(3, 8, 17, 0.0)');
+  ctx.fillStyle = chestGrad;
+  ctx.fillRect(210, 100, 430, 490);
+
+  ctx.strokeStyle = 'rgba(241, 245, 249, 0.88)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(425, 130);
+  ctx.lineTo(425, 550);
+  ctx.stroke();
+  for (let r = 0; r < 7; r++) {
+    ctx.beginPath();
+    ctx.ellipse(425, 195 + r * 44, 135 - r * 7, 22, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
-  // Right buttons/cards
-  ctx.fillStyle = '#132842';
-  ctx.fillRect(240, 56, 250, 68);
-  ctx.fillRect(240, 138, 250, 68);
-  ctx.fillRect(240, 220, 250, 72);
+  ctx.fillStyle = '#38BDF8';
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText('W:1600  L:-500  PA ERECT', 210, 112);
+  ctx.fillStyle = '#94A3B8';
+  ctx.fillText('SID 180cm · 120 kVp · 4.0 mAs', 210, 598);
+
+  // Right Action Modules
+  const cards = [
+    {title: 'IMAGE VIEW & MASK', sub: 'Window/Level · Zoom · Collimation', bg: '#0F2A44', border: '#22D3EE', fg: '#67E8F9'},
+    {title: 'PATIENT ARCHIVE', sub: 'Case Queue & Clinical Log', bg: '#0D2E2A', border: '#10B981', fg: '#6EE7B7'},
+    {title: 'CLINIC EQUIPMENT SHOP', sub: 'DR Upgrade · Film Inventory', bg: '#2C210E', border: '#F59E0B', fg: '#FDE68A'},
+  ];
+  cards.forEach((c, idx) => {
+    const cy = 84 + idx * 180;
+    ctx.fillStyle = c.bg;
+    ctx.fillRect(682, cy, 320, 158);
+    ctx.strokeStyle = c.border;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(682, cy, 320, 158);
+    ctx.fillStyle = c.fg;
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText(c.title, 704, cy + 62);
+    ctx.fillStyle = '#CBD5E1';
+    ctx.font = '18px sans-serif';
+    ctx.fillText(c.sub, 704, cy + 104);
+  });
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createPcSecondaryScreenTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 384;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#07111F';
+  ctx.fillRect(0, 0, 384, 512);
+  ctx.fillStyle = '#0F2540';
+  ctx.fillRect(0, 0, 384, 52);
   ctx.fillStyle = '#67E8F9';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.fillText('IMAGE EDITOR', 260, 96);
-  ctx.fillStyle = '#A7F3D0';
-  ctx.fillText('PATIENT ARCHIVE', 260, 178);
-  ctx.fillStyle = '#FDE68A';
-  ctx.fillText('CLINIC STORE', 260, 262);
+  ctx.font = 'bold 20px monospace';
+  ctx.fillText('RIS WORKLIST · QUEUE', 20, 34);
+
+  for (let i = 0; i < 6; i++) {
+    const y = 70 + i * 70;
+    ctx.fillStyle = i === 0 ? '#11304D' : '#0D1C30';
+    ctx.fillRect(18, y, 348, 56);
+    ctx.strokeStyle = i === 0 ? '#22D3EE' : '#1E3A5F';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(18, y, 348, 56);
+    ctx.fillStyle = i === 0 ? '#67E8F9' : '#E2E8F0';
+    ctx.font = 'bold 17px monospace';
+    ctx.fillText(i === 0 ? '● ACTIVE EXAM ROOM' : `WAIT #${i} · SCHEDULED`, 32, y + 26);
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '14px monospace';
+    ctx.fillText(i === 0 ? 'STATUS: IN PROGRESS' : 'WAITING LOUNGE', 32, y + 46);
+  }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -492,28 +610,70 @@ function createPcScreenTexture(): THREE.CanvasTexture {
 
 function createConsoleTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 160;
+  canvas.width = 768;
+  canvas.height = 420;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#0A1624';
-  ctx.fillRect(0, 0, 256, 160);
+  ctx.fillStyle = '#071220';
+  ctx.fillRect(0, 0, 768, 420);
   ctx.strokeStyle = '#38BDF8';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(8, 8, 752, 404);
+
+  // Header bar
+  ctx.fillStyle = '#0F2640';
+  ctx.fillRect(18, 18, 732, 54);
+  ctx.fillStyle = '#E0F2FE';
+  ctx.font = 'bold 24px monospace';
+  ctx.fillText('DIGITAL HF X-RAY GENERATOR · kVp / mAs CONSOLE', 34, 53);
+
+  // Digital Parameter Boxes (kVp | mAs | mA / ms)
+  const boxes = [
+    {label: 'TUBE VOLTAGE', val: '120', unit: 'kVp', col: '#22D3EE', x: 26},
+    {label: 'TUBE CURRENT', val: '4.0', unit: 'mAs', col: '#34D399', x: 268},
+    {label: 'ANODE / AEC', val: '200', unit: 'mA · LRG', col: '#FBBF24', x: 510},
+  ];
+  boxes.forEach((b) => {
+    ctx.fillStyle = '#0B1D33';
+    ctx.fillRect(b.x, 92, 228, 165);
+    ctx.strokeStyle = b.col;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(b.x, 92, 228, 165);
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText(b.label, b.x + 18, 124);
+    ctx.fillStyle = b.col;
+    ctx.font = 'bold 62px monospace';
+    ctx.fillText(b.val, b.x + 20, 198);
+    ctx.font = 'bold 22px monospace';
+    ctx.fillText(b.unit, b.x + 20, 236);
+  });
+
+  // Bottom Status Strip
+  ctx.fillStyle = '#0B3B2E';
+  ctx.fillRect(26, 282, 228, 66);
+  ctx.fillStyle = '#34D399';
+  ctx.font = 'bold 26px sans-serif';
+  ctx.fillText('● ROTOR READY', 46, 324);
+
+  ctx.fillStyle = '#451A03';
+  ctx.fillRect(268, 282, 228, 66);
+  ctx.strokeStyle = '#F59E0B';
   ctx.lineWidth = 3;
-  ctx.strokeRect(6, 6, 244, 148);
-  ctx.fillStyle = '#22D3EE';
-  ctx.font = 'bold 20px monospace';
-  ctx.fillText('kVp  |  mAs', 20, 42);
-  ctx.fillStyle = '#10B981';
-  ctx.fillRect(20, 62, 100, 26);
-  ctx.fillStyle = '#F59E0B';
-  ctx.fillRect(136, 62, 100, 26);
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.fillText('READY', 42, 81);
-  ctx.fillText('EXPOSE', 152, 81);
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = '14px monospace';
-  ctx.fillText('X-RAY GENERATOR', 22, 128);
+  ctx.strokeRect(268, 282, 228, 66);
+  ctx.fillStyle = '#FDE68A';
+  ctx.font = 'bold 26px sans-serif';
+  ctx.fillText('☢ EXPOSE HV', 292, 324);
+
+  ctx.fillStyle = '#112238';
+  ctx.fillRect(510, 282, 228, 66);
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText('HEAT: 18% · OK', 530, 322);
+
+  ctx.fillStyle = '#64748B';
+  ctx.font = 'bold 17px monospace';
+  ctx.fillText('INTERLOCK: LEAD DOOR SHIELDED · LARGE FOCUS SPOT 1.2mm', 30, 386);
+
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -564,6 +724,80 @@ function createRoomHeaderPlaqueTexture(
   ctx.font = 'bold 21px monospace';
   ctx.fillText(subtitleEn, 256, 98);
 
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createCrReaderTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 320;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#050F1D';
+  ctx.fillRect(0, 0, 512, 320);
+  ctx.strokeStyle = '#38BDF8';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(8, 8, 496, 304);
+
+  ctx.fillStyle = '#0E2440';
+  ctx.fillRect(20, 20, 472, 62);
+  ctx.fillStyle = '#67E8F9';
+  ctx.font = 'bold 28px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('FCR LASER DIGITIZER · CR-X', 256, 60);
+
+  // Waveform / laser scan bar graphic
+  ctx.fillStyle = '#0A192D';
+  ctx.fillRect(28, 100, 456, 110);
+  ctx.strokeStyle = '#0284C7';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(28, 100, 456, 110);
+  ctx.fillStyle = '#38BDF8';
+  ctx.font = 'bold 24px sans-serif';
+  ctx.fillText('INSERT EXPOSED IP CASSETTE', 256, 146);
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText('HE-NE LASER SCAN · 10 PIXELS/MM', 256, 186);
+
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(68, 232, 376, 52);
+  ctx.fillStyle = '#0F172A';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillText('▼ CASSETTE FEED SLOT ▼', 256, 266);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createWaitingTvTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 288;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#071324';
+  ctx.fillRect(0, 0, 512, 288);
+  ctx.strokeStyle = '#F59E0B';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(6, 6, 500, 276);
+  ctx.fillStyle = '#112947';
+  ctx.fillRect(16, 16, 480, 62);
+  ctx.fillStyle = '#FDE68A';
+  ctx.font = 'bold 28px Tahoma, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('صالة الانتظار · WAITING ROOM', 256, 56);
+  ctx.fillStyle = '#E2E8F0';
+  ctx.font = 'bold 24px Tahoma, Arial, sans-serif';
+  ctx.fillText('يرجى الانتظار لحين مناداة اسمك للدخول', 256, 138);
+  ctx.fillStyle = '#38BDF8';
+  ctx.font = 'bold 20px monospace';
+  ctx.fillText('RADIOLOGY DEPARTMENT · QUEUE DISPLAY', 256, 198);
+  ctx.fillStyle = '#10B981';
+  ctx.fillRect(110, 224, 292, 36);
+  ctx.fillStyle = '#052E16';
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText('EXAM ROOM 01: IN SESSION', 256, 248);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -635,6 +869,7 @@ function buildCassetteMesh(
 
 export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   patient,
+  waitingPatients = [],
   requestedExam,
   selectedRegion,
   selectedPosture,
@@ -643,15 +878,21 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   ctDoorOpen,
   mriDoorOpen,
   cassetteState,
+  crExposedPending,
+  isDeveloping,
+  hasDR,
   shieldUsed,
   patientPrepped,
   isExposing,
+  patientSpeech,
+  language,
   ownedUpgrades,
   joystickRef,
   onTechZoneChange,
   onSceneInteract,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const speechBubbleRef = useRef<HTMLDivElement | null>(null);
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
   const [webglUnavailable, setWebglUnavailable] = useState<boolean>(false);
 
@@ -660,12 +901,18 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   const selectedPostureRef = useRef<PatientPosture>(selectedPosture);
   const techLocationRef = useRef<TechLocation>(techLocation);
   const doorClosedRef = useRef<boolean>(doorClosed);
+  const waitingDoorOpenRef = useRef<boolean>(false);
   const ctDoorOpenRef = useRef<boolean>(ctDoorOpen);
   const mriDoorOpenRef = useRef<boolean>(mriDoorOpen);
   const cassetteStateRef = useRef<CassetteState>(cassetteState);
+  const crExposedPendingRef = useRef<boolean>(crExposedPending);
+  const isDevelopingRef = useRef<boolean>(isDeveloping);
+  const hasDRRef = useRef<boolean>(hasDR);
   const shieldUsedRef = useRef<boolean>(shieldUsed);
   const patientPreppedRef = useRef<boolean>(patientPrepped);
   const isExposingRef = useRef<boolean>(isExposing);
+  const patientSpeechRef = useRef<string | null>(patientSpeech);
+  const languageRef = useRef<Language>(language);
   const modalityRef = useRef(requestedExam.modality);
   const ownedUpgradesRef = useRef<UpgradeId[]>(ownedUpgrades);
   const onSceneInteractRef = useRef(onSceneInteract);
@@ -683,7 +930,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     gender: patient?.gender ?? 'M',
     age: patient?.age ?? 32,
   });
+  const waitingPatientsRef = useRef<
+    {id: string; gender: 'M' | 'F'; age: number}[]
+  >(
+    waitingPatients.map((p) => ({id: p.id, gender: p.gender, age: p.age}))
+  );
   const applyPatientAppearanceRef = useRef<(() => void) | null>(null);
+  const applyWaitingPatientsRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     selectedRegionRef.current = selectedRegion;
@@ -733,6 +986,15 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   }, [cassetteState]);
 
   useEffect(() => {
+    crExposedPendingRef.current = crExposedPending;
+  }, [crExposedPending]);
+  useEffect(() => {
+    isDevelopingRef.current = isDeveloping;
+  }, [isDeveloping]);
+  useEffect(() => {
+    hasDRRef.current = hasDR;
+  }, [hasDR]);
+  useEffect(() => {
     shieldUsedRef.current = shieldUsed;
   }, [shieldUsed]);
   useEffect(() => {
@@ -744,6 +1006,12 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     }
     isExposingRef.current = isExposing;
   }, [isExposing]);
+  useEffect(() => {
+    patientSpeechRef.current = patientSpeech;
+  }, [patientSpeech]);
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
   useEffect(() => {
     modalityRef.current = requestedExam.modality;
   }, [requestedExam.modality]);
@@ -767,6 +1035,16 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     patientEnterAnimRef.current = 1.0;
     cameraMoveActiveRef.current = true;
   }, [patient?.id, patient?.gender, patient?.age]);
+
+  const waitingSignature = waitingPatients.map((p) => p.id).join('|');
+  useEffect(() => {
+    waitingPatientsRef.current = waitingPatients.map((p) => ({
+      id: p.id,
+      gender: p.gender,
+      age: p.age,
+    }));
+    applyWaitingPatientsRef.current?.();
+  }, [waitingSignature]);
 
   // Refocus smoothly when switching between table and erect inside exam room
   useEffect(() => {
@@ -825,7 +1103,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x09111c);
-    scene.fog = new THREE.FogExp2(0x09111c, 0.036);
+    scene.fog = new THREE.FogExp2(0x09111c, 0.02);
 
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     scene.environment = pmremGenerator.fromScene(
@@ -885,10 +1163,10 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       keyLight.castShadow = true;
       keyLight.shadow.mapSize.width = 1024;
       keyLight.shadow.mapSize.height = 1024;
-      keyLight.shadow.camera.left = -4.5;
-      keyLight.shadow.camera.right = 4.5;
-      keyLight.shadow.camera.top = 4.5;
-      keyLight.shadow.camera.bottom = -4.5;
+      keyLight.shadow.camera.left = -5.5;
+      keyLight.shadow.camera.right = 7.5;
+      keyLight.shadow.camera.top = 6.5;
+      keyLight.shadow.camera.bottom = -5.5;
       keyLight.shadow.bias = -0.0005;
       keyLight.shadow.normalBias = 0.02;
     }
@@ -898,8 +1176,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     rimLight.position.set(-3.6, 3.2, -3.4);
     scene.add(rimLight);
 
-    const ceilingFillLight = new THREE.PointLight(0xeef8ff, 1.35, 11);
-    ceilingFillLight.position.set(0.5, 3.25, -0.3);
+    const ceilingFillLight = new THREE.PointLight(0xeef8ff, 1.45, 13);
+    ceilingFillLight.position.set(1.2, 3.85, -0.3);
     scene.add(ceilingFillLight);
 
     const boothLight = new THREE.PointLight(0xbae6fd, 1.05, 5.0);
@@ -927,6 +1205,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     detectorTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const pcScreenTex = track(createPcScreenTexture());
     pcScreenTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const pcSecondaryTex = track(createPcSecondaryScreenTexture());
+    pcSecondaryTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const consoleTex = track(createConsoleTexture());
     consoleTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const doorSignTex = track(createDoorSignTexture());
@@ -934,6 +1214,16 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     wallChartTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const suiteHeaderTex = track(createSuiteHeaderTexture());
     suiteHeaderTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const waitingHeaderTex = track(
+      createRoomHeaderPlaqueTexture(
+        'صالة الانتظار · المرضى',
+        'PATIENT WAITING LOUNGE',
+        '#F59E0B'
+      )
+    );
+    waitingHeaderTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const waitingTvTex = track(createWaitingTvTexture());
+    waitingTvTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const ctHeaderTex = track(
       createRoomHeaderPlaqueTexture(
         'غرفة السيتي (المفراس)',
@@ -977,6 +1267,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       )
     );
     mriLockedBadgeTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const crReaderTex = track(createCrReaderTexture());
+    crReaderTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const mriUnlockedBadgeTex = track(
       createDoorStatusBadgeTexture(
         'غرفة الرنين (MRI)',
@@ -1136,6 +1428,16 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         depthWrite: false,
       })
     );
+    const matSuiteWindowGlass = track(
+      new THREE.MeshPhysicalMaterial({
+        color: 0xbae6fd,
+        transparent: true,
+        opacity: 0.08,
+        roughness: 0.04,
+        metalness: 0.08,
+        depthWrite: false,
+      })
+    );
     const matLedStrip = track(
       new THREE.MeshStandardMaterial({
         color: 0x67e8f9,
@@ -1255,130 +1557,146 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     const interactiveMeshes: THREE.Mesh[] = [];
 
     const floorMesh = new THREE.Mesh(
-      track(new THREE.PlaneGeometry(13, 11)),
+      track(new THREE.PlaneGeometry(24, 24)),
       matFloor
     );
     floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.position.set(1.0, 0, -0.5);
     floorMesh.receiveShadow = true;
     scene.add(floorMesh);
 
-    const backWall = new THREE.Mesh(
-      track(new THREE.BoxGeometry(12.5, 3.8, 0.18)),
-      matWall
-    );
-    backWall.position.set(0.2, 1.9, -2.85);
-    backWall.receiveShadow = true;
-    scene.add(backWall);
-
-    const backWainscot = new THREE.Mesh(
-      track(new THREE.BoxGeometry(12.4, 1.05, 0.04)),
-      matWallLower
-    );
-    backWainscot.position.set(0.2, 0.525, -2.74);
-    scene.add(backWainscot);
-
+    // Enlarged Main X-Ray Room Outer Perimeter (x: -5.40 .. +7.40, z: -4.80 .. +2.05)
     const rightWall = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.18, 3.8, 10.5)),
+      track(new THREE.BoxGeometry(0.18, 4.3, 7.2)),
       matWall
     );
-    rightWall.position.set(4.5, 1.9, 0.4);
+    rightWall.position.set(7.4, 2.15, -1.35);
     rightWall.receiveShadow = true;
     scene.add(rightWall);
 
     const leftWall = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.18, 3.8, 10.5)),
+      track(new THREE.BoxGeometry(0.18, 4.3, 14.2)),
       matWall
     );
-    leftWall.position.set(-4.1, 1.9, 0.4);
+    leftWall.position.set(-5.4, 2.15, -2.2);
     scene.add(leftWall);
 
-    const backLed = new THREE.Mesh(
-      track(new THREE.BoxGeometry(11.6, 0.055, 0.04)),
-      matLedStrip
-    );
-    backLed.position.set(0.2, 3.05, -2.73);
-    scene.add(backLed);
-
-    // Anodized Dado Trim Rails along walls
-    const backDado = new THREE.Mesh(
-      track(new THREE.BoxGeometry(12.2, 0.055, 0.06)),
-      matChrome
-    );
-    backDado.position.set(0.2, 1.07, -2.73);
-    scene.add(backDado);
-
     const rightWainscot = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.05, 1.05, 10.2)),
+      track(new THREE.BoxGeometry(0.05, 1.05, 7.0)),
       matWallLower
     );
-    rightWainscot.position.set(4.39, 0.525, 0.4);
+    rightWainscot.position.set(7.29, 0.525, -1.35);
     scene.add(rightWainscot);
 
     const leftWainscot = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.05, 1.05, 10.2)),
+      track(new THREE.BoxGeometry(0.05, 1.05, 13.9)),
       matWallLower
     );
-    leftWainscot.position.set(-3.99, 0.525, 0.4);
+    leftWainscot.position.set(-5.29, 0.525, -2.2);
     scene.add(leftWainscot);
 
+    // North-East Equipment Back Wall (x: +1.25 .. +7.40 at z = -4.80)
+    const backWall = new THREE.Mesh(
+      track(new THREE.BoxGeometry(6.35, 4.3, 0.18)),
+      matWall
+    );
+    backWall.position.set(4.32, 2.15, -4.8);
+    backWall.receiveShadow = true;
+    scene.add(backWall);
+
+    const backWainscot = new THREE.Mesh(
+      track(new THREE.BoxGeometry(6.25, 1.05, 0.04)),
+      matWallLower
+    );
+    backWainscot.position.set(4.32, 0.525, -4.69);
+    scene.add(backWainscot);
+
+    const backLed = new THREE.Mesh(
+      track(new THREE.BoxGeometry(6.0, 0.055, 0.04)),
+      matLedStrip
+    );
+    backLed.position.set(4.32, 3.35, -4.68);
+    scene.add(backLed);
+
+    const backDado = new THREE.Mesh(
+      track(new THREE.BoxGeometry(6.2, 0.055, 0.06)),
+      matChrome
+    );
+    backDado.position.set(4.32, 1.07, -4.68);
+    scene.add(backDado);
+
     // Warm Architectural Acoustic Wood Slats on Back Wall & Right Wall
-    [-3.6, -3.44, -3.28, -3.12, 3.12, 3.28, 3.44, 3.6].forEach((sx) => {
+    [5.85, 6.01, 6.17, 6.33].forEach((sx) => {
       const slat = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.05, 2.35, 0.04)),
+        track(new THREE.BoxGeometry(0.05, 2.6, 0.04)),
         matWarmWood
       );
-      slat.position.set(sx, 2.25, -2.74);
+      slat.position.set(sx, 2.38, -4.69);
       scene.add(slat);
     });
-    [-1.4, -1.24, -1.08, 0.9, 1.06, 1.22].forEach((sz) => {
+    [-2.8, -2.64, -2.48, 0.85, 1.01, 1.17].forEach((sz) => {
       const slat = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.04, 2.35, 0.05)),
+        track(new THREE.BoxGeometry(0.04, 2.6, 0.05)),
         matWarmWood
       );
-      slat.position.set(4.39, 2.25, sz);
+      slat.position.set(7.29, 2.38, sz);
       scene.add(slat);
     });
 
-    // Architectural Ceiling & Recessed LED Skylight Coffers
+    // Architectural High Ceiling (4.20m) & Recessed LED Skylight Coffers
     const ceilingMesh = new THREE.Mesh(
-      track(new THREE.PlaneGeometry(12.8, 10.6)),
+      track(new THREE.PlaneGeometry(24, 24)),
       matCeiling
     );
     ceilingMesh.rotation.x = Math.PI / 2;
-    ceilingMesh.position.set(0.2, 3.55, 0.4);
+    ceilingMesh.position.set(1.0, 4.2, -0.5);
     scene.add(ceilingMesh);
 
     [
-      [-1.4, -1.2],
-      [0.6, -1.2],
-      [2.6, -1.2],
-      [-1.4, 0.7],
-      [0.6, 0.7],
-      [2.6, 0.7],
-      [-2.35, 3.05],
+      [-3.4, -3.1],
+      [-1.0, -3.1],
+      [1.4, -3.1],
+      [3.8, -3.1],
+      [5.8, -3.1],
+      [-3.4, -0.8],
+      [-1.0, -0.8],
+      [1.4, -0.8],
+      [3.8, -0.8],
+      [5.8, -0.8],
+      [-3.4, 1.0],
+      [-1.0, 1.0],
+      [1.4, 1.0],
+      [3.8, 1.0],
+      [5.8, 1.0],
+      [-3.4, 3.1],
+      [-2.1, -6.7],
+      [1.48, 3.9],
+      [1.48, 6.1],
+      [5.42, 3.9],
+      [5.42, 6.1],
     ].forEach(([lx, lz]) => {
       const cofferFrame = new THREE.Mesh(
-        track(new THREE.BoxGeometry(1.18, 0.05, 0.72)),
+        track(new THREE.BoxGeometry(1.36, 0.05, 0.82)),
         matChrome
       );
-      cofferFrame.position.set(lx, 3.53, lz);
+      cofferFrame.position.set(lx, 4.18, lz);
       scene.add(cofferFrame);
 
       const cofferPanel = new THREE.Mesh(
-        track(new THREE.PlaneGeometry(1.08, 0.62)),
+        track(new THREE.PlaneGeometry(1.26, 0.72)),
         matCeilingPanel
       );
       cofferPanel.rotation.x = Math.PI / 2;
-      cofferPanel.position.set(lx, 3.5, lz);
+      cofferPanel.position.set(lx, 4.15, lz);
       scene.add(cofferPanel);
     });
 
-    // Framed Radiography Reference Chart on Right Wall
+    // Framed Radiography Reference Chart on Enlarged Right Wall
     const chartFrame = new THREE.Mesh(
       track(new THREE.BoxGeometry(0.05, 0.96, 1.28)),
       matChrome
     );
-    chartFrame.position.set(4.38, 1.92, -0.15);
+    chartFrame.position.set(7.28, 1.92, -0.45);
     scene.add(chartFrame);
 
     const chartPoster = new THREE.Mesh(
@@ -1394,7 +1712,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       )
     );
     chartPoster.rotation.y = -Math.PI / 2;
-    chartPoster.position.set(4.35, 1.92, -0.15);
+    chartPoster.position.set(7.25, 1.92, -0.45);
     scene.add(chartPoster);
 
     // Standing Zone Floor Decals (Erect Bucky Target + Lead Door Safety Threshold)
@@ -1433,7 +1751,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     safetyThresholdStrip.position.set(-1.04, 0.014, 1.94);
     scene.add(safetyThresholdStrip);
 
-    // Wall Lightbox
+    // Wall Lightbox on Enlarged North Wall (x = 2.75, z = -4.67)
     const lightboxGroup = new THREE.Group();
     const lightboxFrame = new THREE.Mesh(
       track(new THREE.BoxGeometry(2.35, 1.22, 0.08)),
@@ -1453,12 +1771,12 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     lightboxScreen.position.z = 0.045;
     lightboxGroup.add(lightboxScreen);
-    lightboxGroup.position.set(0.2, 1.92, -2.71);
+    lightboxGroup.position.set(2.75, 1.98, -4.67);
     scene.add(lightboxGroup);
 
-    // Back-Wall Clinical Cabinetry & Countertop (x = 2.45, z = -2.54)
+    // Back-Wall Clinical Cabinetry & Countertop (x = 5.05, z = -4.50)
     const cabinetGroup = new THREE.Group();
-    cabinetGroup.position.set(2.45, 0, -2.54);
+    cabinetGroup.position.set(5.05, 0, -4.5);
 
     const baseCabinet = new THREE.Mesh(
       track(new THREE.BoxGeometry(1.55, 0.84, 0.42)),
@@ -1499,9 +1817,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     cabinetGroup.add(upperCabinetLed);
     scene.add(cabinetGroup);
 
-    // Mobile Lead Apron & Shield Rack (x = -3.45, z = -2.25)
+    // Mobile Lead Apron & Shield Rack (x = -4.82, z = -2.25)
     const apronRackGroup = new THREE.Group();
-    apronRackGroup.position.set(-3.45, 0, -2.25);
+    apronRackGroup.position.set(-4.82, 0, -2.25);
     const apronBase = new THREE.Mesh(
       track(new THREE.CylinderGeometry(0.24, 0.26, 0.04, 16)),
       matTrim
@@ -1530,9 +1848,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     apronRackGroup.add(hangingApron);
     scene.add(apronRackGroup);
 
-    // Potted Clinic Foliage Planter (x = 3.82, z = -2.35)
+    // Potted Clinic Foliage Planter (x = 6.72, z = -4.25)
     const planterGroup = new THREE.Group();
-    planterGroup.position.set(3.82, 0, -2.35);
+    planterGroup.position.set(6.72, 0, -4.25);
     const potBody = new THREE.Mesh(
       track(new THREE.CylinderGeometry(0.22, 0.16, 0.42, 18)),
       matClinicalWhite
@@ -1551,34 +1869,316 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     });
     scene.add(planterGroup);
 
-    // Lead-Lined Partition Wall + Observation Window + Swinging Lead Door
+    // =========================================================================
+    // 2A. PATIENT WAITING ROOM (VISIBLE THROUGH CLEAR GLASS DOOR & WINDOWS)
+    // =========================================================================
+    const waitingRoomGroup = new THREE.Group();
+
+    const buildWaitingPartitionPillar = (xCenter: number, width: number) => {
+      const top = new THREE.Mesh(
+        track(new THREE.BoxGeometry(width, 4.2, 0.16)),
+        matWall
+      );
+      top.position.set(xCenter, 2.1, -4.8);
+      waitingRoomGroup.add(top);
+
+      const bot = new THREE.Mesh(
+        track(new THREE.BoxGeometry(width + 0.01, 1.05, 0.18)),
+        matWallLower
+      );
+      bot.position.set(xCenter, 0.525, -4.8);
+      waitingRoomGroup.add(bot);
+    };
+
+    const buildWaitingGlassPanel = (xStart: number, xEnd: number) => {
+      const w = xEnd - xStart;
+      const cx = (xStart + xEnd) / 2;
+
+      const knee = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w + 0.02, 0.68, 0.17)),
+        matWallLower
+      );
+      knee.position.set(cx, 0.34, -4.8);
+      waitingRoomGroup.add(knee);
+
+      const sill = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w + 0.02, 0.06, 0.22)),
+        matChrome
+      );
+      sill.position.set(cx, 0.7, -4.8);
+      waitingRoomGroup.add(sill);
+
+      const glass = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w, 2.08, 0.035)),
+        matSuiteWindowGlass
+      );
+      glass.position.set(cx, 1.76, -4.8);
+      waitingRoomGroup.add(glass);
+
+      const headRail = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w + 0.02, 0.08, 0.22)),
+        matChrome
+      );
+      headRail.position.set(cx, 2.82, -4.8);
+      waitingRoomGroup.add(headRail);
+
+      const upper = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w + 0.02, 1.38, 0.16)),
+        matWall
+      );
+      upper.position.set(cx, 3.51, -4.8);
+      waitingRoomGroup.add(upper);
+    };
+
+    buildWaitingPartitionPillar(-5.075, 0.65); // -5.40 .. -4.75
+    buildWaitingGlassPanel(-4.75, -2.95); // Left Waiting Observation Window
+    buildWaitingPartitionPillar(-2.875, 0.15); // -2.95 .. -2.80
+    // Door opening at x: -2.80 .. -1.45 (width 1.35m)
+    buildWaitingPartitionPillar(-1.375, 0.15); // -1.45 .. -1.30
+    buildWaitingGlassPanel(-1.3, 0.75); // Right Waiting Observation Window
+    buildWaitingPartitionPillar(1.0, 0.5); // +0.75 .. +1.25
+
+    // Door Lintel & Illuminated Waiting Room Sign above Glass Door (facing South into Exam Room)
+    const waitingDoorLintel = new THREE.Mesh(
+      track(new THREE.BoxGeometry(1.4, 1.75, 0.17)),
+      matWall
+    );
+    waitingDoorLintel.position.set(-2.125, 3.325, -4.8);
+    waitingRoomGroup.add(waitingDoorLintel);
+
+    const waitingHeaderBack = new THREE.Mesh(
+      track(new THREE.BoxGeometry(2.3, 0.45, 0.045)),
+      matChrome
+    );
+    waitingHeaderBack.position.set(-2.125, 3.18, -4.67);
+    waitingRoomGroup.add(waitingHeaderBack);
+
+    const waitingHeaderFace = new THREE.Mesh(
+      track(new THREE.PlaneGeometry(2.22, 0.39)),
+      track(
+        new THREE.MeshStandardMaterial({
+          map: waitingHeaderTex,
+          emissiveMap: waitingHeaderTex,
+          emissive: new THREE.Color(0xffffff),
+          emissiveIntensity: 0.85,
+        })
+      )
+    );
+    waitingHeaderFace.position.set(-2.125, 3.18, -4.642);
+    waitingRoomGroup.add(waitingHeaderFace);
+
+    // Tempered Clear Glass Door to Waiting Room (hinged at x = -2.80, z = -4.80)
+    const waitingDoorPivot = new THREE.Group();
+    waitingDoorPivot.position.set(-2.8, 0, -4.8);
+
+    const waitGlassLeaf = new THREE.Mesh(
+      track(new THREE.BoxGeometry(1.3, 2.42, 0.045)),
+      matSuiteWindowGlass
+    );
+    waitGlassLeaf.position.set(0.66, 1.22, 0);
+    waitGlassLeaf.layers.set(1);
+    waitGlassLeaf.userData.action = {
+      type: 'WAITING_DOOR',
+    } satisfies SceneTargetAction;
+    waitingDoorPivot.add(waitGlassLeaf);
+    interactiveMeshes.push(waitGlassLeaf);
+
+    // Chrome perimeter stiles & push bar on glass door
+    const waitStileL = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.06, 2.44, 0.065)),
+      matChrome
+    );
+    waitStileL.position.set(0.03, 1.22, 0);
+    waitingDoorPivot.add(waitStileL);
+
+    const waitStileR = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.06, 2.44, 0.065)),
+      matChrome
+    );
+    waitStileR.position.set(1.29, 1.22, 0);
+    waitingDoorPivot.add(waitStileR);
+
+    const waitBottomRail = new THREE.Mesh(
+      track(new THREE.BoxGeometry(1.32, 0.14, 0.068)),
+      matChrome
+    );
+    waitBottomRail.position.set(0.66, 0.07, 0);
+    waitingDoorPivot.add(waitBottomRail);
+
+    const waitTopRail = new THREE.Mesh(
+      track(new THREE.BoxGeometry(1.32, 0.08, 0.068)),
+      matChrome
+    );
+    waitTopRail.position.set(0.66, 2.4, 0);
+    waitingDoorPivot.add(waitTopRail);
+
+    const waitPushBar = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.018, 0.018, 0.65, 12)),
+      matChrome
+    );
+    waitPushBar.position.set(1.14, 1.12, 0.055);
+    waitingDoorPivot.add(waitPushBar);
+
+    waitingRoomGroup.add(waitingDoorPivot);
+
+    // Waiting Room Enclosure Walls (x: -5.40 .. +1.25, z: -4.80 .. -8.80)
+    const waitingEastWall = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.18, 4.2, 4.15)),
+      matWall
+    );
+    waitingEastWall.position.set(1.25, 2.1, -6.82);
+    waitingRoomGroup.add(waitingEastWall);
+
+    const waitingNorthWall = new THREE.Mesh(
+      track(new THREE.BoxGeometry(6.8, 4.2, 0.18)),
+      matWall
+    );
+    waitingNorthWall.position.set(-2.08, 2.1, -8.8);
+    waitingRoomGroup.add(waitingNorthWall);
+
+    // Warm Inviting Waiting Lounge Lighting + Wood Slats + TV Display
+    const waitingRoomLight = new THREE.PointLight(0xfff1d6, 2.35, 13.5);
+    waitingRoomLight.position.set(-2.1, 3.7, -6.7);
+    scene.add(waitingRoomLight);
+
+    [-4.2, -4.04, -3.88, -0.3, -0.14, 0.02].forEach((sx) => {
+      const wSlat = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.05, 2.6, 0.04)),
+        matWarmWood
+      );
+      wSlat.position.set(sx, 2.15, -8.68);
+      waitingRoomGroup.add(wSlat);
+    });
+
+    const waitTvFrame = new THREE.Mesh(
+      track(new THREE.BoxGeometry(1.85, 1.05, 0.07)),
+      matDarkPad
+    );
+    waitTvFrame.position.set(-2.12, 2.42, -8.67);
+    waitingRoomGroup.add(waitTvFrame);
+
+    const waitTvFace = new THREE.Mesh(
+      track(new THREE.PlaneGeometry(1.74, 0.96)),
+      track(
+        new THREE.MeshStandardMaterial({
+          map: waitingTvTex,
+          emissiveMap: waitingTvTex,
+          emissive: new THREE.Color(0xffffff),
+          emissiveIntensity: 0.82,
+        })
+      )
+    );
+    waitTvFace.position.set(-2.12, 2.42, -8.63);
+    waitingRoomGroup.add(waitTvFace);
+
+    // Cushioned Hospital Waiting Bench Row (facing South toward Door so players see seated patients clearly)
+    const waitBenchBase = new THREE.Mesh(
+      track(new THREE.BoxGeometry(3.85, 0.06, 0.48)),
+      matChrome
+    );
+    waitBenchBase.position.set(-2.1, 0.36, -7.25);
+    waitingRoomGroup.add(waitBenchBase);
+
+    [-3.75, -2.1, -0.45].forEach((lx) => {
+      const leg = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.08, 0.36, 0.42)),
+        matTrim
+      );
+      leg.position.set(lx, 0.18, -7.25);
+      waitingRoomGroup.add(leg);
+    });
+
+    const matBenchCushion = track(
+      new THREE.MeshStandardMaterial({
+        color: 0x0f766e,
+        roughness: 0.58,
+        metalness: 0.08,
+      })
+    );
+    [-3.35, -2.1, -0.85].forEach((sx) => {
+      const seat = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.74, 0.09, 0.52)),
+        matBenchCushion
+      );
+      seat.position.set(sx, 0.43, -7.22);
+      waitingRoomGroup.add(seat);
+
+      const back = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.74, 0.52, 0.09)),
+        matBenchCushion
+      );
+      back.position.set(sx, 0.72, -7.45);
+      waitingRoomGroup.add(back);
+    });
+
+    // Reception Check-In Desk on Left Side of Waiting Room
+    const receptionBody = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.68, 1.02, 1.95)),
+      matClinicalWhite
+    );
+    receptionBody.position.set(-4.65, 0.51, -6.95);
+    waitingRoomGroup.add(receptionBody);
+
+    const receptionTop = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.76, 0.05, 2.02)),
+      matWarmWood
+    );
+    receptionTop.position.set(-4.65, 1.04, -6.95);
+    waitingRoomGroup.add(receptionTop);
+
+    // Waiting Room Plant
+    const waitPot = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.22, 0.16, 0.44, 16)),
+      matClinicalWhite
+    );
+    waitPot.position.set(0.62, 0.22, -7.95);
+    waitingRoomGroup.add(waitPot);
+    [0, 1.5, 3.1, 4.7].forEach((ang) => {
+      const leaf = new THREE.Mesh(
+        track(new THREE.ConeGeometry(0.11, 0.56, 6)),
+        matFoliage
+      );
+      leaf.position.set(0.62 + Math.cos(ang) * 0.1, 0.64, -7.95 + Math.sin(ang) * 0.1);
+      leaf.rotation.set(0.35 * Math.sin(ang), ang, -0.35 * Math.cos(ang));
+      waitingRoomGroup.add(leaf);
+    });
+
+    scene.add(waitingRoomGroup);
+
+    // Lead-Lined Partition Wall + Observation Window + Swinging Lead Door (Expanded Booth x: -5.40 .. -0.52)
     const boothGroup = new THREE.Group();
 
-    // Window section (x: -3.95 to -1.55, z = 2.05)
     const boothBase = new THREE.Mesh(
-      track(new THREE.BoxGeometry(2.45, 0.96, 0.14)),
+      track(new THREE.BoxGeometry(3.84, 0.96, 0.14)),
       matTrim
     );
-    boothBase.position.set(-2.72, 0.48, 2.05);
+    boothBase.position.set(-3.44, 0.48, 2.05);
     boothGroup.add(boothBase);
 
     const boothGlass = new THREE.Mesh(
-      track(new THREE.BoxGeometry(2.26, 1.28, 0.04)),
+      track(new THREE.BoxGeometry(3.56, 1.28, 0.04)),
       matLeadGlass
     );
-    boothGlass.position.set(-2.72, 1.58, 2.05);
+    boothGlass.position.set(-3.44, 1.58, 2.05);
     boothGroup.add(boothGlass);
 
     const boothHeader = new THREE.Mesh(
-      track(new THREE.BoxGeometry(2.45, 0.14, 0.16)),
+      track(new THREE.BoxGeometry(3.84, 0.14, 0.16)),
       matTrim
     );
-    boothHeader.position.set(-2.72, 2.28, 2.05);
+    boothHeader.position.set(-3.44, 2.28, 2.05);
     boothGroup.add(boothHeader);
+
+    const boothUpperWall = new THREE.Mesh(
+      track(new THREE.BoxGeometry(3.86, 1.88, 0.16)),
+      matWall
+    );
+    boothUpperWall.position.set(-3.44, 3.28, 2.05);
+    boothGroup.add(boothUpperWall);
 
     // Illuminated Suite Header Sign above Lead-Glass Window
     const suiteSignFace = new THREE.Mesh(
-      track(new THREE.PlaneGeometry(1.9, 0.34)),
+      track(new THREE.PlaneGeometry(2.2, 0.38)),
       track(
         new THREE.MeshStandardMaterial({
           map: suiteHeaderTex,
@@ -1589,15 +2189,15 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       )
     );
     suiteSignFace.rotation.y = Math.PI;
-    suiteSignFace.position.set(-2.72, 2.55, 1.96);
+    suiteSignFace.position.set(-3.44, 2.62, 1.95);
     boothGroup.add(suiteSignFace);
 
     // Door Frame & Overhead Warning Beacon (door opening at x: -1.48 to -0.58, z = 2.05)
     const doorLintel = new THREE.Mesh(
-      track(new THREE.BoxGeometry(1.15, 0.6, 0.18)),
+      track(new THREE.BoxGeometry(1.15, 2.08, 0.18)),
       matWallLower
     );
-    doorLintel.position.set(-1.02, 2.45, 2.05);
+    doorLintel.position.set(-1.02, 3.18, 2.05);
     boothGroup.add(doorLintel);
 
     const beaconMesh = new THREE.Mesh(
@@ -1647,36 +2247,34 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     boothGroup.add(leadDoorPivot);
 
-    // Control Booth right enclosure wall & rear wall (creates a distinct walk-in room)
+    // Control Booth right enclosure wall & rear wall
     const boothSideWall = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.14, 2.7, 2.1)),
+      track(new THREE.BoxGeometry(0.14, 4.2, 2.35)),
       matWallLower
     );
-    boothSideWall.position.set(-0.52, 1.35, 3.1);
+    boothSideWall.position.set(-0.52, 2.1, 3.22);
     boothGroup.add(boothSideWall);
 
     const boothBackWall = new THREE.Mesh(
-      track(new THREE.BoxGeometry(3.6, 2.7, 0.16)),
+      track(new THREE.BoxGeometry(4.95, 4.2, 0.16)),
       matWall
     );
-    boothBackWall.position.set(-2.25, 1.35, 4.15);
+    boothBackWall.position.set(-2.96, 2.1, 4.35);
     boothGroup.add(boothBackWall);
 
     scene.add(boothGroup);
 
     // =========================================================================
-    // 2B. ADJOINING LOCKED DIAGNOSTIC SUITES: CT SCANNER ROOM & MRI ROOM
+    // 2B. MONUMENTAL DIAGNOSTIC SUITES: GIANT CT & MRI ROOMS + PANORAMIC GLASS
     // =========================================================================
     const diagnosticSuitesGroup = new THREE.Group();
 
-    // South Partition Wall segments along z = 2.05 (x = -0.52 to x = 4.50)
-    // Door 1 Opening (CT): x = 0.30..1.20 | Door 2 Opening (MRI): x = 2.80..3.70
-    const buildPartitionPillar = (xCenter: number, width: number) => {
+    const buildFullPillar = (xCenter: number, width: number) => {
       const wallSeg = new THREE.Mesh(
-        track(new THREE.BoxGeometry(width, 3.55, 0.16)),
+        track(new THREE.BoxGeometry(width, 4.2, 0.16)),
         matWall
       );
-      wallSeg.position.set(xCenter, 1.775, 2.05);
+      wallSeg.position.set(xCenter, 2.1, 2.05);
       wallSeg.receiveShadow = true;
       diagnosticSuitesGroup.add(wallSeg);
 
@@ -1688,29 +2286,141 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       diagnosticSuitesGroup.add(lowerSeg);
     };
 
-    buildPartitionPillar(-0.11, 0.82);
-    buildPartitionPillar(2.0, 1.6);
-    buildPartitionPillar(4.1, 0.8);
+    const buildPanoramicWindow = (
+      xStart: number,
+      xEnd: number,
+      accentHex: number
+    ) => {
+      const w = xEnd - xStart;
+      const cx = (xStart + xEnd) / 2;
 
-    // Rear & Dividing Enclosure Walls for CT & MRI Rooms
-    const suitesRearWall = new THREE.Mesh(
-      track(new THREE.BoxGeometry(5.1, 3.55, 0.18)),
-      matWall
-    );
-    suitesRearWall.position.set(2.0, 1.775, 4.45);
-    diagnosticSuitesGroup.add(suitesRearWall);
+      const kneeWall = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w + 0.02, 0.68, 0.17)),
+        matWallLower
+      );
+      kneeWall.position.set(cx, 0.34, 2.05);
+      diagnosticSuitesGroup.add(kneeWall);
 
-    const suitesDividerWall = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.16, 3.55, 2.4)),
+      const sillRail = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w + 0.02, 0.06, 0.22)),
+        matChrome
+      );
+      sillRail.position.set(cx, 0.7, 2.05);
+      diagnosticSuitesGroup.add(sillRail);
+
+      const glassPane = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w, 2.08, 0.035)),
+        matSuiteWindowGlass
+      );
+      glassPane.position.set(cx, 1.76, 2.05);
+      diagnosticSuitesGroup.add(glassPane);
+
+      const topFrameRail = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w + 0.02, 0.08, 0.22)),
+        matChrome
+      );
+      topFrameRail.position.set(cx, 2.82, 2.05);
+      diagnosticSuitesGroup.add(topFrameRail);
+
+      const upperHeaderWall = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w + 0.02, 1.38, 0.16)),
+        matWall
+      );
+      upperHeaderWall.position.set(cx, 3.51, 2.05);
+      diagnosticSuitesGroup.add(upperHeaderWall);
+
+      const glowStripMat = track(
+        new THREE.MeshStandardMaterial({
+          color: accentHex,
+          emissive: accentHex,
+          emissiveIntensity: 0.95,
+          roughness: 0.2,
+        })
+      );
+      const topAccentBar = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w - 0.06, 0.045, 0.05)),
+        glowStripMat
+      );
+      topAccentBar.position.set(cx, 2.79, 1.94);
+      diagnosticSuitesGroup.add(topAccentBar);
+
+      const botAccentBar = new THREE.Mesh(
+        track(new THREE.BoxGeometry(w - 0.06, 0.038, 0.05)),
+        glowStripMat
+      );
+      botAccentBar.position.set(cx, 0.72, 1.94);
+      diagnosticSuitesGroup.add(botAccentBar);
+    };
+
+    // Structural Pillars & Giant Panoramic Windows along z = 2.05 (x = -0.52 .. 7.40)
+    buildFullPillar(-0.36, 0.32); // West CT pier (-0.52 .. -0.20)
+    buildFullPillar(1.09, 0.18); // CT door/window mullion (1.00 .. 1.18)
+    buildPanoramicWindow(1.18, 3.32, 0x38bdf8); // Giant CT Window (2.14m wide x 2.08m tall)
+    buildFullPillar(3.44, 0.24); // Suite dividing pier (3.32 .. 3.56)
+    buildFullPillar(4.85, 0.18); // MRI door/window mullion (4.76 .. 4.94)
+    buildPanoramicWindow(4.94, 7.22, 0x10b981); // Giant MRI Window (2.28m wide x 2.08m tall)
+    buildFullPillar(7.31, 0.18); // East MRI pier (7.22 .. 7.40)
+
+    // Monumental 4.2m High & 5.65m Deep Enclosure Walls for CT & MRI Suites
+    const ctWestExtensionWall = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.16, 4.2, 3.4)),
       matWallLower
     );
-    suitesDividerWall.position.set(2.0, 1.775, 3.25);
+    ctWestExtensionWall.position.set(-0.52, 2.1, 6.05);
+    diagnosticSuitesGroup.add(ctWestExtensionWall);
+
+    const suitesRearWall = new THREE.Mesh(
+      track(new THREE.BoxGeometry(8.1, 4.2, 0.18)),
+      matWall
+    );
+    suitesRearWall.position.set(3.44, 2.1, 7.7);
+    diagnosticSuitesGroup.add(suitesRearWall);
+
+    const ctBackGlow = new THREE.Mesh(
+      track(new THREE.BoxGeometry(3.4, 0.07, 0.04)),
+      track(
+        new THREE.MeshStandardMaterial({
+          color: 0x38bdf8,
+          emissive: 0x0ea5e9,
+          emissiveIntensity: 1.1,
+        })
+      )
+    );
+    ctBackGlow.position.set(1.48, 3.45, 7.58);
+    diagnosticSuitesGroup.add(ctBackGlow);
+
+    const mriBackGlow = new THREE.Mesh(
+      track(new THREE.BoxGeometry(3.4, 0.07, 0.04)),
+      track(
+        new THREE.MeshStandardMaterial({
+          color: 0x34d399,
+          emissive: 0x10b981,
+          emissiveIntensity: 1.1,
+        })
+      )
+    );
+    mriBackGlow.position.set(5.42, 3.45, 7.58);
+    diagnosticSuitesGroup.add(mriBackGlow);
+
+    const suitesDividerWall = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.2, 4.2, 5.75)),
+      matWallLower
+    );
+    suitesDividerWall.position.set(3.44, 2.1, 4.9);
     diagnosticSuitesGroup.add(suitesDividerWall);
 
-    // Helper to build a labeled locked/unlocked Clinical Suite Door
+    const mriRightWall = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.18, 4.2, 5.75)),
+      matWall
+    );
+    mriRightWall.position.set(7.4, 2.1, 4.9);
+    diagnosticSuitesGroup.add(mriRightWall);
+
+    // Helper to build a grand tall/wide Clinical Suite Door (1.20m wide x 2.45m tall) + huge sign
     const buildSuiteDoor = (opts: {
       hingeX: number;
       centerX: number;
+      signCenterX: number;
       actionType: 'CT_DOOR' | 'MRI_DOOR';
       headerTex: THREE.CanvasTexture;
       lockedTex: THREE.CanvasTexture;
@@ -1718,126 +2428,120 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       accentColor: number;
     }) => {
       const lintel = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.92, 1.4, 0.17)),
+        track(new THREE.BoxGeometry(1.24, 1.75, 0.17)),
         matWall
       );
-      lintel.position.set(opts.centerX, 2.85, 2.05);
+      lintel.position.set(opts.centerX, 3.325, 2.05);
       diagnosticSuitesGroup.add(lintel);
 
-      // Door Header Sign (facing North into main X-Ray Room)
+      // Giant Overhead Suite Header Sign spanning across Door + Panoramic Window
       const headerBacking = new THREE.Mesh(
-        track(new THREE.BoxGeometry(1.36, 0.36, 0.04)),
+        track(new THREE.BoxGeometry(2.55, 0.48, 0.045)),
         matChrome
       );
-      headerBacking.position.set(opts.centerX, 2.48, 1.94);
+      headerBacking.position.set(opts.signCenterX, 3.24, 1.93);
       diagnosticSuitesGroup.add(headerBacking);
 
       const headerFace = new THREE.Mesh(
-        track(new THREE.PlaneGeometry(1.3, 0.31)),
+        track(new THREE.PlaneGeometry(2.46, 0.42)),
         track(
           new THREE.MeshStandardMaterial({
             map: opts.headerTex,
             emissiveMap: opts.headerTex,
             emissive: new THREE.Color(0xffffff),
-            emissiveIntensity: 0.72,
+            emissiveIntensity: 0.85,
           })
         )
       );
       headerFace.rotation.y = Math.PI;
-      headerFace.position.set(opts.centerX, 2.48, 1.915);
+      headerFace.position.set(opts.signCenterX, 3.24, 1.902);
       diagnosticSuitesGroup.add(headerFace);
 
-      // Door Status LED Bar above lintel
       const ledMat = track(
         new THREE.MeshStandardMaterial({
           color: 0xef4444,
           emissive: 0xef4444,
-          emissiveIntensity: 0.9,
+          emissiveIntensity: 0.95,
           roughness: 0.25,
         })
       );
       const statusLed = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.62, 0.045, 0.06)),
+        track(new THREE.BoxGeometry(0.92, 0.06, 0.06)),
         ledMat
       );
-      statusLed.position.set(opts.centerX, 2.21, 1.95);
+      statusLed.position.set(opts.centerX, 2.52, 1.94);
       diagnosticSuitesGroup.add(statusLed);
 
-      // Swinging Door Pivot
       const doorPivot = new THREE.Group();
       doorPivot.position.set(opts.hingeX, 0, 2.05);
 
       const slab = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.88, 2.14, 0.08)),
+        track(new THREE.BoxGeometry(1.18, 2.45, 0.085)),
         matClinicalWhite
       );
-      slab.position.set(0.44, 1.07, 0);
+      slab.position.set(0.59, 1.225, 0);
       slab.castShadow = true;
       slab.layers.set(1);
       slab.userData.action = {type: opts.actionType} satisfies SceneTargetAction;
       doorPivot.add(slab);
       interactiveMeshes.push(slab);
 
-      // Frosted Observation Window Strip on Door
       const windowPane = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.22, 0.72, 0.092)),
-        matLeadGlass
+        track(new THREE.BoxGeometry(0.32, 0.92, 0.096)),
+        matSuiteWindowGlass
       );
-      windowPane.position.set(0.66, 1.48, 0);
+      windowPane.position.set(0.88, 1.62, 0);
       doorPivot.add(windowPane);
 
-      // Chrome Handle
       const handle = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.14, 0.035, 0.14)),
+        track(new THREE.BoxGeometry(0.16, 0.04, 0.14)),
         matChrome
       );
-      handle.position.set(0.76, 1.02, 0);
+      handle.position.set(1.02, 1.08, 0);
       doorPivot.add(handle);
 
-      // Side Vertical Accent Stripe on Door
       const stripe = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.055, 1.98, 0.088)),
+        track(new THREE.BoxGeometry(0.075, 2.3, 0.092)),
         track(
           new THREE.MeshStandardMaterial({
             color: opts.accentColor,
             emissive: opts.accentColor,
-            emissiveIntensity: 0.35,
+            emissiveIntensity: 0.42,
             roughness: 0.35,
           })
         )
       );
-      stripe.position.set(0.1, 1.07, 0);
+      stripe.position.set(0.11, 1.225, 0);
       doorPivot.add(stripe);
 
-      // Locked & Unlocked Nameplate Badges (North face toward Exam Room)
       const lockedBadge = new THREE.Mesh(
-        track(new THREE.PlaneGeometry(0.56, 0.28)),
+        track(new THREE.PlaneGeometry(0.76, 0.36)),
         track(
           new THREE.MeshStandardMaterial({
             map: opts.lockedTex,
             emissiveMap: opts.lockedTex,
             emissive: new THREE.Color(0xffffff),
-            emissiveIntensity: 0.48,
+            emissiveIntensity: 0.52,
           })
         )
       );
       lockedBadge.rotation.y = Math.PI;
-      lockedBadge.position.set(0.36, 1.54, -0.044);
+      lockedBadge.position.set(0.46, 1.72, -0.046);
       doorPivot.add(lockedBadge);
 
       const unlockedBadge = new THREE.Mesh(
-        track(new THREE.PlaneGeometry(0.56, 0.28)),
+        track(new THREE.PlaneGeometry(0.76, 0.36)),
         track(
           new THREE.MeshStandardMaterial({
             map: opts.unlockedTex,
             emissiveMap: opts.unlockedTex,
             emissive: new THREE.Color(0xffffff),
-            emissiveIntensity: 0.48,
+            emissiveIntensity: 0.52,
           })
         )
       );
       unlockedBadge.rotation.y = Math.PI;
-      unlockedBadge.position.set(0.36, 1.54, -0.044);
+      unlockedBadge.position.set(0.46, 1.72, -0.046);
       unlockedBadge.visible = false;
       doorPivot.add(unlockedBadge);
 
@@ -1846,8 +2550,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     };
 
     const ctDoorRig = buildSuiteDoor({
-      hingeX: 0.3,
-      centerX: 0.75,
+      hingeX: -0.2,
+      centerX: 0.4,
+      signCenterX: 1.52,
       actionType: 'CT_DOOR',
       headerTex: ctHeaderTex,
       lockedTex: ctLockedBadgeTex,
@@ -1856,8 +2561,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     });
 
     const mriDoorRig = buildSuiteDoor({
-      hingeX: 2.8,
-      centerX: 3.25,
+      hingeX: 3.56,
+      centerX: 4.16,
+      signCenterX: 5.38,
       actionType: 'MRI_DOOR',
       headerTex: mriHeaderTex,
       lockedTex: mriLockedBadgeTex,
@@ -1865,213 +2571,536 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       accentColor: 0x10b981,
     });
 
-    // CT Suite Interior Equipment (inside Room 1: x ~ 0.78, z ~ 3.45)
-    const ctRoomLight = new THREE.PointLight(0xbae6fd, 1.15, 5.5);
-    ctRoomLight.position.set(0.78, 2.95, 3.25);
+    // Monumental CT Suite Interior & Colossal 64-Slice CT Scanner (x ~ 1.48, z ~ 5.25)
+    const ctRoomLight = new THREE.PointLight(0xbae6fd, 2.35, 12.5);
+    ctRoomLight.position.set(1.48, 3.7, 4.4);
     scene.add(ctRoomLight);
 
     const ctSuiteModel = new THREE.Group();
-    ctSuiteModel.position.set(0.78, 0, 3.55);
+    ctSuiteModel.position.set(1.48, 0, 5.25);
 
     const ctGantryBase = new THREE.Mesh(
-      track(new THREE.BoxGeometry(1.12, 0.26, 0.56)),
+      track(new THREE.BoxGeometry(2.6, 0.28, 1.08)),
       matTrim
     );
-    ctGantryBase.position.set(0, 0.13, 0.28);
+    ctGantryBase.position.set(0, 0.14, 0.42);
     ctSuiteModel.add(ctGantryBase);
 
-    const ctGantryBody = new THREE.Mesh(
-      track(new THREE.TorusGeometry(0.62, 0.2, 20, 40)),
+    // Colossal Gantry Housing Shell + Wide Contoured Bore
+    const ctGantryShoulder = new THREE.Mesh(
+      track(new THREE.BoxGeometry(2.65, 2.42, 0.76)),
       matClinicalWhite
     );
-    ctGantryBody.position.set(0, 1.02, 0.28);
+    ctGantryShoulder.position.set(0, 1.48, 0.46);
+    ctGantryShoulder.castShadow = true;
+    ctSuiteModel.add(ctGantryShoulder);
+
+    const ctGantryBody = new THREE.Mesh(
+      track(new THREE.TorusGeometry(0.92, 0.42, 24, 48)),
+      matClinicalWhite
+    );
+    ctGantryBody.position.set(0, 1.5, 0.28);
     ctSuiteModel.add(ctGantryBody);
 
+    const ctBoreInner = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.56, 0.56, 0.92, 32, 1, true)),
+      matDarkPad
+    );
+    ctBoreInner.rotation.x = Math.PI / 2;
+    ctBoreInner.position.set(0, 1.5, 0.4);
+    ctSuiteModel.add(ctBoreInner);
+
     const ctBoreGlow = new THREE.Mesh(
-      track(new THREE.TorusGeometry(0.44, 0.028, 12, 36)),
+      track(new THREE.TorusGeometry(0.64, 0.045, 14, 40)),
       matLedStrip
     );
-    ctBoreGlow.position.set(0, 1.02, 0.14);
+    ctBoreGlow.position.set(0, 1.5, 0.02);
     ctSuiteModel.add(ctBoreGlow);
 
     const ctBedPedestal = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.44, 0.68, 0.65)),
+      track(new THREE.BoxGeometry(0.68, 0.84, 1.15)),
       matClinicalWhite
     );
-    ctBedPedestal.position.set(0, 0.34, -0.35);
+    ctBedPedestal.position.set(0, 0.42, -1.05);
     ctSuiteModel.add(ctBedPedestal);
 
     const ctCouch = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.52, 0.08, 1.35)),
+      track(new THREE.BoxGeometry(0.78, 0.11, 2.75)),
       matDarkPad
     );
-    ctCouch.position.set(0, 0.72, -0.15);
+    ctCouch.position.set(0, 0.9, -0.75);
     ctSuiteModel.add(ctCouch);
     diagnosticSuitesGroup.add(ctSuiteModel);
 
-    // MRI Suite Interior Equipment (inside Room 2: x ~ 3.28, z ~ 3.55)
-    const mriRoomLight = new THREE.PointLight(0xa7f3d0, 1.15, 5.5);
-    mriRoomLight.position.set(3.28, 2.95, 3.25);
+    // Monumental MRI Suite Interior & Colossal 1.5T Cryogenic MRI (x ~ 5.42, z ~ 5.35)
+    const mriRoomLight = new THREE.PointLight(0xa7f3d0, 2.35, 12.5);
+    mriRoomLight.position.set(5.42, 3.7, 4.4);
     scene.add(mriRoomLight);
 
     const mriSuiteModel = new THREE.Group();
-    mriSuiteModel.position.set(3.28, 0, 3.55);
+    mriSuiteModel.position.set(5.42, 0, 5.35);
 
     const mriBase = new THREE.Mesh(
-      track(new THREE.BoxGeometry(1.18, 0.28, 0.92)),
+      track(new THREE.BoxGeometry(2.58, 0.28, 2.15)),
       matTrim
     );
-    mriBase.position.set(0, 0.14, 0.25);
+    mriBase.position.set(0, 0.14, 0.32);
     mriSuiteModel.add(mriBase);
 
     const mriTunnel = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.76, 0.76, 0.88, 28, 1, true)),
+      track(new THREE.CylinderGeometry(1.28, 1.28, 2.05, 36, 1, true)),
       matClinicalWhite
     );
     mriTunnel.rotation.x = Math.PI / 2;
-    mriTunnel.position.set(0, 1.04, 0.25);
+    mriTunnel.position.set(0, 1.54, 0.32);
+    mriTunnel.castShadow = true;
     mriSuiteModel.add(mriTunnel);
 
     const mriFrontCollar = new THREE.Mesh(
-      track(new THREE.TorusGeometry(0.6, 0.18, 20, 40)),
+      track(new THREE.TorusGeometry(0.92, 0.38, 24, 48)),
       matClinicalWhite
     );
-    mriFrontCollar.position.set(0, 1.04, -0.18);
+    mriFrontCollar.position.set(0, 1.54, -0.68);
     mriSuiteModel.add(mriFrontCollar);
 
+    const mriBackCollar = new THREE.Mesh(
+      track(new THREE.TorusGeometry(0.92, 0.38, 24, 48)),
+      matClinicalWhite
+    );
+    mriBackCollar.position.set(0, 1.54, 1.32);
+    mriSuiteModel.add(mriBackCollar);
+
+    const mriBoreLiner = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.58, 0.58, 2.08, 32, 1, true)),
+      matDarkPad
+    );
+    mriBoreLiner.rotation.x = Math.PI / 2;
+    mriBoreLiner.position.set(0, 1.54, 0.32);
+    mriSuiteModel.add(mriBoreLiner);
+
+    const mriVentStack = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.24, 0.28, 1.65, 18)),
+      matChrome
+    );
+    mriVentStack.position.set(0, 3.38, 0.65);
+    mriSuiteModel.add(mriVentStack);
+
     const mriTealRing = new THREE.Mesh(
-      track(new THREE.TorusGeometry(0.44, 0.032, 12, 36)),
+      track(new THREE.TorusGeometry(0.65, 0.048, 14, 40)),
       track(
         new THREE.MeshStandardMaterial({
           color: 0x34d399,
           emissive: 0x10b981,
-          emissiveIntensity: 1.0,
+          emissiveIntensity: 1.05,
           roughness: 0.2,
         })
       )
     );
-    mriTealRing.position.set(0, 1.04, -0.2);
+    mriTealRing.position.set(0, 1.54, -0.76);
     mriSuiteModel.add(mriTealRing);
 
     const mriCouchPedestal = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.46, 0.68, 0.56)),
+      track(new THREE.BoxGeometry(0.68, 0.84, 1.1)),
       matClinicalWhite
     );
-    mriCouchPedestal.position.set(0, 0.34, -0.45);
+    mriCouchPedestal.position.set(0, 0.42, -1.35);
     mriSuiteModel.add(mriCouchPedestal);
 
     const mriCouchTop = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.52, 0.08, 1.3)),
+      track(new THREE.BoxGeometry(0.78, 0.11, 2.75)),
       matDarkPad
     );
-    mriCouchTop.position.set(0, 0.72, -0.18);
+    mriCouchTop.position.set(0, 0.9, -0.92);
     mriSuiteModel.add(mriCouchTop);
     diagnosticSuitesGroup.add(mriSuiteModel);
 
     scene.add(diagnosticSuitesGroup);
 
     // =========================================================================
-    // 3. CONTROL BOOTH WORKSTATION: 3D CLINIC PC + 3D X-RAY CONSOLE
+    // 3. PROFESSIONAL CONTROL BOOTH WORKSTATION:
+    //    CR LASER DIGITIZER + DUAL-MONITOR PACS PC + HF kVp/mAs CONSOLE
     // =========================================================================
     const deskTop = new THREE.Mesh(
-      track(new THREE.BoxGeometry(2.15, 0.08, 0.68)),
+      track(new THREE.BoxGeometry(3.46, 0.075, 0.78)),
       matClinicalWhite
     );
-    deskTop.position.set(-2.55, 0.86, 2.66);
+    deskTop.position.set(-3.44, 0.86, 2.66);
     deskTop.castShadow = true;
     scene.add(deskTop);
 
-    // 3D Clinic Computer Monitor (Clickable -> opens PACS Image Editor / Log / Shop!)
-    const clinicPcGroup = new THREE.Group();
-    clinicPcGroup.position.set(-2.98, 0.9, 2.62);
-    clinicPcGroup.rotation.y = 0.22;
+    // Desk Support Pedestals & Chrome Legs
+    [-5.05, -1.82].forEach((dx) => {
+      const leg = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.14, 0.84, 0.68)),
+        matTrim
+      );
+      leg.position.set(dx, 0.42, 2.66);
+      leg.castShadow = true;
+      scene.add(leg);
+    });
 
-    const pcStand = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.18, 0.16, 0.12)),
+    // A) INDUSTRIAL CR CASSETTE READER (x = -4.52, z = 2.68, angled toward operator)
+    const crReaderGroup = new THREE.Group();
+    crReaderGroup.position.set(-4.52, 0.9, 2.68);
+    crReaderGroup.rotation.y = 0.46;
+
+    const crPlinth = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.54, 0.04, 0.5)),
+      matDarkPad
+    );
+    crPlinth.position.y = 0.02;
+    crReaderGroup.add(crPlinth);
+
+    const crBody = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.48, 0.56, 0.46)),
+      matClinicalWhite
+    );
+    crBody.position.y = 0.32;
+    crBody.castShadow = true;
+    crBody.layers.set(1);
+    crBody.userData.action = {type: 'CR_READER'} satisfies SceneTargetAction;
+    crReaderGroup.add(crBody);
+    interactiveMeshes.push(crBody);
+
+    // Sculpted side armor plates + chrome corner rails + intake louver vents
+    [-0.245, 0.245].forEach((sx) => {
+      const sidePanel = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.025, 0.48, 0.4)),
+        matTrim
+      );
+      sidePanel.position.set(sx, 0.31, 0);
+      crReaderGroup.add(sidePanel);
+    });
+
+    const crTopHood = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.46, 0.16, 0.28)),
       matTrim
     );
-    pcStand.position.y = 0.08;
-    clinicPcGroup.add(pcStand);
+    crTopHood.position.set(0, 0.58, -0.06);
+    crTopHood.rotation.x = -0.32;
+    crReaderGroup.add(crTopHood);
 
-    const pcFrame = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.68, 0.44, 0.04)),
-      matTrim
-    );
-    pcFrame.position.y = 0.34;
-    pcFrame.layers.set(1);
-    pcFrame.userData.action = {type: 'PC'} satisfies SceneTargetAction;
-    pcFrame.userData.label =
-      'انقر لفتح الحاسوب (تعديل الصورة · المرضى · المتجر)';
-    clinicPcGroup.add(pcFrame);
-    interactiveMeshes.push(pcFrame);
-
-    const pcScreen = new THREE.Mesh(
-      track(new THREE.PlaneGeometry(0.62, 0.38)),
+    const crFaceScreen = new THREE.Mesh(
+      track(new THREE.PlaneGeometry(0.4, 0.24)),
       track(
         new THREE.MeshStandardMaterial({
-          map: pcScreenTex,
-          emissiveMap: pcScreenTex,
+          map: crReaderTex,
+          emissiveMap: crReaderTex,
           emissive: new THREE.Color(0xffffff),
           emissiveIntensity: 0.85,
         })
       )
     );
-    pcScreen.position.set(0, 0.34, 0.025);
-    clinicPcGroup.add(pcScreen);
+    crFaceScreen.position.set(0, 0.46, 0.225);
+    crFaceScreen.rotation.x = -0.18;
+    crReaderGroup.add(crFaceScreen);
 
-    const pcKeyboard = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.42, 0.02, 0.15)),
+    // Flared Aluminum Cassette Intake Chute & Dark Interior Pocket
+    const crChuteBezel = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.42, 0.09, 0.08)),
+      matChrome
+    );
+    crChuteBezel.position.set(0, 0.2, 0.225);
+    crReaderGroup.add(crChuteBezel);
+
+    const crSlotPocket = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.36, 0.045, 0.1)),
       matDarkPad
     );
-    pcKeyboard.position.set(0, 0.01, 0.22);
+    crSlotPocket.position.set(0, 0.2, 0.24);
+    crReaderGroup.add(crSlotPocket);
+
+    const crLedMat = track(
+      new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        emissive: 0x38bdf8,
+        emissiveIntensity: 0.95,
+        roughness: 0.2,
+      })
+    );
+    const crStatusLed = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.42, 0.03, 0.03)),
+      crLedMat
+    );
+    crStatusLed.position.set(0, 0.62, 0.17);
+    crReaderGroup.add(crStatusLed);
+
+    const crEjectBtn = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.018, 0.018, 0.025, 14)),
+      track(
+        new THREE.MeshStandardMaterial({
+          color: 0xf59e0b,
+          emissive: 0xd97706,
+          emissiveIntensity: 0.45,
+        })
+      )
+    );
+    crEjectBtn.rotation.x = Math.PI / 2;
+    crEjectBtn.position.set(0.18, 0.29, 0.235);
+    crReaderGroup.add(crEjectBtn);
+
+    const crInsertedCassette = buildCassetteMesh(
+      track,
+      matCassetteBody,
+      matCassetteEdge,
+      matLedStrip
+    );
+    crInsertedCassette.scale.setScalar(0.68);
+    crInsertedCassette.position.set(0, 0.21, 0.34);
+    crInsertedCassette.visible = false;
+    crReaderGroup.add(crInsertedCassette);
+
+    const crGlowRing = new THREE.Mesh(
+      track(new THREE.RingGeometry(0.2, 0.26, 24)),
+      track(
+        new THREE.MeshBasicMaterial({
+          color: 0xf59e0b,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+        })
+      )
+    );
+    crGlowRing.position.set(0, 0.21, 0.28);
+    crReaderGroup.add(crGlowRing);
+    scene.add(crReaderGroup);
+
+    // B) DUAL-MONITOR MEDICAL PACS WORKSTATION (x = -3.32, z = 2.62)
+    const clinicPcGroup = new THREE.Group();
+    clinicPcGroup.position.set(-3.32, 0.9, 2.62);
+    clinicPcGroup.rotation.y = 0.06;
+
+    const pcDeskMat = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.92, 0.008, 0.36)),
+      matDarkPad
+    );
+    pcDeskMat.position.set(0.04, 0.004, 0.18);
+    clinicPcGroup.add(pcDeskMat);
+
+    const pcStandBase = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.38, 0.025, 0.22)),
+      matTrim
+    );
+    pcStandBase.position.set(0, 0.0125, -0.02);
+    clinicPcGroup.add(pcStandBase);
+
+    const pcStandSpine = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.026, 0.032, 0.38, 16)),
+      matChrome
+    );
+    pcStandSpine.position.set(0, 0.2, -0.05);
+    clinicPcGroup.add(pcStandSpine);
+
+    // Primary 5MP Landscape Diagnostic Monitor
+    const pcFrame = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.76, 0.48, 0.042)),
+      matTrim
+    );
+    pcFrame.position.set(-0.08, 0.38, 0);
+    pcFrame.castShadow = true;
+    pcFrame.layers.set(1);
+    pcFrame.userData.action = {type: 'PC'} satisfies SceneTargetAction;
+    clinicPcGroup.add(pcFrame);
+    interactiveMeshes.push(pcFrame);
+
+    const pcScreen = new THREE.Mesh(
+      track(new THREE.PlaneGeometry(0.71, 0.43)),
+      track(
+        new THREE.MeshStandardMaterial({
+          map: pcScreenTex,
+          emissiveMap: pcScreenTex,
+          emissive: new THREE.Color(0xffffff),
+          emissiveIntensity: 0.92,
+        })
+      )
+    );
+    pcScreen.position.set(-0.08, 0.38, 0.024);
+    clinicPcGroup.add(pcScreen);
+
+    // Secondary Vertical Portrait RIS Worklist Monitor (angled inward)
+    const secMonitorPivot = new THREE.Group();
+    secMonitorPivot.position.set(0.49, 0.39, 0.06);
+    secMonitorPivot.rotation.y = -0.34;
+
+    const secFrame = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.34, 0.46, 0.038)),
+      matTrim
+    );
+    secFrame.castShadow = true;
+    secFrame.layers.set(1);
+    secFrame.userData.action = {type: 'PC'} satisfies SceneTargetAction;
+    secMonitorPivot.add(secFrame);
+    interactiveMeshes.push(secFrame);
+
+    const secScreen = new THREE.Mesh(
+      track(new THREE.PlaneGeometry(0.3, 0.42)),
+      track(
+        new THREE.MeshStandardMaterial({
+          map: pcSecondaryTex,
+          emissiveMap: pcSecondaryTex,
+          emissive: new THREE.Color(0xffffff),
+          emissiveIntensity: 0.85,
+        })
+      )
+    );
+    secScreen.position.set(0, 0, 0.021);
+    secMonitorPivot.add(secScreen);
+    clinicPcGroup.add(secMonitorPivot);
+
+    // Brushed Slate Workstation Tower to side of monitors
+    const pcTower = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.18, 0.38, 0.36)),
+      matTrim
+    );
+    pcTower.position.set(-0.58, 0.19, -0.02);
+    pcTower.castShadow = true;
+    pcTower.layers.set(1);
+    pcTower.userData.action = {type: 'PC'} satisfies SceneTargetAction;
+    clinicPcGroup.add(pcTower);
+    interactiveMeshes.push(pcTower);
+
+    const pcTowerGlow = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.015, 0.28, 0.02)),
+      matLedStrip
+    );
+    pcTowerGlow.position.set(-0.52, 0.21, 0.165);
+    clinicPcGroup.add(pcTowerGlow);
+
+    // Low-Profile Backlit Keyboard + Mouse + Intercom Gooseneck Mic
+    const pcKeyboard = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.42, 0.018, 0.14)),
+      matTrim
+    );
+    pcKeyboard.position.set(-0.06, 0.014, 0.2);
     clinicPcGroup.add(pcKeyboard);
+
+    const pcKeyBacklight = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.38, 0.006, 0.11)),
+      matLedStrip
+    );
+    pcKeyBacklight.position.set(-0.06, 0.023, 0.2);
+    clinicPcGroup.add(pcKeyBacklight);
+
+    const pcMouse = new THREE.Mesh(
+      track(new THREE.CapsuleGeometry(0.028, 0.036, 6, 10)),
+      matTrim
+    );
+    pcMouse.rotation.x = Math.PI / 2;
+    pcMouse.scale.set(1, 1, 0.65);
+    pcMouse.position.set(0.24, 0.018, 0.21);
+    clinicPcGroup.add(pcMouse);
+
     scene.add(clinicPcGroup);
 
-    // 3D X-Ray Generator Control Console (Clickable -> opens / focuses Exposure Console)
+    // C) HOSPITAL-GRADE HF X-RAY GENERATOR CONSOLE (kVp / mAs) (x = -2.22, z = 2.65)
     const xrayConsoleGroup = new THREE.Group();
-    xrayConsoleGroup.position.set(-2.12, 0.9, 2.64);
-    xrayConsoleGroup.rotation.y = -0.18;
+    xrayConsoleGroup.position.set(-2.22, 0.9, 2.65);
+    xrayConsoleGroup.rotation.y = -0.24;
+
+    const consoleBase = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.72, 0.075, 0.44)),
+      matTrim
+    );
+    consoleBase.position.y = 0.038;
+    consoleBase.castShadow = true;
+    xrayConsoleGroup.add(consoleBase);
 
     const consoleBox = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.56, 0.18, 0.34)),
+      track(new THREE.BoxGeometry(0.68, 0.16, 0.36)),
       matClinicalWhite
     );
-    consoleBox.position.y = 0.09;
-    consoleBox.rotation.x = 0.22;
+    consoleBox.position.set(0, 0.12, -0.02);
+    consoleBox.rotation.x = 0.26;
+    consoleBox.castShadow = true;
     consoleBox.layers.set(1);
     consoleBox.userData.action = {type: 'CONSOLE'} satisfies SceneTargetAction;
-    consoleBox.userData.label = 'انقر لضبط لوحة kVp و mAs وإطلاق الأشعة';
     xrayConsoleGroup.add(consoleBox);
     interactiveMeshes.push(consoleBox);
 
     const consoleScreen = new THREE.Mesh(
-      track(new THREE.PlaneGeometry(0.48, 0.26)),
+      track(new THREE.PlaneGeometry(0.58, 0.3)),
       track(
         new THREE.MeshStandardMaterial({
           map: consoleTex,
           emissiveMap: consoleTex,
           emissive: new THREE.Color(0xffffff),
+          emissiveIntensity: 0.88,
+        })
+      )
+    );
+    consoleScreen.position.set(0, 0.205, -0.005);
+    consoleScreen.rotation.x = -Math.PI / 2 + 0.26;
+    xrayConsoleGroup.add(consoleScreen);
+
+    // Two Machined Knurled Rotary Dials (kVp Encoder & mAs Encoder)
+    [-0.18, 0.02].forEach((kx) => {
+      const knobBase = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.032, 0.036, 0.015, 20)),
+        matDarkPad
+      );
+      knobBase.position.set(kx, 0.082, 0.165);
+      xrayConsoleGroup.add(knobBase);
+
+      const knobDial = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.024, 0.026, 0.028, 20)),
+        matChrome
+      );
+      knobDial.position.set(kx, 0.098, 0.165);
+      xrayConsoleGroup.add(knobDial);
+    });
+
+    // Green Rotor/PREP Button + Guarded Illuminated EXPOSE Switch
+    const prepBtn = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.024, 0.026, 0.03, 18)),
+      track(
+        new THREE.MeshStandardMaterial({
+          color: 0x10b981,
+          emissive: 0x059669,
           emissiveIntensity: 0.75,
         })
       )
     );
-    consoleScreen.position.set(0, 0.185, 0.02);
-    consoleScreen.rotation.x = -Math.PI / 2 + 0.22;
-    xrayConsoleGroup.add(consoleScreen);
+    prepBtn.position.set(0.16, 0.09, 0.165);
+    xrayConsoleGroup.add(prepBtn);
+
+    const exposeGuardRing = new THREE.Mesh(
+      track(new THREE.TorusGeometry(0.036, 0.007, 10, 24)),
+      matChrome
+    );
+    exposeGuardRing.rotation.x = Math.PI / 2;
+    exposeGuardRing.position.set(0.26, 0.088, 0.165);
+    xrayConsoleGroup.add(exposeGuardRing);
 
     const exposeSwitch = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.032, 0.032, 0.04, 16)),
+      track(new THREE.CylinderGeometry(0.028, 0.028, 0.036, 18)),
       matLedStrip
     );
-    exposeSwitch.position.set(0.2, 0.16, 0.1);
+    exposeSwitch.position.set(0.26, 0.092, 0.165);
     xrayConsoleGroup.add(exposeSwitch);
+
+    // Coiled Handswitch Cord & Ergonomic Trigger on Right Flank
+    const handSwitchHolder = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.055, 0.11, 0.04)),
+      matDarkPad
+    );
+    handSwitchHolder.position.set(0.39, 0.095, 0.06);
+    xrayConsoleGroup.add(handSwitchHolder);
+
+    const handTrigger = new THREE.Mesh(
+      track(new THREE.CapsuleGeometry(0.022, 0.08, 8, 12)),
+      matClinicalWhite
+    );
+    handTrigger.position.set(0.41, 0.12, 0.06);
+    handTrigger.rotation.z = -0.18;
+    xrayConsoleGroup.add(handTrigger);
+
     scene.add(xrayConsoleGroup);
 
     // =========================================================================
     // 4. CASSETTE STORAGE RACK INSIDE EXAM ROOM (Clickable to pick up Cassette!)
     // =========================================================================
     const rackGroup = new THREE.Group();
-    rackGroup.position.set(-1.65, 0, -1.9);
+    rackGroup.position.set(-3.2, 0, -1.55);
 
     const rackCabinet = new THREE.Mesh(
       track(new THREE.BoxGeometry(0.74, 0.84, 0.46)),
@@ -2453,77 +3482,56 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         metalness: 0.12,
       })
     );
+    const matPatientShoeAccent = track(
+      new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        roughness: 0.45,
+        metalness: 0.1,
+      })
+    );
+    const matPatientPupil = track(
+      new THREE.MeshStandardMaterial({
+        color: 0x090d16,
+        roughness: 0.12,
+        metalness: 0.1,
+      })
+    );
 
     const patientWorldAnchor = new THREE.Group();
     const patientLocalBody = new THREE.Group();
     patientWorldAnchor.add(patientLocalBody);
     scene.add(patientWorldAnchor);
 
+    // Pelvis & Lower Hip Base
     const pPelvis = new THREE.Mesh(
-      track(new THREE.CapsuleGeometry(0.145, 0.14, 14, 22)),
+      track(new THREE.CapsuleGeometry(0.142, 0.145, 14, 22)),
       matPatientBottom
     );
     pPelvis.rotation.z = Math.PI / 2;
-    pPelvis.scale.set(1, 1.05, 0.78);
+    pPelvis.scale.set(1, 1.04, 0.78);
     pPelvis.position.set(0, -0.04, 0);
     pPelvis.castShadow = true;
     patientLocalBody.add(pPelvis);
 
-    const pAbdomen = new THREE.Mesh(
-      track(new THREE.CapsuleGeometry(0.142, 0.18, 14, 22)),
-      matPatientTop
-    );
-    pAbdomen.scale.set(1.12, 1, 0.78);
-    pAbdomen.position.set(0, 0.12, 0);
-    pAbdomen.castShadow = true;
-    patientLocalBody.add(pAbdomen);
-
-    const pChest = new THREE.Mesh(
-      track(new THREE.CapsuleGeometry(0.168, 0.22, 16, 24)),
-      matPatientTop
-    );
-    pChest.scale.set(1.18, 1, 0.78);
-    pChest.position.set(0, 0.34, 0.01);
-    pChest.castShadow = true;
-    patientLocalBody.add(pChest);
-
-    // Tailored V-Neck Scrub/Shirt Collar + Chest Pocket + Badge
-    [-1, 1].forEach((side) => {
-      const collar = new THREE.Mesh(
-        track(new THREE.CapsuleGeometry(0.016, 0.12, 6, 10)),
-        matPatientAccent
-      );
-      collar.position.set(side * 0.055, 0.47, 0.115);
-      collar.rotation.set(0.32, 0, side * -0.45);
-      patientLocalBody.add(collar);
-    });
-
-    const chestPocket = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.075, 0.085, 0.018)),
-      matPatientAccent
-    );
-    chestPocket.position.set(0.095, 0.36, 0.14);
-    patientLocalBody.add(chestPocket);
-
     // Waistband Belt / Sash + Chrome Buckle
     const pBelt = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.155, 0.158, 0.042, 22)),
+      track(new THREE.CylinderGeometry(0.153, 0.156, 0.04, 22)),
       matPatientBelt
     );
     pBelt.scale.set(1.06, 1, 0.76);
-    pBelt.position.set(0, 0.055, 0.002);
+    pBelt.position.set(0, 0.048, 0.002);
     patientLocalBody.add(pBelt);
 
     const pBeltBuckle = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.052, 0.036, 0.022)),
+      track(new THREE.BoxGeometry(0.05, 0.034, 0.022)),
       matChrome
     );
-    pBeltBuckle.position.set(0, 0.055, 0.122);
+    pBeltBuckle.position.set(0, 0.048, 0.121);
     patientLocalBody.add(pBeltBuckle);
 
-    // Flared tunic / blouse hem + side pockets for female patients
+    // Flared tunic / blouse hem for female patients
     const pTunicSkirt = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.16, 0.222, 0.3, 24)),
+      track(new THREE.CylinderGeometry(0.158, 0.222, 0.3, 24)),
       matPatientTop
     );
     pTunicSkirt.scale.set(1.12, 1, 0.82);
@@ -2532,11 +3540,90 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     pTunicSkirt.visible = false;
     patientLocalBody.add(pTunicSkirt);
 
-    // Sculpted Head & Expressive Facial Features
+    // Articulated Spine / Upper Torso Pivot (supports realistic breathing pitch, walking lean & speech posture)
+    const pSpinePivot = new THREE.Group();
+    pSpinePivot.position.set(0, 0.05, 0);
+    patientLocalBody.add(pSpinePivot);
+
+    const pAbdomen = new THREE.Mesh(
+      track(new THREE.CapsuleGeometry(0.138, 0.17, 14, 22)),
+      matPatientTop
+    );
+    pAbdomen.scale.set(1.1, 1, 0.78);
+    pAbdomen.position.set(0, 0.07, 0);
+    pAbdomen.castShadow = true;
+    pSpinePivot.add(pAbdomen);
+
+    // Sculpted Ribcage + Shoulder Clavicle Bridge
+    const pChestGroup = new THREE.Group();
+    pChestGroup.position.set(0, 0.29, 0.01);
+    pSpinePivot.add(pChestGroup);
+
+    const pChest = new THREE.Mesh(
+      track(new THREE.CapsuleGeometry(0.165, 0.21, 16, 24)),
+      matPatientTop
+    );
+    pChest.scale.set(1.18, 1, 0.78);
+    pChest.castShadow = true;
+    pChestGroup.add(pChest);
+
+    const pClavicleBridge = new THREE.Mesh(
+      track(new THREE.CapsuleGeometry(0.066, 0.34, 10, 16)),
+      matPatientTop
+    );
+    pClavicleBridge.rotation.z = Math.PI / 2;
+    pClavicleBridge.scale.set(0.85, 1, 0.72);
+    pClavicleBridge.position.set(0, 0.115, -0.005);
+    pClavicleBridge.castShadow = true;
+    pChestGroup.add(pClavicleBridge);
+
+    // Tailored V-Neck Collar + Placket + Buttons + Chest Pocket + Pen Clip
+    [-1, 1].forEach((side) => {
+      const collar = new THREE.Mesh(
+        track(new THREE.CapsuleGeometry(0.015, 0.125, 6, 10)),
+        matPatientAccent
+      );
+      collar.position.set(side * 0.056, 0.13, 0.112);
+      collar.rotation.set(0.34, 0, side * -0.45);
+      pChestGroup.add(collar);
+    });
+
+    const pPlacket = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.028, 0.23, 0.014)),
+      matPatientAccent
+    );
+    pPlacket.position.set(0, -0.01, 0.13);
+    pChestGroup.add(pPlacket);
+
+    [0.06, -0.01, -0.08].forEach((by) => {
+      const btn = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.007, 0.007, 0.008, 10)),
+        matClinicalWhite
+      );
+      btn.rotation.x = Math.PI / 2;
+      btn.position.set(0, by, 0.138);
+      pChestGroup.add(btn);
+    });
+
+    const chestPocket = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.072, 0.08, 0.016)),
+      matPatientAccent
+    );
+    chestPocket.position.set(0.095, 0.02, 0.132);
+    pChestGroup.add(chestPocket);
+
+    const pocketPen = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.004, 0.004, 0.055, 8)),
+      matChrome
+    );
+    pocketPen.position.set(0.11, 0.048, 0.14);
+    pChestGroup.add(pocketPen);
+
+    // Sculpted Head & Expressive Facial Features (Blinking Eyelids, Pupils, Cheekbones, Talking Lips)
     const pHeadGroup = new THREE.Group();
-    pHeadGroup.position.set(0, 0.56, 0);
+    pHeadGroup.position.set(0, 0.51, 0);
     const pNeck = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.054, 0.066, 0.14, 18)),
+      track(new THREE.CylinderGeometry(0.052, 0.066, 0.14, 18)),
       matPatientSkin
     );
     pNeck.position.set(0, 0.05, 0);
@@ -2551,17 +3638,24 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     pHead.castShadow = true;
     pHeadGroup.add(pHead);
 
-    // Sculpted Jaw / Chin taper
+    // Sculpted Jaw / Chin + Subtle Cheekbones
     const pJaw = new THREE.Mesh(
       track(new THREE.SphereGeometry(0.095, 20, 16)),
       matPatientSkin
     );
-    pJaw.scale.set(0.86, 0.76, 0.9);
-    pJaw.position.set(0, 0.145, 0.024);
+    pJaw.scale.set(0.85, 0.76, 0.9);
+    pJaw.position.set(0, 0.146, 0.024);
     pHeadGroup.add(pJaw);
 
-    // Sculpted Left & Right Ears
     [-1, 1].forEach((side) => {
+      const cheek = new THREE.Mesh(
+        track(new THREE.SphereGeometry(0.036, 12, 10)),
+        matPatientSkin
+      );
+      cheek.scale.set(1.1, 0.78, 0.82);
+      cheek.position.set(side * 0.062, 0.198, 0.094);
+      pHeadGroup.add(cheek);
+
       const ear = new THREE.Mesh(
         track(new THREE.SphereGeometry(0.025, 12, 10)),
         matPatientSkin
@@ -2571,51 +3665,86 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       pHeadGroup.add(ear);
     });
 
-    // Natural Rounded Nose Bridge + Tip
+    // Natural Nose Bridge + Tip
     const pNoseBridge = new THREE.Mesh(
-      track(new THREE.CapsuleGeometry(0.012, 0.032, 6, 10)),
+      track(new THREE.CapsuleGeometry(0.011, 0.03, 6, 10)),
       matPatientSkin
     );
     pNoseBridge.rotation.x = -0.28;
-    pNoseBridge.position.set(0, 0.212, 0.128);
+    pNoseBridge.position.set(0, 0.215, 0.128);
     pHeadGroup.add(pNoseBridge);
 
-    // Layered Eyes (Sclera + Iris) & Expressive Eyebrows
+    const pNoseTip = new THREE.Mesh(
+      track(new THREE.SphereGeometry(0.013, 10, 8)),
+      matPatientSkin
+    );
+    pNoseTip.position.set(0, 0.196, 0.138);
+    pHeadGroup.add(pNoseTip);
+
+    // Layered Eyes (Sclera + Iris + Pupil + Blinking Upper Eyelids) & Expressive Eyebrows
     const browMeshes: THREE.Mesh[] = [];
+    const eyelidMeshes: THREE.Mesh[] = [];
     [-1, 1].forEach((side) => {
       const sclera = new THREE.Mesh(
         track(new THREE.SphereGeometry(0.017, 12, 10)),
         matPatientEyeWhite
       );
-      sclera.scale.set(1.2, 0.8, 0.6);
+      sclera.scale.set(1.22, 0.78, 0.6);
       sclera.position.set(side * 0.043, 0.242, 0.114);
       pHeadGroup.add(sclera);
 
       const iris = new THREE.Mesh(
-        track(new THREE.SphereGeometry(0.01, 10, 8)),
+        track(new THREE.SphereGeometry(0.0098, 10, 8)),
         matPatientIris
       );
       iris.position.set(side * 0.043, 0.242, 0.123);
       pHeadGroup.add(iris);
+
+      const pupil = new THREE.Mesh(
+        track(new THREE.SphereGeometry(0.0052, 8, 8)),
+        matPatientPupil
+      );
+      pupil.position.set(side * 0.043, 0.242, 0.129);
+      pHeadGroup.add(pupil);
+
+      const eyelid = new THREE.Mesh(
+        track(
+          new THREE.SphereGeometry(
+            0.0185,
+            12,
+            10,
+            0,
+            Math.PI * 2,
+            0,
+            Math.PI * 0.52
+          )
+        ),
+        matPatientSkin
+      );
+      eyelid.scale.set(1.24, 0.88, 0.72);
+      eyelid.position.set(side * 0.043, 0.244, 0.115);
+      eyelid.rotation.x = -1.15;
+      pHeadGroup.add(eyelid);
+      eyelidMeshes.push(eyelid);
 
       const brow = new THREE.Mesh(
         track(new THREE.CapsuleGeometry(0.0055, 0.028, 6, 8)),
         matPatientHair
       );
       brow.rotation.z = Math.PI / 2 - side * 0.12;
-      brow.position.set(side * 0.044, 0.265, 0.116);
+      brow.position.set(side * 0.044, 0.266, 0.116);
       pHeadGroup.add(brow);
       browMeshes.push(brow);
     });
 
-    // Natural Lips / Smile Contour
+    // Natural Articulated Lips (upper & lower contour that animate gently during speech)
     const pLips = new THREE.Mesh(
       track(new THREE.CapsuleGeometry(0.0085, 0.032, 6, 10)),
       matPatientLips
     );
     pLips.rotation.z = Math.PI / 2;
     pLips.scale.set(1, 1, 0.65);
-    pLips.position.set(0, 0.162, 0.116);
+    pLips.position.set(0, 0.163, 0.116);
     pHeadGroup.add(pLips);
 
     // Base Scalp Hair + Male Sculpted Top Crown + Sideburns
@@ -2679,7 +3808,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     pMustache.visible = false;
     pHeadGroup.add(pMustache);
 
-    // Female Layered Long Hair (Parted Bangs + Crown + Shoulder Back Locks + Hairband)
+    // Female Layered Long Hair
     const pBangL = new THREE.Mesh(
       track(new THREE.CapsuleGeometry(0.035, 0.095, 8, 12)),
       matPatientHair
@@ -2732,7 +3861,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     pHairSideR.visible = false;
     pHeadGroup.add(pHairSideR);
 
-    // Female Layered Draped Hijab (Underscarf Band + Outer Wrap + Pleated Shoulder Shawl)
+    // Female Layered Draped Hijab
     const pHijabUnderscarf = new THREE.Mesh(
       track(new THREE.TorusGeometry(0.118, 0.016, 10, 24)),
       matPatientHijabTrim
@@ -2769,122 +3898,199 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     pHijabFold.visible = false;
     pHeadGroup.add(pHijabFold);
 
-    patientLocalBody.add(pHeadGroup);
+    pSpinePivot.add(pHeadGroup);
 
-    // Sculpted Arms + Sleeve Cuffs + Wristwatch + Natural Hands
-    const armGroups: THREE.Group[] = [];
+    // 2-Bone Articulated Arms (Shoulder Pivot -> UpperArm -> Elbow Pivot -> Forearm -> Wrist -> Multi-Finger Hand)
+    const shoulderPivots: THREE.Group[] = [];
+    const elbowPivots: THREE.Group[] = [];
+    const wristPivots: THREE.Group[] = [];
     [1, -1].forEach((side) => {
       const shoulderPivot = new THREE.Group();
-      shoulderPivot.position.set(side * 0.25, 0.44, 0);
-      const shoulder = new THREE.Mesh(
+      shoulderPivot.position.set(side * 0.245, 0.39, 0);
+
+      const shoulderCap = new THREE.Mesh(
         track(new THREE.SphereGeometry(0.064, 16, 14)),
         matPatientTop
       );
-      shoulderPivot.add(shoulder);
+      shoulderPivot.add(shoulderCap);
+
       const upperArm = new THREE.Mesh(
-        track(new THREE.CapsuleGeometry(0.048, 0.23, 12, 16)),
+        track(new THREE.CapsuleGeometry(0.047, 0.2, 12, 16)),
         matPatientTop
       );
-      upperArm.position.set(0, -0.155, 0);
+      upperArm.position.set(0, -0.14, 0);
       upperArm.castShadow = true;
       shoulderPivot.add(upperArm);
 
       const sleeveCuff = new THREE.Mesh(
-        track(new THREE.CylinderGeometry(0.052, 0.054, 0.035, 16)),
+        track(new THREE.CylinderGeometry(0.051, 0.053, 0.032, 16)),
         matPatientAccent
       );
-      sleeveCuff.position.set(0, -0.265, 0);
+      sleeveCuff.position.set(0, -0.235, 0);
       shoulderPivot.add(sleeveCuff);
 
-      const forearm = new THREE.Mesh(
-        track(new THREE.CapsuleGeometry(0.039, 0.21, 12, 16)),
+      // Elbow Joint Pivot
+      const elbowPivot = new THREE.Group();
+      elbowPivot.position.set(0, -0.275, 0);
+      shoulderPivot.add(elbowPivot);
+
+      const elbowCap = new THREE.Mesh(
+        track(new THREE.SphereGeometry(0.042, 12, 10)),
         matPatientSkin
       );
-      forearm.position.set(0, -0.415, 0.04);
-      forearm.rotation.x = -0.15;
+      elbowPivot.add(elbowCap);
+
+      const forearm = new THREE.Mesh(
+        track(new THREE.CapsuleGeometry(0.037, 0.19, 12, 16)),
+        matPatientSkin
+      );
+      forearm.position.set(0, -0.125, 0);
       forearm.castShadow = true;
-      shoulderPivot.add(forearm);
+      elbowPivot.add(forearm);
 
       if (side === -1) {
         const watchStrap = new THREE.Mesh(
-          track(new THREE.CylinderGeometry(0.042, 0.042, 0.024, 14)),
+          track(new THREE.CylinderGeometry(0.04, 0.04, 0.022, 14)),
           matPatientBelt
         );
-        watchStrap.position.set(0, -0.5, 0.052);
-        watchStrap.rotation.x = -0.15;
-        shoulderPivot.add(watchStrap);
+        watchStrap.position.set(0, -0.215, 0);
+        elbowPivot.add(watchStrap);
+      } else {
+        // Hospital Patient Identification Wristband
+        const idBand = new THREE.Mesh(
+          track(new THREE.CylinderGeometry(0.039, 0.039, 0.018, 14)),
+          matClinicalWhite
+        );
+        idBand.position.set(0, -0.215, 0);
+        elbowPivot.add(idBand);
       }
 
-      // Rounded Sculpted Hand + Thumb
+      // Wrist + Sculpted Multi-Finger Hand
+      const wristPivot = new THREE.Group();
+      wristPivot.position.set(0, -0.25, 0);
+      elbowPivot.add(wristPivot);
+
       const palm = new THREE.Mesh(
-        track(new THREE.CapsuleGeometry(0.028, 0.055, 8, 12)),
+        track(new THREE.CapsuleGeometry(0.025, 0.042, 8, 12)),
         matPatientSkin
       );
-      palm.scale.set(0.75, 1, 1.15);
-      palm.position.set(0, -0.565, 0.062);
-      shoulderPivot.add(palm);
+      palm.scale.set(0.7, 1, 1.18);
+      palm.position.set(0, -0.042, 0);
+      wristPivot.add(palm);
 
       const thumb = new THREE.Mesh(
-        track(new THREE.CapsuleGeometry(0.011, 0.028, 6, 8)),
+        track(new THREE.CapsuleGeometry(0.0085, 0.026, 6, 8)),
         matPatientSkin
       );
-      thumb.position.set(-side * 0.016, -0.548, 0.088);
-      thumb.rotation.x = 0.55;
-      shoulderPivot.add(thumb);
+      thumb.position.set(-side * 0.014, -0.038, 0.028);
+      thumb.rotation.x = 0.5;
+      wristPivot.add(thumb);
 
-      patientLocalBody.add(shoulderPivot);
-      armGroups.push(shoulderPivot);
+      [-0.018, -0.006, 0.006, 0.018].forEach((fz, fi) => {
+        const len = fi === 1 || fi === 2 ? 0.034 : 0.028;
+        const finger = new THREE.Mesh(
+          track(new THREE.CapsuleGeometry(0.0068, len, 6, 8)),
+          matPatientSkin
+        );
+        finger.position.set(-side * 0.004, -0.078, fz);
+        finger.rotation.z = side * 0.14;
+        wristPivot.add(finger);
+      });
+
+      pSpinePivot.add(shoulderPivot);
+      shoulderPivots.push(shoulderPivot);
+      elbowPivots.push(elbowPivot);
+      wristPivots.push(wristPivot);
     });
 
-    // Sculpted Legs + Trousers Cuffs + Two-Tone Medical Sneakers
+    // 3-Bone Articulated Legs (Hip -> Thigh -> Knee -> Shin -> Ankle -> Detailed Two-Tone Sneaker)
     const thighPivots: THREE.Group[] = [];
     const kneePivots: THREE.Group[] = [];
+    const anklePivots: THREE.Group[] = [];
     [1, -1].forEach((side) => {
       const hipPivot = new THREE.Group();
-      hipPivot.position.set(side * 0.11, -0.12, 0);
+      hipPivot.position.set(side * 0.108, -0.11, 0);
+
       const thigh = new THREE.Mesh(
-        track(new THREE.CapsuleGeometry(0.068, 0.34, 12, 18)),
+        track(new THREE.CapsuleGeometry(0.068, 0.32, 12, 18)),
         matPatientBottom
       );
-      thigh.position.set(0, -0.22, 0);
+      thigh.position.set(0, -0.21, 0);
       thigh.castShadow = true;
       hipPivot.add(thigh);
+
       const kneeJoint = new THREE.Group();
-      kneeJoint.position.set(0, -0.44, 0);
+      kneeJoint.position.set(0, -0.43, 0);
+
       const kneeCap = new THREE.Mesh(
-        track(new THREE.SphereGeometry(0.064, 14, 12)),
+        track(new THREE.SphereGeometry(0.063, 14, 12)),
         matPatientBottom
       );
       kneeJoint.add(kneeCap);
+
       const shin = new THREE.Mesh(
-        track(new THREE.CapsuleGeometry(0.054, 0.34, 12, 18)),
+        track(new THREE.CapsuleGeometry(0.053, 0.33, 12, 18)),
         matPatientBottom
       );
-      shin.position.set(0, -0.22, 0);
+      shin.position.set(0, -0.21, 0);
       shin.castShadow = true;
       kneeJoint.add(shin);
 
-      // Two-tone Sneaker (Upper + White Outsole + Toe Cap)
-      const shoeSole = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.09, 0.026, 0.185)),
+      const ankleHem = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.057, 0.059, 0.03, 16)),
+        matPatientBottom
+      );
+      ankleHem.position.set(0, -0.37, 0);
+      kneeJoint.add(ankleHem);
+
+      // Ankle Pivot + Detailed Sneaker
+      const anklePivot = new THREE.Group();
+      anklePivot.position.set(0, -0.415, 0);
+      kneeJoint.add(anklePivot);
+
+      const sockCollar = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.044, 0.046, 0.036, 14)),
         matClinicalWhite
       );
-      shoeSole.position.set(0, -0.448, 0.058);
-      kneeJoint.add(shoeSole);
+      sockCollar.position.set(0, 0.005, 0);
+      anklePivot.add(sockCollar);
+
+      const shoeSole = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.094, 0.026, 0.195)),
+        matClinicalWhite
+      );
+      shoeSole.position.set(0, -0.036, 0.056);
+      anklePivot.add(shoeSole);
 
       const shoeUpper = new THREE.Mesh(
-        track(new THREE.CapsuleGeometry(0.042, 0.095, 8, 14)),
+        track(new THREE.CapsuleGeometry(0.043, 0.1, 10, 14)),
         matPatientShoeUpper
       );
       shoeUpper.rotation.x = Math.PI / 2;
       shoeUpper.scale.set(1, 1, 0.72);
-      shoeUpper.position.set(0, -0.422, 0.055);
-      kneeJoint.add(shoeUpper);
+      shoeUpper.position.set(0, -0.01, 0.054);
+      anklePivot.add(shoeUpper);
+
+      const shoeHeelTrim = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.092, 0.034, 0.035)),
+        matPatientShoeAccent
+      );
+      shoeHeelTrim.position.set(0, -0.012, -0.025);
+      anklePivot.add(shoeHeelTrim);
+
+      const shoeLaces = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.045, 0.008, 0.055)),
+        matClinicalWhite
+      );
+      shoeLaces.position.set(0, 0.018, 0.068);
+      shoeLaces.rotation.x = 0.24;
+      anklePivot.add(shoeLaces);
 
       hipPivot.add(kneeJoint);
       patientLocalBody.add(hipPivot);
       thighPivots.push(hipPivot);
       kneePivots.push(kneeJoint);
+      anklePivots.push(anklePivot);
     });
 
     const leadApronMesh = new THREE.Mesh(
@@ -2919,8 +4125,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       }
 
       if (isFemale) {
-        // Tailored female silhouette + tunic dress + layered hijab or flowing hair
         pChest.scale.set(0.95, 0.96, 0.78);
+        pClavicleBridge.scale.set(0.75, 0.88, 0.68);
         pAbdomen.scale.set(0.83, 1, 0.7);
         pPelvis.scale.set(1.16, 1.08, 0.84);
         pNeck.scale.set(0.82, 1, 0.82);
@@ -2929,7 +4135,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         browMeshes.forEach((b) => {
           b.scale.set(0.85, 0.9, 0.85);
         });
-        armGroups.forEach((arm, idx) => {
+        shoulderPivots.forEach((arm, idx) => {
           arm.position.x = (idx === 0 ? 1 : -1) * 0.21;
           arm.scale.set(0.87, 0.97, 0.87);
         });
@@ -2943,6 +4149,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         matPatientAccent.color.setHex(FEMALE_ACCENT_COLORS[topIdx]);
         matPatientBottom.color.setHex(0x1e293b);
         matPatientShoeUpper.color.setHex(0x475569);
+        matPatientShoeAccent.color.setHex(FEMALE_ACCENT_COLORS[topIdx]);
         matPatientBelt.color.setHex(0x0f172a);
         const hijabIdx = (seed >> 5) % FEMALE_HIJAB_COLORS.length;
         matPatientHijab.color.setHex(FEMALE_HIJAB_COLORS[hijabIdx]);
@@ -2968,9 +4175,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         pBeard.visible = false;
         pMustache.visible = false;
       } else {
-        // Structured male silhouette + styled crown/sideburns + optional beard
-        pChest.scale.set(1.26, 1.02, 0.82);
-        pAbdomen.scale.set(1.14, 1.0, 0.8);
+        pChest.scale.set(1.24, 1.02, 0.82);
+        pClavicleBridge.scale.set(0.88, 1.02, 0.74);
+        pAbdomen.scale.set(1.12, 1.0, 0.8);
         pPelvis.scale.set(0.96, 1.02, 0.76);
         pNeck.scale.set(1.04, 1, 1.04);
         pHead.scale.set(0.94, 1.08, 0.99);
@@ -2978,9 +4185,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         browMeshes.forEach((b) => {
           b.scale.set(1.2, 1.05, 1.1);
         });
-        armGroups.forEach((arm, idx) => {
-          arm.position.x = (idx === 0 ? 1 : -1) * 0.268;
-          arm.scale.set(1.05, 1.02, 1.05);
+        shoulderPivots.forEach((arm, idx) => {
+          arm.position.x = (idx === 0 ? 1 : -1) * 0.262;
+          arm.scale.set(1.04, 1.02, 1.04);
         });
         thighPivots.forEach((hip, idx) => {
           hip.position.x = (idx === 0 ? 1 : -1) * 0.105;
@@ -2994,6 +4201,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
           MALE_BOTTOM_COLORS[(seed >> 6) % MALE_BOTTOM_COLORS.length]
         );
         matPatientShoeUpper.color.setHex(0x1e293b);
+        matPatientShoeAccent.color.setHex(MALE_ACCENT_COLORS[topIdx]);
         matPatientBelt.color.setHex(0x1e293b);
 
         pHijabCap.visible = false;
@@ -3034,7 +4242,6 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         type: 'REGION',
         region: spot.id,
       } satisfies SceneTargetAction;
-      hitMesh.userData.label = `انقر لتوجيه أنبوب الأشعة نحو: ${REGION_LABELS_AR[spot.id]}`;
       patientLocalBody.add(hitMesh);
       interactiveMeshes.push(hitMesh);
 
@@ -3055,10 +4262,10 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     const railGroup = new THREE.Group();
     [-0.7, 0.7].forEach((rz) => {
       const rail = new THREE.Mesh(
-        track(new THREE.BoxGeometry(4.6, 0.08, 0.08)),
+        track(new THREE.BoxGeometry(5.4, 0.08, 0.08)),
         matChrome
       );
-      rail.position.set(0.2, 3.38, rz);
+      rail.position.set(0.4, 4.02, rz);
       railGroup.add(rail);
     });
     scene.add(railGroup);
@@ -3068,15 +4275,15 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       track(new THREE.BoxGeometry(0.3, 0.1, 1.54)),
       matTrim
     );
-    bridgeBar.position.set(0, 3.33, 0);
+    bridgeBar.position.set(0, 3.97, 0);
     gantryCarriage.add(bridgeBar);
 
     const tubeAssembly = new THREE.Group();
     const teleColumn = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.075, 0.088, 2.2, 18)),
+      track(new THREE.CylinderGeometry(0.075, 0.088, 2.85, 18)),
       matChrome
     );
-    teleColumn.position.set(0, 1.15, 0);
+    teleColumn.position.set(0, 1.48, 0);
     tubeAssembly.add(teleColumn);
 
     const tubePivot = new THREE.Group();
@@ -3143,16 +4350,485 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       track(new THREE.BoxGeometry(0.85, 0.78, 0.55)),
       matTrim
     );
-    sideDesk.position.set(2.8, 0.39, -2.15);
+    sideDesk.position.set(3.9, 0.39, -4.35);
     processorGroup.add(sideDesk);
     const procUnit = new THREE.Mesh(
       track(new THREE.BoxGeometry(0.54, 0.32, 0.42)),
       matClinicalWhite
     );
-    procUnit.position.set(2.8, 0.94, -2.15);
+    procUnit.position.set(3.9, 0.94, -4.35);
     processorGroup.add(procUnit);
     processorGroup.visible = false;
     scene.add(processorGroup);
+
+    // =========================================================================
+    // 8B. VISIBLE WAITING ROOM PATIENTS (STANDING BY DOOR + SEATED ON BENCHES)
+    // =========================================================================
+    interface WaitingRig {
+      root: THREE.Group;
+      spinePivot: THREE.Group;
+      chest: THREE.Mesh;
+      pelvis: THREE.Mesh;
+      headGroup: THREE.Group;
+      eyelids: THREE.Mesh[];
+      shoulderPivots: THREE.Group[];
+      elbowPivots: THREE.Group[];
+      legPivots: THREE.Group[];
+      phoneMesh: THREE.Mesh;
+      hairScalp: THREE.Mesh;
+      beard: THREE.Mesh;
+      hijab: THREE.Mesh;
+      hijabDrape: THREE.Mesh;
+      longHair: THREE.Mesh;
+      tunic: THREE.Mesh;
+      matSkin: THREE.MeshStandardMaterial;
+      matTop: THREE.MeshStandardMaterial;
+      matAccent: THREE.MeshStandardMaterial;
+      matBot: THREE.MeshStandardMaterial;
+      matHair: THREE.MeshStandardMaterial;
+      matHijab: THREE.MeshStandardMaterial;
+      baseX: number;
+      baseY: number;
+      baseZ: number;
+      seated: boolean;
+      hasPhone: boolean;
+    }
+
+    const buildWaitingPatientRig = (
+      x: number,
+      z: number,
+      seated: boolean,
+      hasPhone: boolean
+    ): WaitingRig => {
+      const root = new THREE.Group();
+      const baseY = seated ? 0.51 : 0.96;
+      root.position.set(x, baseY, z);
+
+      const matSkin = track(
+        new THREE.MeshStandardMaterial({color: 0xdba88a, roughness: 0.52})
+      );
+      const matTop = track(
+        new THREE.MeshStandardMaterial({color: 0x2563eb, roughness: 0.66})
+      );
+      const matAccent = track(
+        new THREE.MeshStandardMaterial({color: 0x93c5fd, roughness: 0.55})
+      );
+      const matBot = track(
+        new THREE.MeshStandardMaterial({color: 0x1e293b, roughness: 0.72})
+      );
+      const matHair = track(
+        new THREE.MeshStandardMaterial({color: 0x171b24, roughness: 0.52})
+      );
+      const matHijab = track(
+        new THREE.MeshStandardMaterial({color: 0xf8fafc, roughness: 0.65})
+      );
+
+      const pelvis = new THREE.Mesh(
+        track(new THREE.CapsuleGeometry(0.14, 0.13, 10, 16)),
+        matBot
+      );
+      pelvis.rotation.z = Math.PI / 2;
+      pelvis.scale.set(1, 1.04, 0.78);
+      pelvis.position.set(0, -0.02, 0);
+      root.add(pelvis);
+
+      const tunic = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.155, 0.21, 0.26, 18)),
+        matTop
+      );
+      tunic.position.set(0, -0.04, 0);
+      tunic.visible = false;
+      root.add(tunic);
+
+      const spinePivot = new THREE.Group();
+      spinePivot.position.set(0, 0.04, 0);
+      root.add(spinePivot);
+
+      const chest = new THREE.Mesh(
+        track(new THREE.CapsuleGeometry(0.16, 0.26, 12, 18)),
+        matTop
+      );
+      chest.scale.set(1.14, 1, 0.78);
+      chest.position.set(0, 0.19, 0);
+      chest.castShadow = true;
+      spinePivot.add(chest);
+
+      [-1, 1].forEach((side) => {
+        const wCollar = new THREE.Mesh(
+          track(new THREE.CapsuleGeometry(0.013, 0.1, 6, 8)),
+          matAccent
+        );
+        wCollar.position.set(side * 0.05, 0.33, 0.105);
+        wCollar.rotation.set(0.32, 0, side * -0.45);
+        spinePivot.add(wCollar);
+      });
+
+      const headGroup = new THREE.Group();
+      headGroup.position.set(0, 0.44, 0);
+
+      const neck = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.05, 0.06, 0.12, 14)),
+        matSkin
+      );
+      neck.position.y = 0.04;
+      headGroup.add(neck);
+
+      const head = new THREE.Mesh(
+        track(new THREE.SphereGeometry(0.122, 20, 16)),
+        matSkin
+      );
+      head.scale.set(0.92, 1.06, 0.96);
+      head.position.set(0, 0.195, 0.01);
+      headGroup.add(head);
+
+      const nose = new THREE.Mesh(
+        track(new THREE.CapsuleGeometry(0.01, 0.025, 4, 8)),
+        matSkin
+      );
+      nose.rotation.x = -0.26;
+      nose.position.set(0, 0.188, 0.124);
+      headGroup.add(nose);
+
+      const lips = new THREE.Mesh(
+        track(new THREE.CapsuleGeometry(0.0075, 0.028, 4, 8)),
+        matPatientLips
+      );
+      lips.rotation.z = Math.PI / 2;
+      lips.position.set(0, 0.142, 0.112);
+      headGroup.add(lips);
+
+      const eyelids: THREE.Mesh[] = [];
+      [-1, 1].forEach((side) => {
+        const ear = new THREE.Mesh(
+          track(new THREE.SphereGeometry(0.022, 10, 8)),
+          matSkin
+        );
+        ear.scale.set(0.45, 1.12, 0.72);
+        ear.position.set(side * 0.112, 0.192, 0.005);
+        headGroup.add(ear);
+
+        const sclera = new THREE.Mesh(
+          track(new THREE.SphereGeometry(0.0155, 10, 8)),
+          matPatientEyeWhite
+        );
+        sclera.scale.set(1.2, 0.78, 0.6);
+        sclera.position.set(side * 0.041, 0.214, 0.11);
+        headGroup.add(sclera);
+
+        const iris = new THREE.Mesh(
+          track(new THREE.SphereGeometry(0.009, 8, 8)),
+          matPatientIris
+        );
+        iris.position.set(side * 0.041, 0.214, 0.118);
+        headGroup.add(iris);
+
+        const eyelid = new THREE.Mesh(
+          track(
+            new THREE.SphereGeometry(
+              0.0165,
+              10,
+              8,
+              0,
+              Math.PI * 2,
+              0,
+              Math.PI * 0.52
+            )
+          ),
+          matSkin
+        );
+        eyelid.scale.set(1.22, 0.88, 0.7);
+        eyelid.position.set(side * 0.041, 0.216, 0.111);
+        eyelid.rotation.x = -1.15;
+        headGroup.add(eyelid);
+        eyelids.push(eyelid);
+
+        const brow = new THREE.Mesh(
+          track(new THREE.CapsuleGeometry(0.005, 0.025, 4, 6)),
+          matHair
+        );
+        brow.rotation.z = Math.PI / 2 - side * 0.12;
+        brow.position.set(side * 0.042, 0.236, 0.112);
+        headGroup.add(brow);
+      });
+
+      const hairScalp = new THREE.Mesh(
+        track(
+          new THREE.SphereGeometry(0.126, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58)
+        ),
+        matHair
+      );
+      hairScalp.rotation.x = -0.3;
+      hairScalp.position.set(0, 0.21, -0.004);
+      headGroup.add(hairScalp);
+
+      const beard = new THREE.Mesh(
+        track(
+          new THREE.SphereGeometry(
+            0.106,
+            14,
+            10,
+            -Math.PI * 0.45,
+            Math.PI * 0.9,
+            Math.PI * 0.55,
+            Math.PI * 0.42
+          )
+        ),
+        matHair
+      );
+      beard.rotation.y = Math.PI / 2;
+      beard.position.set(0, 0.176, 0.016);
+      beard.visible = false;
+      headGroup.add(beard);
+
+      const hijab = new THREE.Mesh(
+        track(new THREE.SphereGeometry(0.135, 18, 14)),
+        matHijab
+      );
+      hijab.scale.set(0.96, 1.08, 1.02);
+      hijab.position.set(0, 0.2, -0.015);
+      hijab.visible = false;
+      headGroup.add(hijab);
+
+      const hijabDrape = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.095, 0.16, 0.22, 16)),
+        matHijab
+      );
+      hijabDrape.position.set(0, 0.025, -0.004);
+      hijabDrape.visible = false;
+      headGroup.add(hijabDrape);
+
+      const longHair = new THREE.Mesh(
+        track(new THREE.CapsuleGeometry(0.11, 0.22, 8, 12)),
+        matHair
+      );
+      longHair.position.set(0, 0.08, -0.07);
+      longHair.visible = false;
+      headGroup.add(longHair);
+
+      spinePivot.add(headGroup);
+
+      // 2-Segment Articulated Arms + Optional Smartphone
+      const shoulderPivots: THREE.Group[] = [];
+      const elbowPivots: THREE.Group[] = [];
+      let phoneMesh!: THREE.Mesh;
+
+      [1, -1].forEach((side) => {
+        const sPivot = new THREE.Group();
+        sPivot.position.set(side * 0.225, 0.34, 0);
+
+        const uArm = new THREE.Mesh(
+          track(new THREE.CapsuleGeometry(0.044, 0.19, 8, 12)),
+          matTop
+        );
+        uArm.position.set(0, -0.13, 0);
+        sPivot.add(uArm);
+
+        const ePivot = new THREE.Group();
+        ePivot.position.set(0, -0.25, 0);
+        sPivot.add(ePivot);
+
+        const fArm = new THREE.Mesh(
+          track(new THREE.CapsuleGeometry(0.036, 0.18, 8, 12)),
+          matSkin
+        );
+        fArm.position.set(0, -0.115, 0);
+        ePivot.add(fArm);
+
+        const hand = new THREE.Mesh(
+          track(new THREE.CapsuleGeometry(0.024, 0.038, 6, 10)),
+          matSkin
+        );
+        hand.position.set(0, -0.24, 0);
+        ePivot.add(hand);
+
+        if (side === 1) {
+          phoneMesh = new THREE.Mesh(
+            track(new THREE.BoxGeometry(0.068, 0.01, 0.12)),
+            track(
+              new THREE.MeshStandardMaterial({
+                color: 0x0f172a,
+                emissive: 0x38bdf8,
+                emissiveIntensity: 0.75,
+                roughness: 0.2,
+              })
+            )
+          );
+          phoneMesh.position.set(-0.01, -0.245, 0.042);
+          phoneMesh.visible = hasPhone;
+          ePivot.add(phoneMesh);
+        }
+
+        spinePivot.add(sPivot);
+        shoulderPivots.push(sPivot);
+        elbowPivots.push(ePivot);
+      });
+
+      // Articulated Legs + Two-Tone Sneakers resting on floor
+      const legPivots: THREE.Group[] = [];
+      [1, -1].forEach((side) => {
+        const lPivot = new THREE.Group();
+        lPivot.position.set(side * 0.1, -0.06, 0);
+
+        if (seated) {
+          const thigh = new THREE.Mesh(
+            track(new THREE.CapsuleGeometry(0.062, 0.29, 8, 12)),
+            matBot
+          );
+          thigh.rotation.x = Math.PI / 2;
+          thigh.position.set(0, -0.02, 0.17);
+          lPivot.add(thigh);
+
+          const shin = new THREE.Mesh(
+            track(new THREE.CapsuleGeometry(0.052, 0.34, 8, 12)),
+            matBot
+          );
+          shin.position.set(0, -0.23, 0.33);
+          lPivot.add(shin);
+
+          const sole = new THREE.Mesh(
+            track(new THREE.BoxGeometry(0.09, 0.024, 0.18)),
+            matClinicalWhite
+          );
+          sole.position.set(0, -0.438, 0.385);
+          lPivot.add(sole);
+
+          const shoe = new THREE.Mesh(
+            track(new THREE.CapsuleGeometry(0.04, 0.09, 8, 12)),
+            matPatientShoeUpper
+          );
+          shoe.rotation.x = Math.PI / 2;
+          shoe.scale.set(1, 1, 0.72);
+          shoe.position.set(0, -0.415, 0.385);
+          lPivot.add(shoe);
+        } else {
+          const thigh = new THREE.Mesh(
+            track(new THREE.CapsuleGeometry(0.064, 0.33, 10, 14)),
+            matBot
+          );
+          thigh.position.set(0, -0.21, 0);
+          lPivot.add(thigh);
+
+          const shin = new THREE.Mesh(
+            track(new THREE.CapsuleGeometry(0.052, 0.34, 10, 14)),
+            matBot
+          );
+          shin.position.set(0, -0.61, 0);
+          lPivot.add(shin);
+
+          const sole = new THREE.Mesh(
+            track(new THREE.BoxGeometry(0.09, 0.025, 0.185)),
+            matClinicalWhite
+          );
+          sole.position.set(0, -0.885, 0.055);
+          lPivot.add(sole);
+
+          const shoe = new THREE.Mesh(
+            track(new THREE.CapsuleGeometry(0.042, 0.095, 8, 12)),
+            matPatientShoeUpper
+          );
+          shoe.rotation.x = Math.PI / 2;
+          shoe.scale.set(1, 1, 0.72);
+          shoe.position.set(0, -0.86, 0.055);
+          lPivot.add(shoe);
+        }
+
+        root.add(lPivot);
+        legPivots.push(lPivot);
+      });
+
+      waitingRoomGroup.add(root);
+      return {
+        root,
+        spinePivot,
+        chest,
+        pelvis,
+        headGroup,
+        eyelids,
+        shoulderPivots,
+        elbowPivots,
+        legPivots,
+        phoneMesh,
+        hairScalp,
+        beard,
+        hijab,
+        hijabDrape,
+        longHair,
+        tunic,
+        matSkin,
+        matTop,
+        matAccent,
+        matBot,
+        matHair,
+        matHijab,
+        baseX: x,
+        baseY,
+        baseZ: z,
+        seated,
+        hasPhone,
+      };
+    };
+
+    const waitingPatientRigs: WaitingRig[] = [
+      buildWaitingPatientRig(-2.08, -5.7, false, true), // Next up: standing by glass Waiting Door with phone
+      buildWaitingPatientRig(-3.35, -7.15, true, false), // Seated #2
+      buildWaitingPatientRig(-2.1, -7.15, true, true), // Seated #3 reading phone
+      buildWaitingPatientRig(-0.85, -7.15, true, false), // Seated #4
+    ];
+
+    const applyWaitingPatients = () => {
+      const list = waitingPatientsRef.current;
+      waitingPatientRigs.forEach((rig, idx) => {
+        const info = list[idx];
+        rig.root.visible = Boolean(info);
+        if (!info) return;
+
+        const seed = hashPatientSeed(info.id);
+        const isFemale = info.gender === 'F';
+        rig.matSkin.color.setHex(SKIN_TONES[seed % SKIN_TONES.length]);
+        rig.matHair.color.setHex(
+          info.age >= 52
+            ? 0x94a3b8
+            : seed % 3 === 0
+              ? 0x2c1d15
+              : 0x171b24
+        );
+
+        if (isFemale) {
+          const topIdx = (seed >> 3) % FEMALE_TOP_COLORS.length;
+          rig.chest.scale.set(0.95, 0.96, 0.76);
+          rig.tunic.visible = true;
+          rig.matTop.color.setHex(FEMALE_TOP_COLORS[topIdx]);
+          rig.matAccent.color.setHex(FEMALE_ACCENT_COLORS[topIdx]);
+          rig.matBot.color.setHex(0x1e293b);
+          rig.matHijab.color.setHex(
+            FEMALE_HIJAB_COLORS[(seed >> 5) % FEMALE_HIJAB_COLORS.length]
+          );
+          const wearsHijab = (seed >> 2) % 3 !== 0;
+          rig.hijab.visible = wearsHijab;
+          rig.hijabDrape.visible = wearsHijab;
+          rig.hairScalp.visible = !wearsHijab;
+          rig.longHair.visible = !wearsHijab;
+          rig.beard.visible = false;
+        } else {
+          const topIdx = (seed >> 3) % MALE_TOP_COLORS.length;
+          rig.chest.scale.set(1.2, 1.0, 0.82);
+          rig.tunic.visible = false;
+          rig.matTop.color.setHex(MALE_TOP_COLORS[topIdx]);
+          rig.matAccent.color.setHex(MALE_ACCENT_COLORS[topIdx]);
+          rig.matBot.color.setHex(
+            MALE_BOTTOM_COLORS[(seed >> 6) % MALE_BOTTOM_COLORS.length]
+          );
+          rig.hijab.visible = false;
+          rig.hijabDrape.visible = false;
+          rig.longHair.visible = false;
+          rig.hairScalp.visible = true;
+          rig.beard.visible = info.age >= 24 && (seed >> 2) % 3 !== 0;
+        }
+      });
+    };
+
+    applyWaitingPatientsRef.current = applyWaitingPatients;
+    applyWaitingPatients();
 
     if (!isSoftwareGl) {
       renderer.compile(scene, camera);
@@ -3212,6 +4888,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
           | undefined;
         if (action) {
           handReachImpulseRef.current = 1.0;
+          if (action.type === 'WAITING_DOOR') {
+            waitingDoorOpenRef.current = !waitingDoorOpenRef.current;
+          }
           onSceneInteractRef.current(action);
         }
       }
@@ -3221,6 +4900,83 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       if (activeDragPointerId === e.pointerId) {
         activeDragPointerId = null;
         renderer.domElement.style.cursor = 'grab';
+      }
+    };
+
+    const getLocalizedActionLabel = (
+      action: SceneTargetAction | undefined
+    ): string | null => {
+      if (!action) return null;
+      const isAr = languageRef.current === 'ar';
+      switch (action.type) {
+        case 'REGION':
+          return isAr
+            ? `انقر لتوجيه أنبوب الأشعة نحو: ${REGION_LABELS_I18N.ar[action.region]}`
+            : `Aim X-Ray tube at: ${REGION_LABELS_I18N.en[action.region]}`;
+        case 'CASSETTE_RACK':
+          return isAr
+            ? 'انقر لأخذ كاسيت الأشعة بيدك'
+            : 'Click to pick up X-Ray cassette';
+        case 'TABLE_BUCKY':
+          if (crExposedPendingRef.current) {
+            return isAr
+              ? 'انقر لسحب الكاسيت المصوّر ونقله لقارئ CR'
+              : 'Click to retrieve exposed cassette for CR Reader';
+          }
+          return isAr
+            ? 'انقر لإدخال الكاسيت داخل درج الطاولة'
+            : 'Click to insert cassette into Table Bucky';
+        case 'WALL_BUCKY':
+          if (crExposedPendingRef.current) {
+            return isAr
+              ? 'انقر لسحب الكاسيت المصوّر ونقله لقارئ CR'
+              : 'Click to retrieve exposed cassette for CR Reader';
+          }
+          return isAr
+            ? 'انقر لوضع الكاسيت داخل الحامل الواقف (البكي)'
+            : 'Click to insert cassette into Wall Bucky';
+        case 'CR_READER':
+          return isAr
+            ? 'جهاز قارئ الكاسيت (CR) — انقر لإدخال الكاسيت وقراءته للحاسوب'
+            : 'CR Cassette Reader — Click to insert & digitize cassette';
+        case 'DOOR':
+          return isAr
+            ? 'انقر لفتح/إغلاق الباب الرصاصي'
+            : 'Click to open/close Lead Door';
+        case 'WAITING_DOOR':
+          return isAr
+            ? 'باب صالة الانتظار — انقر لفتح/إغلاق باب المرضى المنتظرين'
+            : 'Waiting Room Door — Click to open/close';
+        case 'CT_DOOR': {
+          const unlocked = ownedUpgradesRef.current.includes('ct_scanner');
+          if (unlocked) {
+            return isAr
+              ? 'غرفة السيتي (المفراس CT) — انقر لفتح/إغلاق الباب'
+              : 'CT Scanner Suite — Click to open/close door';
+          }
+          return isAr
+            ? 'غرفة السيتي (المفراس CT) مغلقة 🔒 — غير متوفر حالياً (قريباً)'
+            : 'CT Scanner Suite Locked 🔒 — Unavailable (Coming Soon)';
+        }
+        case 'MRI_DOOR': {
+          const unlocked = ownedUpgradesRef.current.includes('mri_suite');
+          if (unlocked) {
+            return isAr
+              ? 'غرفة الرنين المغناطيسي (MRI) — انقر لفتح/إغلاق الباب'
+              : 'MRI Suite — Click to open/close door';
+          }
+          return isAr
+            ? 'غرفة الرنين المغناطيسي (MRI) مغلقة 🔒 — غير متوفر حالياً (قريباً)'
+            : 'MRI Suite Locked 🔒 — Unavailable (Coming Soon)';
+        }
+        case 'CONSOLE':
+          return isAr
+            ? 'لوحة التحكم — اضبط kVp و mAs وأطلق الأشعة'
+            : 'Exposure Console — Set kVp, mAs & Expose';
+        case 'PC':
+          return isAr
+            ? 'حاسوب العيادة — انقر لفتح الصورة والأرشيف والمتجر'
+            : 'Clinic PC — View Radiograph, Log & Shop';
       }
     };
 
@@ -3252,7 +5008,10 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
       const hits = getIntersects(e.clientX, e.clientY);
       if (hits.length > 0) {
-        const label = hits[0].object.userData.label as string | undefined;
+        const action = hits[0].object.userData.action as
+          | SceneTargetAction
+          | undefined;
+        const label = getLocalizedActionLabel(action);
         if (label) {
           renderer.domElement.style.cursor = 'pointer';
           setHoveredLabel(label);
@@ -3382,7 +5141,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
             curZ,
             doorClosedRef.current,
             canEnterCt,
-            canEnterMri
+            canEnterMri,
+            waitingDoorOpenRef.current
           )
         ) {
           nextX = curX + stepX;
@@ -3395,7 +5155,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
             curZ + stepZ,
             doorClosedRef.current,
             canEnterCt,
-            canEnterMri
+            canEnterMri,
+            waitingDoorOpenRef.current
           )
         ) {
           nextZ = curZ + stepZ;
@@ -3426,8 +5187,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
       if (cameraMoveActiveRef.current && inputMag <= 0.04) {
         if (techLocationRef.current === 'BOOTH') {
-          _camGoalPos.set(-2.55, 1.56, 3.35);
-          _camGoalTarget.set(-1.35, 1.15, 0.9);
+          _camGoalPos.set(-3.05, 1.56, 3.55);
+          _camGoalTarget.set(-2.55, 1.15, 1.6);
         } else if (isErect && !isBoreScan) {
           _camGoalPos.set(0.15, 1.56, 1.55);
           _camGoalTarget.set(2.0, 1.15, -0.35);
@@ -3478,7 +5239,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         );
       }
 
-      // 2. First-Person 3D Technician Hands & Held Cassette Animation
+      // 2. First-Person 3D Technician Hands, Held Cassette & CR Reader Animation
       if (handReachImpulseRef.current > 0) {
         handReachImpulseRef.current = Math.max(
           0,
@@ -3486,8 +5247,41 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         );
       }
       const reachForward = Math.sin(handReachImpulseRef.current * Math.PI) * 0.14;
-      const holdingCassette = cassetteStateRef.current === 'IN_HAND';
+      const cState = cassetteStateRef.current;
+      const holdingCassette =
+        cState === 'IN_HAND' || cState === 'EXPOSED_IN_HAND';
       handheldCassette.visible = holdingCassette;
+
+      // Tint cassette LED strip amber when exposed (ready for CR Reader)
+      matLedStrip.emissive.setHex(
+        cState === 'EXPOSED_IN_HAND' ||
+          cState === 'IN_CR_READER' ||
+          crExposedPendingRef.current
+          ? 0xf59e0b
+          : 0x06b6d4
+      );
+
+      // Update CR Reader slot & status glow
+      crInsertedCassette.visible = cState === 'IN_CR_READER';
+      if (cState === 'IN_CR_READER' || isDevelopingRef.current) {
+        crInsertedCassette.position.z =
+          0.22 + Math.sin(elapsed * 8) * 0.02;
+        crLedMat.color.setHex(0x22d3ee);
+        crLedMat.emissive.setHex(0x22d3ee);
+        crLedMat.emissiveIntensity = 1.6 + Math.sin(elapsed * 12) * 0.5;
+        (crGlowRing.material as THREE.MeshBasicMaterial).opacity = 0;
+      } else if (cState === 'EXPOSED_IN_HAND' && !hasDRRef.current) {
+        crLedMat.color.setHex(0xf59e0b);
+        crLedMat.emissive.setHex(0xf59e0b);
+        crLedMat.emissiveIntensity = 1.4 + Math.sin(elapsed * 6) * 0.4;
+        (crGlowRing.material as THREE.MeshBasicMaterial).opacity =
+          0.5 + Math.sin(elapsed * 5) * 0.25;
+      } else {
+        crLedMat.color.setHex(hasDRRef.current ? 0x475569 : 0x38bdf8);
+        crLedMat.emissive.setHex(hasDRRef.current ? 0x1e293b : 0x0ea5e9);
+        crLedMat.emissiveIntensity = hasDRRef.current ? 0.15 : 0.7;
+        (crGlowRing.material as THREE.MeshBasicMaterial).opacity = 0;
+      }
 
       const walkSwayX =
         speedNorm > 0.05 ? Math.sin(walkPhase) * 0.014 * speedNorm : 0;
@@ -3515,7 +5309,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         delta
       );
 
-      // 3. Lead Door + CT Suite Door + MRI Suite Door Animations & Lock Status
+      // 3. Lead Door + Waiting Room Glass Door + CT Suite Door + MRI Suite Door Animations
       const doorGoalY = doorClosedRef.current ? 0 : -1.25;
       leadDoorPivot.rotation.y = THREE.MathUtils.damp(
         leadDoorPivot.rotation.y,
@@ -3524,13 +5318,77 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         delta
       );
 
+      waitingDoorPivot.rotation.y = THREE.MathUtils.damp(
+        waitingDoorPivot.rotation.y,
+        waitingDoorOpenRef.current ? -1.25 : 0,
+        7.0,
+        delta
+      );
+
+      // Lifelike idle breathing, blinking, phone glances & weight-shifting in Waiting Room
+      waitingPatientRigs.forEach((rig, idx) => {
+        if (!rig.root.visible) return;
+        const phase = elapsed * 1.35 + idx * 1.7;
+        const blinkCycle = (elapsed + idx * 1.15) % 4.1;
+        const isBlinking = blinkCycle > 3.92;
+        rig.eyelids.forEach((lid) => {
+          lid.rotation.x = THREE.MathUtils.damp(
+            lid.rotation.x,
+            isBlinking ? 0.62 : -1.15,
+            28,
+            delta
+          );
+        });
+
+        rig.spinePivot.rotation.x = rig.hasPhone
+          ? 0.06 + Math.sin(phase) * 0.012
+          : Math.sin(phase) * 0.014;
+        rig.chest.scale.z = 0.78 + Math.sin(phase * 1.1) * 0.022;
+
+        if (rig.hasPhone) {
+          const checkPhone = Math.sin(phase * 0.45) > -0.35;
+          rig.headGroup.rotation.x = THREE.MathUtils.damp(
+            rig.headGroup.rotation.x,
+            checkPhone ? 0.28 : -0.04,
+            5,
+            delta
+          );
+          rig.headGroup.rotation.y = THREE.MathUtils.damp(
+            rig.headGroup.rotation.y,
+            checkPhone ? 0.14 : Math.sin(phase * 0.5) * 0.22,
+            4,
+            delta
+          );
+          rig.shoulderPivots[0].rotation.set(-0.62, 0.15, -0.08);
+          rig.elbowPivots[0].rotation.set(-1.35, 0, -0.18);
+          rig.shoulderPivots[1].rotation.set(
+            rig.seated ? -0.32 : 0.05,
+            0,
+            rig.seated ? 0.14 : -0.08
+          );
+          rig.elbowPivots[1].rotation.set(rig.seated ? -0.82 : -0.22, 0, 0);
+        } else {
+          rig.headGroup.rotation.x = Math.sin(phase * 0.42) * 0.05;
+          rig.headGroup.rotation.y = Math.sin(phase * 0.52) * 0.24;
+          rig.shoulderPivots[0].rotation.set(-0.35, 0, 0.1);
+          rig.elbowPivots[0].rotation.set(-0.92, 0, -0.2);
+          rig.shoulderPivots[1].rotation.set(-0.35, 0, -0.1);
+          rig.elbowPivots[1].rotation.set(-0.92, 0, 0.2);
+        }
+
+        if (!rig.seated) {
+          const sway = Math.sin(phase * 0.6) * 0.028;
+          rig.root.position.x = rig.baseX + sway;
+          rig.root.position.y = rig.baseY + Math.abs(Math.sin(phase * 0.6)) * 0.008;
+          rig.legPivots[0].rotation.z = -sway * 1.1;
+          rig.legPivots[1].rotation.z = -sway * 1.1;
+        }
+      });
+
       ctDoorRig.lockedBadge.visible = !hasCT;
       ctDoorRig.unlockedBadge.visible = hasCT;
       ctDoorRig.ledMat.color.setHex(hasCT ? 0x10b981 : 0xef4444);
       ctDoorRig.ledMat.emissive.setHex(hasCT ? 0x10b981 : 0xef4444);
-      ctDoorRig.slab.userData.label = hasCT
-        ? 'غرفة السيتي (المفراس CT) — انقر لفتح/إغلاق الباب'
-        : 'غرفة السيتي (المفراس CT) مغلقة 🔒 — غير متوفر حالياً (قريباً)';
       ctDoorRig.doorPivot.rotation.y = THREE.MathUtils.damp(
         ctDoorRig.doorPivot.rotation.y,
         canEnterCt ? -1.25 : 0,
@@ -3542,9 +5400,6 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       mriDoorRig.unlockedBadge.visible = hasMRI;
       mriDoorRig.ledMat.color.setHex(hasMRI ? 0x10b981 : 0xef4444);
       mriDoorRig.ledMat.emissive.setHex(hasMRI ? 0x10b981 : 0xef4444);
-      mriDoorRig.slab.userData.label = hasMRI
-        ? 'غرفة الرنين المغناطيسي (MRI) — انقر لفتح/إغلاق الباب'
-        : 'غرفة الرنين المغناطيسي (MRI) مغلقة 🔒 — غير متوفر حالياً (قريباً)';
       mriDoorRig.doorPivot.rotation.y = THREE.MathUtils.damp(
         mriDoorRig.doorPivot.rotation.y,
         canEnterMri ? -1.25 : 0,
@@ -3556,7 +5411,6 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       const targetSpot =
         ANATOMY_SPOTS.find((s) => s.id === selectedRegionRef.current) ||
         ANATOMY_SPOTS[2];
-      const cState = cassetteStateRef.current;
       rackCassette.visible = cState === 'RACK';
       tableInsertedCassette.visible = cState === 'TABLE_BUCKY';
       wallInsertedCassette.visible = cState === 'WALL_BUCKY';
@@ -3589,102 +5443,322 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       // Highlight glow hints on Rack / Table Bucky / Wall Bucky
       (rackGlowRing.material as THREE.MeshBasicMaterial).opacity =
         cState === 'RACK' ? 0.45 + Math.sin(elapsed * 4) * 0.18 : 0.08;
-      (tableBuckyGlow.material as THREE.MeshBasicMaterial).opacity =
-        cState === 'IN_HAND' && !isErect
-          ? 0.55 + Math.sin(elapsed * 5) * 0.25
-          : cState === 'TABLE_BUCKY' && !isErect
-            ? 0.22
-            : 0.0;
-      (wallBuckyGlow.material as THREE.MeshBasicMaterial).opacity =
-        cState === 'IN_HAND' && isErect
-          ? 0.55 + Math.sin(elapsed * 5) * 0.25
-          : 0.0;
 
-      // 5. Patient Entry + Posture Kinematics
+      const tableGlowMat = tableBuckyGlow.material as THREE.MeshBasicMaterial;
+      const wallGlowMat = wallBuckyGlow.material as THREE.MeshBasicMaterial;
+      if (crExposedPendingRef.current && cState === 'TABLE_BUCKY') {
+        tableGlowMat.color.setHex(0xf59e0b);
+        tableGlowMat.opacity = 0.6 + Math.sin(elapsed * 6) * 0.28;
+      } else {
+        tableGlowMat.color.setHex(0x22d3ee);
+        tableGlowMat.opacity =
+          cState === 'IN_HAND' && !isErect
+            ? 0.55 + Math.sin(elapsed * 5) * 0.25
+            : cState === 'TABLE_BUCKY' && !isErect
+              ? 0.22
+              : 0.0;
+      }
+
+      if (crExposedPendingRef.current && cState === 'WALL_BUCKY') {
+        wallGlowMat.color.setHex(0xf59e0b);
+        wallGlowMat.opacity = 0.6 + Math.sin(elapsed * 6) * 0.28;
+      } else {
+        wallGlowMat.color.setHex(0x22d3ee);
+        wallGlowMat.opacity =
+          cState === 'IN_HAND' && isErect
+            ? 0.55 + Math.sin(elapsed * 5) * 0.25
+            : 0.0;
+      }
+
+      // 5. Realistic Patient Walk-In Choreography + Posture & Articulated Kinematics
       const targetErect = isErect && !isBoreScan ? 1 : 0;
-      erectBlend = THREE.MathUtils.damp(erectBlend, targetErect, 6.5, delta);
+      erectBlend = THREE.MathUtils.damp(erectBlend, targetErect, 6.2, delta);
 
       if (patientEnterAnimRef.current > 0) {
         patientEnterAnimRef.current = Math.max(
           0,
-          patientEnterAnimRef.current - delta * 1.4
+          patientEnterAnimRef.current - delta * 0.56
         );
       }
+      const enterP = patientEnterAnimRef.current;
 
-      const arcLift = Math.sin(erectBlend * Math.PI) * 0.36;
+      const arcLift = Math.sin(erectBlend * Math.PI) * 0.34;
       const lyingY =
         posture === 'TABLE_LEFT_LAT' || posture === 'TABLE_RIGHT_LAT'
           ? 1.14
           : 1.09;
       const standingY = 0.96;
 
-      const enterOffsetZ = patientEnterAnimRef.current * 0.85;
-      const anchorGoalX = THREE.MathUtils.lerp(
+      let anchorGoalX = THREE.MathUtils.lerp(
         slidingTableGroup.position.x,
         ERECT_PATIENT_X,
         erectBlend
       );
-      const anchorGoalY =
+      let anchorGoalY =
         THREE.MathUtils.lerp(lyingY, standingY, erectBlend) + arcLift;
-      const anchorGoalZ =
-        THREE.MathUtils.lerp(0, ERECT_Z, erectBlend) + enterOffsetZ;
+      let anchorGoalZ = THREE.MathUtils.lerp(0, ERECT_Z, erectBlend);
+      let anchorRollZ = THREE.MathUtils.lerp(Math.PI / 2, 0, erectBlend);
+      let walkAmp = 0;
+      let walkCycle = 0;
+      let walkYawOverride: number | null = null;
+
+      if (enterP > 0.001) {
+        if (targetErect === 1) {
+          // Walk smoothly from Waiting Room Door area (-1.2, -3.15) to Wall Bucky standing spot
+          const walkProgress = 1 - enterP;
+          const easeP =
+            walkProgress * walkProgress * (3 - 2 * walkProgress);
+          anchorGoalX = THREE.MathUtils.lerp(-1.15, ERECT_PATIENT_X, easeP);
+          anchorGoalZ = THREE.MathUtils.lerp(-3.15, ERECT_Z, easeP);
+          walkAmp = Math.sin(Math.min(1, enterP * 1.25) * Math.PI * 0.5);
+          walkCycle = walkProgress * Math.PI * 5.2;
+          anchorGoalY = standingY + Math.abs(Math.sin(walkCycle)) * 0.025 * walkAmp;
+          anchorRollZ = 0;
+          if (enterP > 0.24) {
+            walkYawOverride = Math.atan2(
+              ERECT_PATIENT_X - -1.15,
+              ERECT_Z - -3.15
+            );
+          }
+        } else {
+          // First walk upright to table bedside, then smoothly sit & recline onto cushion
+          if (enterP > 0.42) {
+            const pWalk = (1 - enterP) / 0.58;
+            const easeW = pWalk * pWalk * (3 - 2 * pWalk);
+            const tableSideX = slidingTableGroup.position.x + 0.12;
+            const tableSideZ = 0.92;
+            anchorGoalX = THREE.MathUtils.lerp(-1.15, tableSideX, easeW);
+            anchorGoalZ = THREE.MathUtils.lerp(-3.0, tableSideZ, easeW);
+            walkAmp = Math.sin(Math.min(1, (1 - pWalk) * 1.4) * Math.PI * 0.5);
+            walkCycle = pWalk * Math.PI * 4.4;
+            anchorGoalY = standingY + Math.abs(Math.sin(walkCycle)) * 0.024 * walkAmp;
+            anchorRollZ = 0;
+            walkYawOverride = Math.atan2(tableSideX - -1.15, tableSideZ - -3.0);
+          } else {
+            const pLie = 1 - enterP / 0.42;
+            const easeL = pLie * pLie * (3 - 2 * pLie);
+            anchorGoalX = THREE.MathUtils.lerp(
+              slidingTableGroup.position.x + 0.12,
+              slidingTableGroup.position.x,
+              easeL
+            );
+            anchorGoalZ = THREE.MathUtils.lerp(0.92, 0, easeL);
+            anchorGoalY =
+              THREE.MathUtils.lerp(standingY, lyingY, easeL) +
+              Math.sin(easeL * Math.PI) * 0.24;
+            anchorRollZ = THREE.MathUtils.lerp(0, Math.PI / 2, easeL);
+          }
+        }
+      }
 
       patientWorldAnchor.position.set(anchorGoalX, anchorGoalY, anchorGoalZ);
-      patientWorldAnchor.rotation.z = THREE.MathUtils.lerp(
-        Math.PI / 2,
-        0,
-        erectBlend
-      );
+      patientWorldAnchor.rotation.z = anchorRollZ;
 
-      const patientBodyYaw = getTargetBodyYaw(isBoreScan ? 'SUPINE' : posture);
+      const patientTargetYaw =
+        walkYawOverride !== null
+          ? walkYawOverride
+          : getTargetBodyYaw(isBoreScan ? 'SUPINE' : posture);
       patientLocalBody.rotation.y = dampAngle(
         patientLocalBody.rotation.y,
-        patientBodyYaw,
-        7.5,
+        patientTargetYaw,
+        6.8,
         delta
       );
+
+      // Subtle stepping & arm counterbalance while turning in erect posture
+      let yawDelta = Math.abs(patientTargetYaw - patientLocalBody.rotation.y);
+      if (yawDelta > Math.PI) yawDelta = Math.PI * 2 - yawDelta;
+      const turningStep =
+        erectBlend > 0.7 && walkAmp < 0.05 && yawDelta > 0.06
+          ? Math.min(1, yawDelta * 1.4) * 0.42
+          : 0;
+      const activeStride = walkAmp > 0.02 ? walkAmp : turningStep;
+      const activeCycle = walkAmp > 0.02 ? walkCycle : elapsed * 10.5;
 
       const isErectLat =
         posture === 'ERECT_LEFT_LAT' || posture === 'ERECT_RIGHT_LAT';
       const isTableLat =
         posture === 'TABLE_LEFT_LAT' || posture === 'TABLE_RIGHT_LAT';
+      const isHandTableExam =
+        !isErect && selectedRegionRef.current === 'hand';
+      const isSpeaking = Boolean(patientSpeechRef.current);
 
-      pHeadGroup.rotation.y = THREE.MathUtils.damp(
-        pHeadGroup.rotation.y,
-        posture === 'PRONE' ? 0.5 : 0,
-        7,
+      // Blinking Eyelids (quick natural blink every ~3.9s)
+      const pBlinkPhase = elapsed % 3.9;
+      const pBlinking = pBlinkPhase > 3.81;
+      eyelidMeshes.forEach((lid) => {
+        lid.rotation.x = THREE.MathUtils.damp(
+          lid.rotation.x,
+          pBlinking ? 0.62 : -1.15,
+          30,
+          delta
+        );
+      });
+
+      // Talking Lips + Head Nod / Gaze Micro-Animation
+      const talkOsc = isSpeaking ? Math.abs(Math.sin(elapsed * 14.5)) : 0;
+      pLips.scale.y = THREE.MathUtils.damp(
+        pLips.scale.y,
+        1 + talkOsc * 0.85,
+        24,
         delta
       );
 
-      const armGoalX = isErectLat ? -2.05 : posture === 'ERECT_PA' ? -0.45 : 0;
-      const armGoalZ = posture === 'ERECT_PA' ? 0.16 : 0.06;
-      armGroups.forEach((arm, idx) => {
+      const headGoalY =
+        posture === 'PRONE'
+          ? 0.56
+          : isSpeaking
+            ? Math.sin(elapsed * 2.6) * 0.14
+            : walkAmp > 0.05
+              ? 0
+              : Math.sin(elapsed * 0.85) * 0.07;
+      const headGoalX = isSpeaking
+        ? Math.sin(elapsed * 4.5) * 0.08
+        : walkAmp > 0.05
+          ? 0.03
+          : Math.sin(elapsed * 1.2) * 0.02;
+      pHeadGroup.rotation.y = THREE.MathUtils.damp(
+        pHeadGroup.rotation.y,
+        headGoalY,
+        6.5,
+        delta
+      );
+      pHeadGroup.rotation.x = THREE.MathUtils.damp(
+        pHeadGroup.rotation.x,
+        headGoalX,
+        6.5,
+        delta
+      );
+
+      // Physiological Breathing + Spine Micro-Motion (pauses on breath hold!)
+      const breathWave = patientPreppedRef.current ? 0 : Math.sin(elapsed * 2.25);
+      pChestGroup.scale.set(
+        1 + breathWave * 0.018,
+        1,
+        1 + breathWave * 0.032
+      );
+      pSpinePivot.rotation.x = THREE.MathUtils.damp(
+        pSpinePivot.rotation.x,
+        activeStride * 0.045 + breathWave * 0.012,
+        6,
+        delta
+      );
+      pSpinePivot.rotation.y = THREE.MathUtils.damp(
+        pSpinePivot.rotation.y,
+        Math.sin(activeCycle) * 0.06 * activeStride,
+        8,
+        delta
+      );
+
+      // Anatomically Authentic 2-Bone Arm & Wrist Joint Targets per Posture / Walk / Speech
+      shoulderPivots.forEach((sPivot, idx) => {
+        const sideSign = idx === 0 ? 1 : -1; // idx 0: Left (+X), idx 1: Right (-X)
+        const ePivot = elbowPivots[idx];
+        const wPivot = wristPivots[idx];
+
+        let sX = -0.05;
+        let sZ = sideSign * 0.08;
+        let eX = -0.18;
+        let eZ = 0;
+        let wX = 0;
+
+        if (activeStride > 0.03) {
+          const swing = Math.sin(activeCycle) * sideSign * activeStride;
+          sX = swing * 0.34 - 0.04;
+          sZ = sideSign * 0.1;
+          eX = -0.22 - Math.max(0, -swing) * 0.25;
+        } else if (isErect && isErectLat) {
+          // Lateral chest/cervical: raise arms gracefully overhead so chest clears beam
+          sX = -2.22;
+          sZ = sideSign * 0.12;
+          eX = -0.78;
+          eZ = -sideSign * 0.18;
+        } else if (isErect && posture === 'ERECT_PA') {
+          // PA Chest: elbows bent slightly forward/outward wrapping toward Bucky
+          sX = -0.26;
+          sZ = sideSign * 0.26;
+          eX = -0.88;
+          eZ = -sideSign * 0.36;
+          wX = 0.18;
+        } else if (!isErect && posture === 'PRONE') {
+          sX = -1.7;
+          sZ = sideSign * 0.24;
+          eX = -1.1;
+          eZ = -sideSign * 0.25;
+        } else if (!isErect && isTableLat) {
+          const isTopArm =
+            (posture === 'TABLE_LEFT_LAT' && idx === 1) ||
+            (posture === 'TABLE_RIGHT_LAT' && idx === 0);
+          sX = isTopArm ? -0.35 : -0.95;
+          sZ = sideSign * (isTopArm ? 0.14 : 0.08);
+          eX = isTopArm ? -0.85 : -1.05;
+        } else if (!isErect && isHandTableExam && idx === 1) {
+          // Extend examined right arm smoothly outward onto hand target pad
+          sX = 0.04;
+          sZ = -0.44;
+          eX = -0.35;
+          wX = -0.15;
+        } else if (isSpeaking && idx === 1 && isErect) {
+          // Polite natural hand gesture while speaking
+          sX = -0.34 + Math.sin(elapsed * 4.2) * 0.07;
+          sZ = -0.14;
+          eX = -0.95 + Math.sin(elapsed * 5.0) * 0.12;
+        } else {
+          // Natural relaxed arm hang / table supine rest
+          sX = isErect ? -0.05 : 0.06;
+          sZ = sideSign * (isErect ? 0.09 : 0.12);
+          eX = isErect ? -0.2 : -0.1;
+        }
+
+        const breathLift = breathWave * 0.004;
+        sPivot.position.y = 0.39 + breathLift;
+        sPivot.rotation.x = THREE.MathUtils.damp(sPivot.rotation.x, sX, 7.5, delta);
+        sPivot.rotation.z = THREE.MathUtils.damp(sPivot.rotation.z, sZ, 7.5, delta);
+        ePivot.rotation.x = THREE.MathUtils.damp(ePivot.rotation.x, eX, 8, delta);
+        ePivot.rotation.z = THREE.MathUtils.damp(ePivot.rotation.z, eZ, 8, delta);
+        wPivot.rotation.x = THREE.MathUtils.damp(wPivot.rotation.x, wX, 8, delta);
+      });
+
+      // Articulated 3-Bone Leg, Knee & Ankle Relaxation Kinematics
+      thighPivots.forEach((hip, idx) => {
         const sideSign = idx === 0 ? 1 : -1;
-        arm.rotation.x = THREE.MathUtils.damp(arm.rotation.x, armGoalX, 7, delta);
-        arm.rotation.z = THREE.MathUtils.damp(
-          arm.rotation.z,
-          sideSign * armGoalZ,
-          7,
-          delta
-        );
-      });
+        const knee = kneePivots[idx];
+        const ankle = anklePivots[idx];
 
-      const hipFlex = isTableLat ? -0.34 : 0;
-      const kneeFlex = isTableLat ? 0.56 : 0;
-      thighPivots.forEach((hip) => {
-        hip.rotation.x = THREE.MathUtils.damp(hip.rotation.x, hipFlex, 7, delta);
-      });
-      kneePivots.forEach((knee) => {
-        knee.rotation.x = THREE.MathUtils.damp(
-          knee.rotation.x,
-          kneeFlex,
-          7,
-          delta
-        );
-      });
+        let hipGoalX = 0;
+        let hipGoalZ = sideSign * 0.02;
+        let kneeGoalX = 0.04;
+        let ankleGoalX = isErect ? 0 : 0.28;
 
-      const breathAmp = patientPreppedRef.current ? 0.002 : 0.013;
-      pChest.position.z = 0.01 + Math.sin(elapsed * 2.4) * breathAmp;
+        if (activeStride > 0.03) {
+          const legPhase = Math.sin(activeCycle) * sideSign * activeStride;
+          hipGoalX = -legPhase * 0.44;
+          kneeGoalX = Math.max(0.05, legPhase * 0.62 + 0.16 * activeStride);
+          ankleGoalX = legPhase * 0.16;
+        } else if (isTableLat) {
+          const isTopLeg =
+            (posture === 'TABLE_LEFT_LAT' && idx === 1) ||
+            (posture === 'TABLE_RIGHT_LAT' && idx === 0);
+          hipGoalX = isTopLeg ? -0.52 : -0.22;
+          kneeGoalX = isTopLeg ? 0.92 : 0.42;
+          ankleGoalX = 0.22;
+        } else if (isErect) {
+          // Natural weight shift idle stance
+          const sway = Math.sin(elapsed * 0.7) * 0.025;
+          hipGoalZ = sideSign * 0.03 + sway;
+          kneeGoalX = idx === 0 ? 0.03 : 0.06;
+        } else {
+          // Comfortable relaxed supine/prone leg alignment
+          hipGoalZ = sideSign * 0.045;
+          kneeGoalX = posture === 'PRONE' ? 0.06 : 0.03;
+          ankleGoalX = posture === 'PRONE' ? 0.42 : 0.28;
+        }
+
+        hip.rotation.x = THREE.MathUtils.damp(hip.rotation.x, hipGoalX, 8, delta);
+        hip.rotation.z = THREE.MathUtils.damp(hip.rotation.z, hipGoalZ, 7, delta);
+        knee.rotation.x = THREE.MathUtils.damp(knee.rotation.x, kneeGoalX, 8, delta);
+        ankle.rotation.x = THREE.MathUtils.damp(ankle.rotation.x, ankleGoalX, 7, delta);
+      });
 
       // 6. Ceiling X-Ray Crane & Wall Bucky Receptor
       const goalGantryX = THREE.MathUtils.lerp(
@@ -3778,6 +5852,45 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       });
 
       renderer.render(scene, camera);
+
+      // Project large, high-contrast 3D speech bubble clearly above patient's head
+      const bubbleEl = speechBubbleRef.current;
+      if (bubbleEl) {
+        if (patientSpeechRef.current) {
+          pHeadGroup.getWorldPosition(_headWorldPos);
+          _headWorldPos.y += isErect ? 0.54 : 0.44;
+          _headProj.copy(_headWorldPos).project(camera);
+          const cw = container?.clientWidth || 0;
+          const ch = container?.clientHeight || 0;
+          if (
+            cw > 0 &&
+            ch > 0 &&
+            _headProj.z > -1 &&
+            _headProj.z < 1 &&
+            Math.abs(_headProj.x) <= 1.25 &&
+            Math.abs(_headProj.y) <= 1.25
+          ) {
+            const padX = Math.min(145, cw * 0.28);
+            const sx = THREE.MathUtils.clamp(
+              (_headProj.x * 0.5 + 0.5) * cw,
+              padX,
+              Math.max(padX, cw - padX)
+            );
+            const sy = THREE.MathUtils.clamp(
+              (-_headProj.y * 0.5 + 0.5) * ch,
+              96,
+              Math.max(96, ch - 92)
+            );
+            bubbleEl.style.transform = `translate3d(${sx.toFixed(1)}px, ${sy.toFixed(1)}px, 0) translate(-50%, -100%)`;
+            bubbleEl.style.opacity = '1';
+          } else {
+            bubbleEl.style.opacity = '0';
+          }
+        } else {
+          bubbleEl.style.opacity = '0';
+        }
+      }
+
       if (isSoftwareGl) {
         afterDraw(tick);
       } else {
@@ -3818,12 +5931,31 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         <div className="w-full h-full flex items-center justify-center p-6">
           <img
             src={CLINIC_ROOM_IMAGE}
-            alt="غرفة الأشعة"
+            alt={language === 'ar' ? 'غرفة الأشعة' : 'Radiology Room'}
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover opacity-80"
           />
         </div>
       )}
+
+      {/* Floating Large High-Contrast 3D Patient Dialogue Speech Bubble */}
+      <div
+        ref={speechBubbleRef}
+        style={{opacity: 0, left: 0, top: 0}}
+        className="pointer-events-none absolute z-30 transition-opacity duration-200 min-w-[205px] sm:min-w-[260px] max-w-[310px] sm:max-w-[420px]"
+      >
+        {patientSpeech && (
+          <div className="relative rounded-2xl bg-[#F8FAFC] border-[3px] border-cyan-500 px-4 py-3 sm:px-5 sm:py-3.5 text-slate-950 shadow-[0_18px_46px_rgba(0,0,0,0.82)] text-center">
+            <div className="inline-block rounded-md bg-cyan-600 px-2 py-0.5 text-[10px] sm:text-xs font-extrabold tracking-wide text-white mb-1.5">
+              {language === 'ar' ? 'المريض يتحدث' : 'PATIENT'}
+            </div>
+            <p className="text-sm sm:text-base md:text-lg font-extrabold leading-relaxed text-slate-950">
+              {patientSpeech}
+            </p>
+            <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 bg-[#F8FAFC] border-r-[3px] border-b-[3px] border-cyan-500" />
+          </div>
+        )}
+      </div>
 
       {/* Contextual 3D Interaction Hover Prompt (No backdrop-blur over WebGL) */}
       {hoveredLabel && (

@@ -2,6 +2,7 @@ import React from 'react';
 import {FileText} from 'lucide-react';
 import type {CompletedCase} from '../types/radiology';
 import {PATIENT_AVATARS, REGION_SCAN_IMAGES} from '../data/radiologyData';
+import {useLanguage} from '../i18n/translations';
 
 interface PatientLogViewProps {
   cases: CompletedCase[];
@@ -14,26 +15,35 @@ export const PatientLogView: React.FC<PatientLogViewProps> = ({
   totalRevenue,
   retakesCount,
 }) => {
+  const {lang} = useLanguage();
+  const isAr = lang === 'ar';
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-white">
-            سجل الحالات والفحوصات المنجزة
+            {isAr ? 'سجل الحالات والفحوصات المنجزة' : 'Completed Exams & Patient Log'}
           </h2>
           <p className="mt-1 text-sm text-slate-400">
-            أرشيف الفحوصات الإشعاعية وصور المرضى التي تم تصويرها واعتماد تقاريرها في العيادة.
+            {isAr
+              ? 'أرشيف الفحوصات الإشعاعية وصور المرضى التي تم تصويرها واعتماد تقاريرها في العيادة.'
+              : 'Archive of diagnostic radiographs and patient reports completed and approved in your clinic.'}
           </p>
         </div>
         <div className="flex items-center gap-6 text-sm text-slate-300">
           <div>
-            <span className="text-slate-400">إجمالي الإيرادات: </span>
+            <span className="text-slate-400">
+              {isAr ? 'إجمالي الإيرادات: ' : 'Total Revenue: '}
+            </span>
             <span className="font-mono-num font-bold text-emerald-400">
               ${totalRevenue.toLocaleString('en-US')}
             </span>
           </div>
           <div>
-            <span className="text-slate-400">إعادات التصوير: </span>
+            <span className="text-slate-400">
+              {isAr ? 'إعادات التصوير: ' : 'Retakes: '}
+            </span>
             <span className="font-mono-num font-bold text-amber-300">
               {retakesCount}
             </span>
@@ -45,22 +55,36 @@ export const PatientLogView: React.FC<PatientLogViewProps> = ({
         <div className="rounded-xl border border-slate-800 bg-[#131C29] p-12 text-center space-y-2">
           <FileText className="w-8 h-8 text-slate-500 mx-auto" />
           <p className="text-base font-medium text-slate-300">
-            لا توجد حالات مسجلة بعد
+            {isAr ? 'لا توجد حالات مسجلة بعد' : 'No completed cases recorded yet'}
           </p>
           <p className="text-xs text-slate-500">
-            ابدأ باستقبال المريض الأول في غرفة التصوير لتظهر التقارير والصور هنا.
+            {isAr
+              ? 'ابدأ باستقبال المريض الأول في غرفة التصوير لتظهر التقارير والصور هنا.'
+              : 'Start examining your first patient in the X-Ray room to build your archive.'}
           </p>
         </div>
       ) : (
         <div className="rounded-xl border border-slate-800 bg-[#131C29] overflow-x-auto">
-          <table className="w-full text-right border-collapse">
+          <table
+            className={`w-full border-collapse ${isAr ? 'text-right' : 'text-left'}`}
+          >
             <thead>
               <tr className="border-b border-slate-800 text-xs text-slate-400">
-                <th className="py-3.5 px-4 font-medium">المريض</th>
-                <th className="py-3.5 px-4 font-medium">صورة الفحص</th>
-                <th className="py-3.5 px-4 font-medium">إعدادات التعريض</th>
-                <th className="py-3.5 px-4 font-medium">النتيجة التشخيصية</th>
-                <th className="py-3.5 px-4 font-medium">الرسوم</th>
+                <th className="py-3.5 px-4 font-medium">
+                  {isAr ? 'المريض' : 'Patient'}
+                </th>
+                <th className="py-3.5 px-4 font-medium">
+                  {isAr ? 'صورة الفحص' : 'Exam Image'}
+                </th>
+                <th className="py-3.5 px-4 font-medium">
+                  {isAr ? 'إعدادات التعريض' : 'Exposure'}
+                </th>
+                <th className="py-3.5 px-4 font-medium">
+                  {isAr ? 'النتيجة التشخيصية' : 'Diagnostic Finding'}
+                </th>
+                <th className="py-3.5 px-4 font-medium">
+                  {isAr ? 'الرسوم' : 'Fee'}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70 text-sm">
@@ -90,7 +114,7 @@ export const PatientLogView: React.FC<PatientLogViewProps> = ({
                   </td>
                   <td className="py-3.5 px-4 font-mono-num text-xs text-cyan-300 whitespace-nowrap">
                     {c.kvpUsed} kVp · {c.masUsed} mAs
-                    {c.shieldUsed ? ' · حماية' : ''}
+                    {c.shieldUsed ? (isAr ? ' · حماية' : ' · Shield') : ''}
                   </td>
                   <td className="py-3.5 px-4 text-xs text-slate-300 max-w-md">
                     {c.findingAr}
