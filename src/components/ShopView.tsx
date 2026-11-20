@@ -70,6 +70,8 @@ const ShopImageFrame: React.FC<{
         <img
           src={src}
           alt={alt}
+          loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
           onError={() => setErrored(true)}
           className="w-full h-full object-cover"

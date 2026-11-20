@@ -134,6 +134,7 @@ export interface ClinicRank {
 }
 
 export type Language = 'ar' | 'en';
+export type GraphicsQuality = 'auto' | 'low' | 'high';
 
 export type TechLocation = 'ROOM' | 'BOOTH';
 export type CassetteState =

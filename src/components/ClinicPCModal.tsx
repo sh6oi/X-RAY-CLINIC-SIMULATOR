@@ -108,7 +108,7 @@ export const ClinicPCModal: React.FC<ClinicPCModalProps> = ({
     <div className="fixed inset-0 z-50 bg-[#050911]/92 flex items-center justify-center p-1.5 sm:p-5">
       <div className="w-full max-w-5xl h-[96dvh] sm:h-auto sm:max-h-[92vh] rounded-2xl border border-cyan-800/70 bg-[#0B121E] shadow-[0_20px_70px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden">
         {/* Workstation Window Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-slate-800 bg-[#080E18]">
+        <div className="hud-pc-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-slate-800 bg-[#080E18]">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-white font-bold text-xs sm:text-sm">
               <Monitor className="w-4 h-4 text-cyan-400 shrink-0" />
@@ -161,7 +161,7 @@ export const ClinicPCModal: React.FC<ClinicPCModalProps> = ({
         </div>
 
         {/* Workstation Content */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5">
+        <div className="hud-pc-content flex-1 overflow-y-auto p-3 sm:p-5">
           {activeTab === 'IMAGE' && (
             <div>
               {isDeveloping ? (

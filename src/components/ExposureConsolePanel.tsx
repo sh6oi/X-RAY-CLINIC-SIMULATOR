@@ -102,7 +102,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
   return (
     <aside className="hud-console-panel pointer-events-auto fixed top-[118px] left-2.5 right-2.5 sm:top-auto sm:bottom-24 sm:left-5 sm:right-auto z-20 sm:w-[390px] max-h-[44dvh] sm:max-h-[78dvh] overflow-y-auto rounded-2xl border-2 border-slate-700/90 bg-gradient-to-b from-[#131C2A] via-[#0C131F] to-[#080D16] shadow-[0_20px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.08)] p-3 sm:p-4 space-y-2.5 sm:space-y-3">
       {/* Brushed Hardware Console Top Bezel */}
-      <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-700/80">
+      <div className="hud-console-header flex items-center justify-between gap-2 pb-2 border-b border-slate-700/80">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-[#09121F] border border-cyan-500/40 flex items-center justify-center shrink-0">
             <Sliders className="w-3.5 h-3.5 text-cyan-400" />
@@ -131,7 +131,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
       </div>
 
       {/* Physical LED Interlock Status Strip */}
-      <div className="grid grid-cols-3 gap-1.5 text-[10px] sm:text-[11px]">
+      <div className="hud-console-interlock grid grid-cols-3 gap-1.5 text-[10px] sm:text-[11px]">
         <div
           className={`rounded-lg border px-2 py-1.5 flex items-center gap-1.5 ${
             doorClosed
@@ -188,14 +188,14 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
       {/* Dual Digital Recessed LCD Displays: kVp & mAs */}
       <div className="grid grid-cols-2 gap-2">
         {/* kVp Hardware Module */}
-        <div className="rounded-xl border border-cyan-900/70 bg-[#050B14] shadow-[inset_0_2px_10px_rgba(0,0,0,0.85)] p-2.5 space-y-1.5">
+        <div className="hud-console-lcd rounded-xl border border-cyan-900/70 bg-[#050B14] shadow-[inset_0_2px_10px_rgba(0,0,0,0.85)] p-2.5 space-y-1.5">
           <div className="flex items-center justify-between text-[10px] text-slate-400">
             <span>{isAr ? 'الجهد (kVp)' : 'Tube kVp'}</span>
             <span className="font-mono-num text-cyan-500/80">45–130</span>
           </div>
 
           <div className="flex items-baseline justify-between gap-1">
-            <span className="font-mono-num text-xl sm:text-3xl font-bold tracking-tight text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">
+            <span className="hud-console-val font-mono-num text-xl sm:text-3xl font-bold tracking-tight text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">
               {kvp}
             </span>
             <span className="font-mono-num text-[11px] font-semibold text-cyan-500">
@@ -219,7 +219,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
               type="button"
               disabled={locked || kvp <= 45}
               onClick={() => onChangeKvp(Math.max(45, kvp - 5))}
-              className="py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[10px] font-mono-num font-bold text-slate-200 cursor-pointer"
+              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[10px] font-mono-num font-bold text-slate-200 cursor-pointer"
             >
               -5
             </button>
@@ -227,7 +227,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
               type="button"
               disabled={locked || kvp <= 45}
               onClick={() => onChangeKvp(Math.max(45, kvp - 1))}
-              className="py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center cursor-pointer"
+              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center cursor-pointer"
               aria-label="-1 kVp"
             >
               <Minus className="w-3 h-3" />
@@ -236,7 +236,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
               type="button"
               disabled={locked || kvp >= 130}
               onClick={() => onChangeKvp(Math.min(130, kvp + 1))}
-              className="py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center cursor-pointer"
+              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center cursor-pointer"
               aria-label="+1 kVp"
             >
               <Plus className="w-3 h-3" />
@@ -245,7 +245,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
               type="button"
               disabled={locked || kvp >= 130}
               onClick={() => onChangeKvp(Math.min(130, kvp + 5))}
-              className="py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[10px] font-mono-num font-bold text-slate-200 cursor-pointer"
+              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[10px] font-mono-num font-bold text-slate-200 cursor-pointer"
             >
               +5
             </button>
@@ -253,14 +253,14 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
         </div>
 
         {/* mAs Hardware Module */}
-        <div className="rounded-xl border border-emerald-900/60 bg-[#050B14] shadow-[inset_0_2px_10px_rgba(0,0,0,0.85)] p-2.5 space-y-1.5">
+        <div className="hud-console-lcd rounded-xl border border-emerald-900/60 bg-[#050B14] shadow-[inset_0_2px_10px_rgba(0,0,0,0.85)] p-2.5 space-y-1.5">
           <div className="flex items-center justify-between text-[10px] text-slate-400">
             <span>{isAr ? 'الكمية (mAs)' : 'Exposure mAs'}</span>
             <span className="font-mono-num text-emerald-500/80">1–50</span>
           </div>
 
           <div className="flex items-baseline justify-between gap-1">
-            <span className="font-mono-num text-xl sm:text-3xl font-bold tracking-tight text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]">
+            <span className="hud-console-val font-mono-num text-xl sm:text-3xl font-bold tracking-tight text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]">
               {mas}
             </span>
             <span className="font-mono-num text-[11px] font-semibold text-emerald-500">
@@ -284,7 +284,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
               type="button"
               disabled={locked || mas <= 1}
               onClick={() => onChangeMas(Math.max(1, mas - 5))}
-              className="py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[10px] font-mono-num font-bold text-slate-200 cursor-pointer"
+              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[10px] font-mono-num font-bold text-slate-200 cursor-pointer"
             >
               -5
             </button>
@@ -292,7 +292,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
               type="button"
               disabled={locked || mas <= 1}
               onClick={() => onChangeMas(Math.max(1, mas - 1))}
-              className="py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center cursor-pointer"
+              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center cursor-pointer"
               aria-label="-1 mAs"
             >
               <Minus className="w-3 h-3" />
@@ -301,7 +301,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
               type="button"
               disabled={locked || mas >= 50}
               onClick={() => onChangeMas(Math.min(50, mas + 1))}
-              className="py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center cursor-pointer"
+              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center cursor-pointer"
               aria-label="+1 mAs"
             >
               <Plus className="w-3 h-3" />
@@ -310,7 +310,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
               type="button"
               disabled={locked || mas >= 50}
               onClick={() => onChangeMas(Math.min(50, mas + 5))}
-              className="py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[10px] font-mono-num font-bold text-slate-200 cursor-pointer"
+              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[10px] font-mono-num font-bold text-slate-200 cursor-pointer"
             >
               +5
             </button>
@@ -319,7 +319,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
       </div>
 
       {/* Telemetry Mini Bar + Projection Tactile Keypad */}
-      <div className="rounded-xl border border-slate-800 bg-[#070D17] p-2.5 space-y-2">
+      <div className="hud-console-proj-box rounded-xl border border-slate-800 bg-[#070D17] p-2.5 space-y-2">
         <div className="flex items-center justify-between text-[11px] gap-2">
           <span className="text-slate-400 truncate">
             {isAr ? 'الإسقاط: ' : 'View: '}
@@ -422,7 +422,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
         type="button"
         onClick={onExpose}
         disabled={locked}
-        className={`w-full py-2.5 sm:py-3 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border-2 cursor-pointer disabled:cursor-not-allowed transition-colors ${
+        className={`hud-console-expose w-full py-2.5 sm:py-3 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border-2 cursor-pointer disabled:cursor-not-allowed transition-colors ${
           isExposing
             ? 'bg-amber-400 border-amber-200 text-slate-950 shadow-[0_0_24px_rgba(251,191,36,0.65)]'
             : readyToFire

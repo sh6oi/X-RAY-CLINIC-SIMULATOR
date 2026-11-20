@@ -78,47 +78,192 @@ input[type="range"].radiology-slider::-moz-range-thumb {
   cursor: pointer;
 }
 
-/* Mobile landscape viewport adaptation (compact HUD so 3D view remains wide open) */
-@media (orientation: landscape) and (max-height: 540px) {
+/* Mobile landscape viewport adaptation: sized specifically for horizontal phones */
+@media (orientation: landscape) and (max-height: 560px) {
   .hud-header-bar {
     flex-direction: row !important;
+    flex-wrap: nowrap !important;
     align-items: flex-start !important;
-    padding: 4px 8px !important;
+    padding: 4px max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)) !important;
     gap: 6px !important;
   }
   .hud-telemetry-card {
     padding: 4px 8px !important;
     gap: 6px !important;
+    width: auto !important;
+    border-radius: 10px !important;
+  }
+  .hud-telemetry-card button {
+    padding: 3px 6px !important;
+    font-size: 10px !important;
   }
   .hud-patient-card {
     padding: 4px 8px !important;
-    max-width: 260px !important;
+    gap: 7px !important;
+    width: auto !important;
+    max-width: min(290px, 44vw) !important;
+    border-radius: 10px !important;
   }
-  .hud-console-panel {
-    top: 52px !important;
-    bottom: 58px !important;
-    right: 8px !important;
-    left: auto !important;
-    width: min(310px, 45vw) !important;
-    max-height: calc(100dvh - 116px) !important;
-    padding: 8px 10px !important;
+  .hud-patient-avatar {
+    width: 30px !important;
+    height: 30px !important;
   }
-  .hud-joystick-wrap {
-    bottom: 60px !important;
-    left: 10px !important;
-    right: auto !important;
-    transform: scale(0.74);
-    transform-origin: bottom left;
-  }
-  .hud-bottom-dock {
-    padding: 4px 8px !important;
-    gap: 4px !important;
+  .hud-patient-meta {
+    font-size: 10px !important;
+    line-height: 1.25 !important;
   }
   .hud-credit-badge {
-    top: 52px !important;
+    top: 46px !important;
     bottom: auto !important;
-    left: 8px !important;
+    left: max(8px, env(safe-area-inset-left)) !important;
     right: auto !important;
-    max-width: 42vw !important;
+    padding: 3px 8px !important;
+    font-size: 9.5px !important;
+    max-width: 36vw !important;
+    border-radius: 8px !important;
+  }
+  .hud-toast {
+    top: 46px !important;
+    padding: 4px 10px !important;
+    font-size: 11px !important;
+    max-width: 56vw !important;
+  }
+  .hud-low-films {
+    top: 46px !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    padding: 3px 8px !important;
+    font-size: 10px !important;
+  }
+  .hud-hover-label {
+    top: 46px !important;
+    padding: 4px 10px !important;
+    font-size: 10.5px !important;
+  }
+  .hud-speech-bubble {
+    min-width: 155px !important;
+    max-width: min(250px, 38vw) !important;
+  }
+  .hud-speech-card {
+    padding: 6px 10px !important;
+    border-width: 2px !important;
+    border-radius: 12px !important;
+  }
+  .hud-speech-tag {
+    font-size: 9px !important;
+    padding: 1px 6px !important;
+    margin-bottom: 2px !important;
+  }
+  .hud-speech-text {
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+  .hud-console-panel {
+    top: 46px !important;
+    bottom: 50px !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    left: auto !important;
+    width: min(335px, 47vw) !important;
+    max-height: calc(100dvh - 98px) !important;
+    padding: 7px 9px !important;
+    border-radius: 12px !important;
+  }
+  .hud-console-panel > * + * {
+    margin-top: 6px !important;
+  }
+  .hud-console-header {
+    padding-bottom: 4px !important;
+  }
+  .hud-console-interlock {
+    font-size: 9.5px !important;
+    gap: 4px !important;
+  }
+  .hud-console-interlock > div {
+    padding: 3px 6px !important;
+  }
+  .hud-console-lcd {
+    padding: 6px 8px !important;
+  }
+  .hud-console-val {
+    font-size: 17px !important;
+    line-height: 1.1 !important;
+  }
+  .hud-console-step {
+    padding: 2px 0 !important;
+    font-size: 9.5px !important;
+  }
+  .hud-console-proj-box {
+    padding: 5px 8px !important;
+  }
+  .hud-console-expose {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+  .hud-joystick-wrap {
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    left: max(10px, env(safe-area-inset-left)) !important;
+    right: auto !important;
+  }
+  .hud-joystick-ring {
+    width: 78px !important;
+    height: 78px !important;
+  }
+  .hud-joystick-knob {
+    width: 34px !important;
+    height: 34px !important;
+  }
+  .hud-joystick-label {
+    font-size: 9px !important;
+    padding: 1px 6px !important;
+  }
+  .hud-bottom-dock {
+    left: 98px !important;
+    right: max(6px, env(safe-area-inset-right)) !important;
+    padding: 0 0 max(5px, env(safe-area-inset-bottom)) 0 !important;
+    gap: 4px !important;
+  }
+  .hud-position-panel {
+    padding: 4px 8px !important;
+    gap: 4px !important;
+    border-radius: 12px !important;
+  }
+  .hud-position-panel button {
+    padding: 3px 7px !important;
+    font-size: 10px !important;
+  }
+  .hud-action-bar {
+    padding: 4px 8px !important;
+    gap: 5px !important;
+    border-radius: 12px !important;
+  }
+  .hud-action-bar button {
+    padding: 5px 9px !important;
+    font-size: 10.5px !important;
+  }
+  .hud-pc-header {
+    flex-direction: row !important;
+    align-items: center !important;
+    padding: 6px 12px !important;
+    gap: 8px !important;
+  }
+  .hud-pc-content {
+    padding: 8px 12px !important;
+  }
+}
+
+/* Even tighter sizing for ultra-short phones (<= 390px tall in landscape) */
+@media (orientation: landscape) and (max-height: 400px) {
+  .hud-joystick-ring {
+    width: 70px !important;
+    height: 70px !important;
+  }
+  .hud-joystick-knob {
+    width: 30px !important;
+    height: 30px !important;
+  }
+  .hud-bottom-dock {
+    left: 90px !important;
+  }
+  .hud-patient-card {
+    max-width: 245px !important;
   }
 }

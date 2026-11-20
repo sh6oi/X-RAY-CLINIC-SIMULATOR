@@ -147,10 +147,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </div>
       </header>
 
-      <main className="flex-1 flex items-center py-4 sm:py-8 px-3 sm:px-6">
-        <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 items-stretch">
+      <main className="flex-1 flex items-center py-3 sm:py-5 px-3 sm:px-6">
+        <div className="max-w-6xl mx-auto w-full grid grid-cols-1 min-[600px]:grid-cols-12 gap-4 sm:gap-6 items-stretch">
           {/* Form Column */}
-          <div className="lg:col-span-5 rounded-2xl border border-slate-800 bg-[#111A27] p-4 sm:p-8 flex flex-col justify-between gap-5">
+          <div className="min-[600px]:col-span-6 lg:col-span-5 rounded-2xl border border-slate-800 bg-[#111A27] p-4 sm:p-6 flex flex-col justify-between gap-4">
             <div className="space-y-4 sm:space-y-5">
               <div className="space-y-1.5 sm:space-y-2">
                 <h1 className="text-xl sm:text-3xl font-display font-bold text-white [text-wrap:balance]">
@@ -348,8 +348,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </div>
 
           {/* Visual Showcase Column */}
-          <div className="lg:col-span-7 rounded-2xl border border-slate-800 bg-[#0E1622] overflow-hidden flex flex-col justify-between">
-            <div className="relative flex-1 min-h-[200px] sm:min-h-[260px] bg-slate-900 overflow-hidden">
+          <div className="min-[600px]:col-span-6 lg:col-span-7 rounded-2xl border border-slate-800 bg-[#0E1622] overflow-hidden flex flex-col justify-between">
+            <div className="relative flex-1 min-h-[160px] sm:min-h-[210px] bg-slate-900 overflow-hidden">
               {!heroError ? (
                 <img
                   src={CLINIC_ROOM_IMAGE}
@@ -398,6 +398,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     <img
                       src={thumb.src}
                       alt={thumb.alt}
+                      loading="lazy"
+                      decoding="async"
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
                     />

@@ -22,9 +22,15 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
   });
   const [isDragging, setIsDragging] = useState(false);
 
-  const maxRadius = 42;
+  const getDynamicMaxRadius = () => {
+    const el = baseRef.current;
+    if (!el) return 42;
+    const w = el.getBoundingClientRect().width;
+    return w > 0 ? Math.max(24, w * 0.42) : 42;
+  };
 
   const updateFromClient = (clientX: number, clientY: number) => {
+    const maxRadius = getDynamicMaxRadius();
     let dx = clientX - originRef.current.x;
     let dy = clientY - originRef.current.y;
     const dist = Math.hypot(dx, dy);
@@ -134,7 +140,7 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className={`relative w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 touch-none flex items-center justify-center shadow-[0_12px_32px_rgba(0,0,0,0.68)] transition-colors cursor-grab active:cursor-grabbing ${
+        className={`hud-joystick-ring relative w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 touch-none flex items-center justify-center shadow-[0_12px_32px_rgba(0,0,0,0.68)] transition-colors cursor-grab active:cursor-grabbing ${
           isDragging
             ? 'border-cyan-400 bg-[#0A1E36]/95'
             : 'border-cyan-600/80 bg-[#08101C]/92 hover:border-cyan-400'
@@ -162,7 +168,7 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
           style={{
             transform: `translate3d(${knobOffset.x}px, ${knobOffset.y}px, 0)`,
           }}
-          className={`pointer-events-none w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.55)] ${
+          className={`hud-joystick-knob pointer-events-none w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.55)] ${
             isDragging
               ? 'bg-cyan-300 border-white text-slate-950 scale-105'
               : 'bg-cyan-500/95 border-cyan-200 text-slate-950'
@@ -172,7 +178,7 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
         </div>
       </div>
 
-      <span className="pointer-events-none px-2 py-0.5 rounded-md bg-[#08101C]/92 border border-slate-800 text-[10px] sm:text-[11px] font-semibold text-cyan-200 whitespace-nowrap">
+      <span className="hud-joystick-label pointer-events-none px-2 py-0.5 rounded-md bg-[#08101C]/92 border border-slate-800 text-[10px] sm:text-[11px] font-semibold text-cyan-200 whitespace-nowrap">
         {displayLabel}
       </span>
     </div>

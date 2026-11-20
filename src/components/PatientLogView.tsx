@@ -95,6 +95,8 @@ export const PatientLogView: React.FC<PatientLogViewProps> = ({
                       <img
                         src={c.patientAvatarPath || PATIENT_AVATARS.manYoung}
                         alt={c.patientNameAr}
+                        loading="lazy"
+                        decoding="async"
                         referrerPolicy="no-referrer"
                         className="w-9 h-9 rounded-lg object-cover border border-slate-700 shrink-0"
                       />
@@ -106,6 +108,8 @@ export const PatientLogView: React.FC<PatientLogViewProps> = ({
                       <img
                         src={c.examImagePath || REGION_SCAN_IMAGES.chest}
                         alt={c.examTitleAr}
+                        loading="lazy"
+                        decoding="async"
                         referrerPolicy="no-referrer"
                         className="w-9 h-9 rounded-md object-cover border border-slate-800 bg-black shrink-0"
                       />

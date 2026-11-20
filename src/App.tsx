@@ -4,17 +4,22 @@ import {
   ArrowLeftRight,
   CheckCircle2,
   Coins,
+  Cpu,
   DoorClosed,
   DoorOpen,
   Film,
   Hand,
   Languages,
   LogOut,
+  Maximize2,
+  Minimize2,
   Monitor,
   Package,
+  RotateCcw,
   ScanLine,
   Shield,
   Sliders,
+  Smartphone,
   UserCheck,
   Volume2,
   VolumeX,
@@ -24,6 +29,7 @@ import type {
   CassetteState,
   ClinicSaveState,
   CompletedCase,
+  GraphicsQuality,
   PatientCase,
   PatientPosture,
   ProjectionType,
@@ -176,6 +182,27 @@ export default function App() {
   // Toast message
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  // Mobile landscape / portrait orientation helper
+  const [isPortraitPhone, setIsPortraitPhone] = useState<boolean>(() =>
+    typeof window !== 'undefined'
+      ? window.innerHeight > window.innerWidth && window.innerWidth <= 680
+      : false
+  );
+  const [portraitDismissed, setPortraitDismissed] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  const [graphicsQuality, setGraphicsQuality] = useState<GraphicsQuality>(() => {
+    try {
+      const stored = localStorage.getItem('clinic_graphics_quality_v1');
+      if (stored === 'low' || stored === 'high' || stored === 'auto') {
+        return stored;
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+    return 'auto';
+  });
+
   const joystickRef = useRef<{x: number; y: number}>({x: 0, y: 0});
   const exposeTimerRef = useRef<number | null>(null);
   const developTimerRef = useRef<number | null>(null);
@@ -198,6 +225,79 @@ export default function App() {
       setToastMsg(null);
     }, 4000);
   }, []);
+
+  useEffect(() => {
+    const checkViewport = () => {
+      const portrait =
+        window.innerHeight > window.innerWidth && window.innerWidth <= 680;
+      setIsPortraitPhone(portrait);
+      if (!portrait) setPortraitDismissed(false);
+    };
+    const onFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    checkViewport();
+    window.addEventListener('resize', checkViewport);
+    window.addEventListener('orientationchange', checkViewport);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => {
+      window.removeEventListener('resize', checkViewport);
+      window.removeEventListener('orientationchange', checkViewport);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+    };
+  }, []);
+
+  const handleToggleLandscapeFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen?.();
+        const orientation = screen.orientation as
+          | (ScreenOrientation & {lock?: (type: string) => Promise<void>})
+          | undefined;
+        await orientation?.lock?.('landscape').catch(() => {});
+      } else {
+        await document.exitFullscreen?.();
+      }
+    } catch {
+      // Fullscreen/orientation lock not supported on this browser; user rotates physically
+    }
+  };
+
+  const handleCycleGraphicsQuality = () => {
+    const next: GraphicsQuality =
+      graphicsQuality === 'auto'
+        ? 'low'
+        : graphicsQuality === 'low'
+          ? 'high'
+          : 'auto';
+    setGraphicsQuality(next);
+    try {
+      localStorage.setItem('clinic_graphics_quality_v1', next);
+    } catch {
+      // Ignore storage failures
+    }
+    showToast(
+      next === 'low'
+        ? isAr
+          ? 'تم تفعيل الوضع الخفيف ⚡ (مناسب للأجهزة الضعيفة والقديمة)'
+          : 'Fast Performance mode enabled ⚡ (Optimized for weak devices)'
+        : next === 'high'
+          ? isAr
+            ? 'تم تفعيل الجودة العالية للرسوميات'
+            : 'High Graphics quality enabled'
+          : isAr
+            ? 'الرسوميات: تلقائي حسب قوة الجهاز'
+            : 'Graphics: Auto device adaptation'
+    );
+  };
+
+  const handleAutoDowngradeQuality = useCallback(() => {
+    showToast(
+      isAr
+        ? 'تم تفعيل الوضع الخفيف تلقائياً لضمان سلاسة اللعب على جهازك ⚡'
+        : 'Switched to Fast mode automatically for smoother FPS ⚡'
+    );
+  }, [isAr, showToast]);
 
   const triggerPatientSpeech = useCallback(
     (msgAr: string, msgEn: string, durationMs = 6500) => {
@@ -1410,10 +1510,13 @@ export default function App() {
         isExposing={isExposing}
         patientSpeech={patientSpeech}
         language={lang}
+        graphicsQuality={graphicsQuality}
+        paused={pcOpen || (isPortraitPhone && !portraitDismissed)}
         ownedUpgrades={save.ownedUpgrades}
         joystickRef={joystickRef}
         onTechZoneChange={handleTechZoneChange}
         onSceneInteract={handleSceneInteract}
+        onAutoDowngradeQuality={handleAutoDowngradeQuality}
       />
 
       {/* TOP BAR HUD */}
@@ -1503,6 +1606,36 @@ export default function App() {
 
             <button
               type="button"
+              onClick={handleCycleGraphicsQuality}
+              title={
+                isAr
+                  ? 'تبديل جودة الرسوميات (تلقائي / خفيف / عالي)'
+                  : 'Graphics Mode (Auto / Fast / High)'
+              }
+              className={`flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-lg text-[10.5px] sm:text-xs font-semibold cursor-pointer transition-colors ${
+                graphicsQuality === 'low'
+                  ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-300'
+                  : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {graphicsQuality === 'low'
+                  ? isAr
+                    ? 'خفيف'
+                    : 'Fast'
+                  : graphicsQuality === 'high'
+                    ? isAr
+                      ? 'عالي'
+                      : 'High'
+                    : isAr
+                      ? 'تلقائي'
+                      : 'Auto'}
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => {
                 setPcTab(currentEvaluation ? 'IMAGE' : 'LOG');
                 setPcOpen(true);
@@ -1511,6 +1644,27 @@ export default function App() {
             >
               <Monitor className="w-3.5 h-3.5 shrink-0" />
               <span>{isAr ? 'الحاسوب' : 'PC'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleToggleLandscapeFullscreen()}
+              title={
+                isFullscreen
+                  ? isAr
+                    ? 'إنهاء ملء الشاشة'
+                    : 'Exit Fullscreen'
+                  : isAr
+                    ? 'ملء الشاشة بالعرض'
+                    : 'Landscape Fullscreen'
+              }
+              className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 cursor-pointer transition-colors"
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-3.5 h-3.5 text-cyan-400" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" />
+              )}
             </button>
 
             <button
@@ -1533,10 +1687,11 @@ export default function App() {
             <img
               src={activePatient.avatarPath}
               alt={activePatient.nameAr}
+              decoding="async"
               referrerPolicy="no-referrer"
-              className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg object-cover border border-slate-700 shrink-0"
+              className="hud-patient-avatar w-9 h-9 sm:w-12 sm:h-12 rounded-lg object-cover border border-slate-700 shrink-0"
             />
-            <div className="min-w-0 flex-1 space-y-0.5 text-[10.5px] sm:text-xs">
+            <div className="hud-patient-meta min-w-0 flex-1 space-y-0.5 text-[10.5px] sm:text-xs">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-bold text-white truncate">
                   {activePatient.nameAr} ({activePatient.age}{' '}
@@ -1570,7 +1725,7 @@ export default function App() {
 
       {/* LOW FILMS QUICK WARNING STRIP */}
       {lowFilmsWarning && (
-        <div className="pointer-events-auto fixed top-[116px] sm:top-20 right-2.5 sm:right-4 z-20 rounded-xl border border-amber-600/70 bg-[#1B1308]/95 px-2.5 py-1 sm:px-3.5 sm:py-2 flex items-center gap-2 text-[11px] sm:text-xs text-amber-200 shadow-lg">
+        <div className="hud-low-films pointer-events-auto fixed top-[116px] sm:top-20 right-2.5 sm:right-4 z-20 rounded-xl border border-amber-600/70 bg-[#1B1308]/95 px-2.5 py-1 sm:px-3.5 sm:py-2 flex items-center gap-2 text-[11px] sm:text-xs text-amber-200 shadow-lg">
           <Package className="w-3.5 h-3.5 text-amber-400 shrink-0" />
           <span>
             {save.films === 0
@@ -1596,7 +1751,7 @@ export default function App() {
 
       {/* TOAST FEEDBACK */}
       {toastMsg && (
-        <div className="pointer-events-none fixed top-[116px] sm:top-20 left-1/2 -translate-x-1/2 z-30 rounded-xl border border-cyan-600/70 bg-[#081523]/95 px-3.5 py-2 text-[11px] sm:text-sm font-semibold text-cyan-100 flex items-center gap-2 shadow-2xl max-w-[92vw]">
+        <div className="hud-toast pointer-events-none fixed top-[116px] sm:top-20 left-1/2 -translate-x-1/2 z-30 rounded-xl border border-cyan-600/70 bg-[#081523]/95 px-3.5 py-2 text-[11px] sm:text-sm font-semibold text-cyan-100 flex items-center gap-2 shadow-2xl max-w-[92vw]">
           <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
           <span>{toastMsg}</span>
         </div>
@@ -1663,7 +1818,7 @@ export default function App() {
       <footer className="hud-bottom-dock pointer-events-none fixed bottom-0 inset-x-0 z-20 px-2 pt-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] sm:p-4 flex flex-col items-center gap-1 sm:gap-2">
         {/* Inside Exam Room: Quick Positioning & Region Controls */}
         {techLocation === 'ROOM' && !caseApproved && !crExposedPending && (
-          <div className="pointer-events-auto max-w-5xl w-full rounded-2xl border border-slate-800 bg-[#08101C]/95 px-2 sm:px-3 py-1 sm:py-2 shadow-2xl flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-1 sm:gap-2.5">
+          <div className="hud-position-panel pointer-events-auto max-w-5xl w-full rounded-2xl border border-slate-800 bg-[#08101C]/95 px-2 sm:px-3 py-1 sm:py-2 shadow-2xl flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-1 sm:gap-2.5">
             {/* Postures */}
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
               <span className="text-[10.5px] sm:text-[11px] text-slate-400 shrink-0 mx-1">
@@ -1732,7 +1887,7 @@ export default function App() {
         )}
 
         {/* Primary Clinical Step Action Bar */}
-        <div className="pointer-events-auto max-w-full rounded-2xl border border-slate-700/80 bg-[#08101C]/95 px-2.5 sm:px-4 py-1.5 sm:py-2 shadow-2xl flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
+        <div className="hud-action-bar pointer-events-auto max-w-full rounded-2xl border border-slate-700/80 bg-[#08101C]/95 px-2.5 sm:px-4 py-1.5 sm:py-2 shadow-2xl flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
           {caseApproved ? (
             <button
               type="button"
@@ -1959,6 +2114,53 @@ export default function App() {
         totalRevenue={save.totalRevenue}
         retakesCount={save.retakesCount}
       />
+
+      {/* MOBILE PORTRAIT -> LANDSCAPE GUIDANCE OVERLAY */}
+      {isPortraitPhone && !portraitDismissed && (
+        <div className="fixed inset-0 z-[80] bg-[#060B13]/96 flex items-center justify-center p-5">
+          <div className="w-full max-w-sm rounded-2xl border border-cyan-600/60 bg-[#0B1422] p-6 text-center space-y-4 shadow-2xl">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center">
+              <Smartphone className="w-8 h-8 text-cyan-300 -rotate-90" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h2 className="text-lg font-display font-bold text-white">
+                {isAr
+                  ? 'يرجى تدوير الهاتف بالعرض'
+                  : 'Rotate Phone to Landscape'}
+              </h2>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {isAr
+                  ? 'تم تصميم هذه اللعبة بحجم وتنسيق يناسب الهواتف بالوضع الأفقي (بالعرض) لوضوح غرفة الأشعة وسهولة التحكم.'
+                  : 'This 3D simulator is designed for horizontal (landscape) phone play for optimal room view and thumb controls.'}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => void handleToggleLandscapeFullscreen()}
+                className="w-full py-2.5 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+              >
+                <RotateCcw className="w-4 h-4 shrink-0" />
+                <span>
+                  {isAr
+                    ? 'تشغيل بالعرض وملء الشاشة'
+                    : 'Enter Landscape Fullscreen'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPortraitDismissed(true)}
+                className="w-full py-2 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer transition-colors"
+              >
+                {isAr ? 'متابعة على الوضع الحالي' : 'Continue Anyway'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

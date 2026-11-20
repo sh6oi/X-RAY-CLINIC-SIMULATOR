@@ -247,10 +247,10 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
       </div>
 
       {/* Main Two-Column Organized View + Mask Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      <div className="grid grid-cols-1 min-[600px]:grid-cols-12 gap-3 sm:gap-4 items-start">
         {/* LEFT/TOP: Illuminated Radiograph View + Collimation Mask Viewport */}
-        <div className="lg:col-span-7 rounded-xl border border-slate-800 bg-[#08101C] p-3 sm:p-4 flex flex-col items-center gap-3">
-          <div className="relative w-full max-w-[440px] aspect-square rounded-xl bg-[#04080F] border-2 border-cyan-900/60 overflow-hidden flex items-center justify-center shadow-[0_0_45px_rgba(34,211,238,0.12)]">
+        <div className="min-[600px]:col-span-7 rounded-xl border border-slate-800 bg-[#08101C] p-2.5 sm:p-4 flex flex-col items-center gap-2.5 sm:gap-3">
+          <div className="relative w-full max-w-[240px] sm:max-w-[275px] lg:max-w-[380px] aspect-square rounded-xl bg-[#04080F] border-2 border-cyan-900/60 overflow-hidden flex items-center justify-center shadow-[0_0_45px_rgba(34,211,238,0.12)]">
             <div
               className="w-full h-full flex items-center justify-center transition-transform duration-200"
               style={{
@@ -370,7 +370,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
         </div>
 
         {/* RIGHT/BOTTOM: Organized View Controls, Mask Controls, and Approval */}
-        <div className="lg:col-span-5 space-y-3.5">
+        <div className="min-[600px]:col-span-5 space-y-3">
           {/* Card 1: View Controls */}
           <section className="rounded-xl border border-slate-800 bg-[#0D1624] p-4 space-y-3">
             <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
