@@ -198,27 +198,8 @@ input[type="range"].radiology-slider::-moz-range-thumb {
     padding: 6px 10px !important;
     font-size: 11px !important;
   }
-  .hud-joystick-wrap {
-    bottom: max(8px, env(safe-area-inset-bottom)) !important;
-    left: max(10px, env(safe-area-inset-left)) !important;
-    right: auto !important;
-  }
-  .hud-joystick-ring {
-    width: 78px !important;
-    height: 78px !important;
-  }
-  .hud-joystick-knob {
-    width: 34px !important;
-    height: 34px !important;
-  }
-  .hud-joystick-label {
-    font-size: 9px !important;
-    padding: 1px 6px !important;
-  }
   .hud-bottom-dock {
-    left: 98px !important;
-    right: max(6px, env(safe-area-inset-right)) !important;
-    padding: 0 0 max(5px, env(safe-area-inset-bottom)) 0 !important;
+    padding: 0 max(6px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)) !important;
     gap: 4px !important;
   }
   .hud-position-panel {
@@ -252,17 +233,6 @@ input[type="range"].radiology-slider::-moz-range-thumb {
 
 /* Even tighter sizing for ultra-short phones (<= 390px tall in landscape) */
 @media (orientation: landscape) and (max-height: 400px) {
-  .hud-joystick-ring {
-    width: 70px !important;
-    height: 70px !important;
-  }
-  .hud-joystick-knob {
-    width: 30px !important;
-    height: 30px !important;
-  }
-  .hud-bottom-dock {
-    left: 90px !important;
-  }
   .hud-patient-card {
     max-width: 245px !important;
   }

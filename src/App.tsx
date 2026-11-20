@@ -4,10 +4,10 @@ import {
   ArrowLeftRight,
   CheckCircle2,
   Coins,
-  Cpu,
   DoorClosed,
   DoorOpen,
   Film,
+  Gamepad2,
   Hand,
   Languages,
   LogOut,
@@ -23,6 +23,7 @@ import {
   UserCheck,
   Volume2,
   VolumeX,
+  Zap,
 } from 'lucide-react';
 import type {
   BodyRegion,
@@ -30,6 +31,7 @@ import type {
   ClinicSaveState,
   CompletedCase,
   GraphicsQuality,
+  JoystickConfig,
   PatientCase,
   PatientPosture,
   ProjectionType,
@@ -74,6 +76,7 @@ import {
   type SceneTargetAction,
 } from './components/RadiologyRoom3D';
 import {ClinicPCModal} from './components/ClinicPCModal';
+import {ControlSettingsModal} from './components/ControlSettingsModal';
 import {ExposureConsolePanel} from './components/ExposureConsolePanel';
 import {VirtualJoystick} from './components/VirtualJoystick';
 import {DesignerCredit} from './components/DesignerCredit';
@@ -174,10 +177,17 @@ export default function App() {
   const [caseApproved, setCaseApproved] = useState<boolean>(false);
   const [patientSpeech, setPatientSpeech] = useState<string | null>(null);
 
-  // Control Booth Console Drawer, Clinic PC Modal & 10-Patient Designer Milestone
+  // Control Booth Console Drawer, Clinic PC Modal, Control Settings & 10-Patient Designer Milestone
   const [consoleOpen, setConsoleOpen] = useState<boolean>(true);
   const [pcOpen, setPcOpen] = useState<boolean>(false);
   const [pcTab, setPcTab] = useState<WorkspaceTab>('IMAGE');
+  const [controlsModalOpen, setControlsModalOpen] = useState<boolean>(false);
+  const [isRepositioningJoystick, setIsRepositioningJoystick] =
+    useState<boolean>(false);
+  const [draftJoystickCoords, setDraftJoystickCoords] = useState<{
+    x: number;
+    y: number;
+  }>({x: 0.14, y: 0.72});
   const [designerPopupOpen, setDesignerPopupOpen] = useState<boolean>(false);
   const [designerMilestoneCount, setDesignerMilestoneCount] =
     useState<number>(10);
@@ -194,17 +204,50 @@ export default function App() {
   const [portraitDismissed, setPortraitDismissed] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
-  const [graphicsQuality, setGraphicsQuality] = useState<GraphicsQuality>(() => {
+  const getDefaultJoystickConfig = (): JoystickConfig => ({
+    preset: 'bottom-left',
+    size: 'md',
+    customX: 0.12,
+    customY: 0.74,
+  });
+
+  const [joystickConfig, setJoystickConfig] = useState<JoystickConfig>(() => {
     try {
-      const stored = localStorage.getItem('clinic_graphics_quality_v1');
-      if (stored === 'low' || stored === 'high' || stored === 'auto') {
-        return stored;
+      const raw = localStorage.getItem('clinic_joystick_config_v2');
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<JoystickConfig>;
+        if (
+          parsed &&
+          (parsed.preset === 'bottom-left' ||
+            parsed.preset === 'bottom-right' ||
+            parsed.preset === 'top-left' ||
+            parsed.preset === 'top-right' ||
+            parsed.preset === 'custom')
+        ) {
+          return {
+            preset: parsed.preset,
+            size:
+              parsed.size === 'sm' || parsed.size === 'lg'
+                ? parsed.size
+                : 'md',
+            customX:
+              typeof parsed.customX === 'number'
+                ? Math.min(0.92, Math.max(0.08, parsed.customX))
+                : 0.12,
+            customY:
+              typeof parsed.customY === 'number'
+                ? Math.min(0.88, Math.max(0.16, parsed.customY))
+                : 0.74,
+          };
+        }
       }
     } catch {
-      // Ignore storage access errors
+      // Ignore storage errors
     }
-    return 'auto';
+    return getDefaultJoystickConfig();
   });
+
+  const [graphicsQuality] = useState<GraphicsQuality>('low');
 
   const joystickRef = useRef<{x: number; y: number}>({x: 0, y: 0});
   const exposeTimerRef = useRef<number | null>(null);
@@ -266,32 +309,33 @@ export default function App() {
     }
   };
 
-  const handleCycleGraphicsQuality = () => {
-    const next: GraphicsQuality =
-      graphicsQuality === 'auto'
-        ? 'low'
-        : graphicsQuality === 'low'
-          ? 'high'
-          : 'auto';
-    setGraphicsQuality(next);
+  const updateJoystickConfig = useCallback((next: JoystickConfig) => {
+    setJoystickConfig(next);
     try {
-      localStorage.setItem('clinic_graphics_quality_v1', next);
+      localStorage.setItem('clinic_joystick_config_v2', JSON.stringify(next));
     } catch {
-      // Ignore storage failures
+      // Ignore storage errors
     }
-    showToast(
-      next === 'low'
-        ? isAr
-          ? 'تم تفعيل الوضع الخفيف ⚡ (مناسب للأجهزة الضعيفة والقديمة)'
-          : 'Fast Performance mode enabled ⚡ (Optimized for weak devices)'
-        : next === 'high'
-          ? isAr
-            ? 'تم تفعيل الجودة العالية للرسوميات'
-            : 'High Graphics quality enabled'
-          : isAr
-            ? 'الرسوميات: تلقائي حسب قوة الجهاز'
-            : 'Graphics: Auto device adaptation'
-    );
+  }, []);
+
+  const handleSelectGraphicsQuality = useCallback(
+    (_next: GraphicsQuality) => {
+      try {
+        localStorage.setItem('clinic_graphics_quality_v3', 'low');
+      } catch {
+        // Ignore storage failures
+      }
+      showToast(
+        isAr
+          ? 'جودة الرسوميات: الوضع الخفيف ⚡ (مفعل دائماً لأعلى سلاسة)'
+          : 'Graphics Quality: Fast Mode ⚡ (Locked for optimal performance)'
+      );
+    },
+    [isAr, showToast]
+  );
+
+  const handleCycleGraphicsQuality = () => {
+    handleSelectGraphicsQuality('low');
   };
 
   const handleAutoDowngradeQuality = useCallback(() => {
@@ -1524,6 +1568,7 @@ export default function App() {
         paused={
           pcOpen ||
           designerPopupOpen ||
+          controlsModalOpen ||
           (isPortraitPhone && !portraitDismissed)
         }
         ownedUpgrades={save.ownedUpgrades}
@@ -1623,29 +1668,23 @@ export default function App() {
               onClick={handleCycleGraphicsQuality}
               title={
                 isAr
-                  ? 'تبديل جودة الرسوميات (تلقائي / خفيف / عالي)'
-                  : 'Graphics Mode (Auto / Fast / High)'
+                  ? 'جودة الرسوميات: خفيف (الوضع المتاح)'
+                  : 'Graphics Mode: Fast'
               }
-              className={`flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-lg text-[10.5px] sm:text-xs font-semibold cursor-pointer transition-colors ${
-                graphicsQuality === 'low'
-                  ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-300'
-                  : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300'
-              }`}
+              className="flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-lg text-[10.5px] sm:text-xs font-semibold cursor-pointer transition-colors bg-emerald-500/20 border border-emerald-500/50 text-emerald-300"
             >
-              <Cpu className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                {graphicsQuality === 'low'
-                  ? isAr
-                    ? 'خفيف'
-                    : 'Fast'
-                  : graphicsQuality === 'high'
-                    ? isAr
-                      ? 'عالي'
-                      : 'High'
-                    : isAr
-                      ? 'تلقائي'
-                      : 'Auto'}
-              </span>
+              <Zap className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+              <span>{isAr ? 'خفيف' : 'Fast'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setControlsModalOpen(true)}
+              title={isAr ? 'إعدادات التحكم' : 'Control Settings'}
+              className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 text-slate-200 text-[10.5px] sm:text-xs font-semibold cursor-pointer transition-colors"
+            >
+              <Gamepad2 className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span>{isAr ? 'إعدادات التحكم' : 'Controls'}</span>
             </button>
 
             <button
@@ -1801,17 +1840,41 @@ export default function App() {
         />
       )}
 
-      {/* VIRTUAL JOYSTICK CIRCLE */}
-      {!pcOpen && (
+      {/* VIRTUAL JOYSTICK CIRCLE (CUSTOMIZABLE POSITION & SIZE) */}
+      {!pcOpen && !isRepositioningJoystick && (
         <div
-          className={`hud-joystick-wrap pointer-events-auto fixed left-2.5 sm:left-auto sm:right-6 sm:bottom-6 z-20 ${
-            techLocation === 'ROOM' && !caseApproved
-              ? 'bottom-[138px]'
-              : 'bottom-16'
+          style={
+            joystickConfig.preset === 'custom'
+              ? {
+                  left: `${Math.round(joystickConfig.customX * 100)}%`,
+                  top: `${Math.round(joystickConfig.customY * 100)}%`,
+                  transform: 'translate(-50%, -50%)',
+                }
+              : undefined
+          }
+          className={`hud-joystick-wrap pointer-events-auto fixed z-20 ${
+            joystickConfig.preset === 'custom'
+              ? ''
+              : joystickConfig.preset === 'top-left'
+                ? 'left-[max(0.75rem,env(safe-area-inset-left))] top-[62px] sm:top-[82px]'
+                : joystickConfig.preset === 'top-right'
+                  ? 'right-[max(0.75rem,env(safe-area-inset-right))] top-[62px] sm:top-[82px]'
+                  : joystickConfig.preset === 'bottom-right'
+                    ? `right-[max(0.75rem,env(safe-area-inset-right))] sm:bottom-6 ${
+                        techLocation === 'ROOM' && !caseApproved
+                          ? 'bottom-2 min-[640px]:bottom-[120px] min-[900px]:bottom-6'
+                          : 'bottom-2 min-[640px]:bottom-16 min-[900px]:bottom-6'
+                      }`
+                    : `left-[max(0.75rem,env(safe-area-inset-left))] sm:bottom-6 ${
+                        techLocation === 'ROOM' && !caseApproved
+                          ? 'bottom-2 min-[640px]:bottom-[120px] min-[900px]:bottom-6'
+                          : 'bottom-2 min-[640px]:bottom-16 min-[900px]:bottom-6'
+                      }`
           }`}
         >
           <VirtualJoystick
             joystickRef={joystickRef}
+            size={joystickConfig.size}
             label={
               techLocation === 'BOOTH'
                 ? isAr
@@ -1825,8 +1888,103 @@ export default function App() {
         </div>
       )}
 
+      {/* LIVE FREE-DRAG JOYSTICK REPOSITIONING OVERLAY */}
+      {isRepositioningJoystick && (
+        <div
+          onPointerDown={(e) => {
+            if ((e.target as HTMLElement).closest('button')) return;
+            const nx = Math.min(
+              0.92,
+              Math.max(0.08, e.clientX / (window.innerWidth || 1))
+            );
+            const ny = Math.min(
+              0.88,
+              Math.max(0.16, e.clientY / (window.innerHeight || 1))
+            );
+            setDraftJoystickCoords({x: nx, y: ny});
+          }}
+          onPointerMove={(e) => {
+            if (e.buttons === 0 && e.pointerType === 'mouse') return;
+            if ((e.target as HTMLElement).closest('button')) return;
+            const nx = Math.min(
+              0.92,
+              Math.max(0.08, e.clientX / (window.innerWidth || 1))
+            );
+            const ny = Math.min(
+              0.88,
+              Math.max(0.16, e.clientY / (window.innerHeight || 1))
+            );
+            setDraftJoystickCoords({x: nx, y: ny});
+          }}
+          className="fixed inset-0 z-[72] bg-slate-950/65 touch-none select-none"
+        >
+          {/* Guide Grid & Action Toolbar */}
+          <div className="pointer-events-auto fixed top-3 left-1/2 -translate-x-1/2 z-[75] rounded-2xl border border-amber-500/70 bg-[#0B1422] px-4 py-2.5 shadow-2xl flex flex-wrap items-center justify-center gap-2.5 max-w-[94vw]">
+            <span className="text-xs font-bold text-amber-200 whitespace-nowrap">
+              {isAr
+                ? 'اضغط أو اسحب إلى الموقع المطلوب لزر تحريك التقني'
+                : 'Tap or drag anywhere to place Technician Move button'}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                updateJoystickConfig({
+                  ...joystickConfig,
+                  preset: 'custom',
+                  customX: draftJoystickCoords.x,
+                  customY: draftJoystickCoords.y,
+                });
+                setIsRepositioningJoystick(false);
+                showToast(
+                  isAr
+                    ? 'تم حفظ موقع زر تحريك التقني بنجاح!'
+                    : 'Joystick position saved!'
+                );
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer transition-colors"
+            >
+              {isAr ? 'حفظ الموقع' : 'Save Position'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsRepositioningJoystick(false);
+                setControlsModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs cursor-pointer transition-colors"
+            >
+              {isAr ? 'إلغاء' : 'Cancel'}
+            </button>
+          </div>
+
+          <div
+            style={{
+              left: `${Math.round(draftJoystickCoords.x * 100)}%`,
+              top: `${Math.round(draftJoystickCoords.y * 100)}%`,
+              transform: 'translate(-50%, -50%)',
+            }}
+            className="pointer-events-none fixed"
+          >
+            <VirtualJoystick
+              joystickRef={joystickRef}
+              size={joystickConfig.size}
+              disabled
+              label={isAr ? 'اسحب لتحديد المكان' : 'Drag to Place'}
+            />
+          </div>
+        </div>
+      )}
+
       {/* BOTTOM FIRST-PERSON WORKFLOW DOCK */}
-      <footer className="hud-bottom-dock pointer-events-none fixed bottom-0 inset-x-0 z-20 px-2 pt-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] sm:p-4 flex flex-col items-center gap-1 sm:gap-2">
+      <footer
+        className={`hud-bottom-dock pointer-events-none fixed bottom-0 inset-x-0 z-20 px-2 pt-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] sm:p-4 flex flex-col items-center gap-1 sm:gap-2 ${
+          joystickConfig.preset === 'bottom-left'
+            ? 'max-[900px]:pl-[104px]'
+            : joystickConfig.preset === 'bottom-right'
+              ? 'max-[900px]:pr-[104px]'
+              : ''
+        }`}
+      >
         {/* Inside Exam Room: Quick Positioning & Region Controls */}
         {techLocation === 'ROOM' && !caseApproved && !crExposedPending && (
           <div className="hud-position-panel pointer-events-auto max-w-5xl w-full rounded-2xl border border-slate-800 bg-[#08101C]/95 px-2 sm:px-3 py-1 sm:py-2 shadow-2xl flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-1 sm:gap-2.5">
@@ -2124,6 +2282,40 @@ export default function App() {
         completedCases={save.completedCases}
         totalRevenue={save.totalRevenue}
         retakesCount={save.retakesCount}
+      />
+
+      {/* CONTROL SETTINGS & JOYSTICK POSITION MODAL */}
+      <ControlSettingsModal
+        isOpen={controlsModalOpen}
+        onClose={() => setControlsModalOpen(false)}
+        joystickConfig={joystickConfig}
+        onChangeJoystickConfig={updateJoystickConfig}
+        onResetJoystickConfig={() => {
+          const def = getDefaultJoystickConfig();
+          updateJoystickConfig(def);
+          showToast(
+            isAr
+              ? 'تم إرجاع زر تحريك التقني للموقع الافتراضي.'
+              : 'Joystick position reset to default.'
+          );
+        }}
+        onStartFreeDrag={() => {
+          const startCoords =
+            joystickConfig.preset === 'custom'
+              ? {x: joystickConfig.customX, y: joystickConfig.customY}
+              : joystickConfig.preset === 'top-left'
+                ? {x: 0.12, y: 0.28}
+                : joystickConfig.preset === 'top-right'
+                  ? {x: 0.88, y: 0.28}
+                  : joystickConfig.preset === 'bottom-right'
+                    ? {x: 0.88, y: 0.74}
+                    : {x: 0.12, y: 0.74};
+          setDraftJoystickCoords(startCoords);
+          setControlsModalOpen(false);
+          setIsRepositioningJoystick(true);
+        }}
+        graphicsQuality={graphicsQuality}
+        onChangeGraphicsQuality={handleSelectGraphicsQuality}
       />
 
       {/* DESIGNER CREDIT MILESTONE POPUP (EVERY 10 COMPLETED PATIENTS) */}

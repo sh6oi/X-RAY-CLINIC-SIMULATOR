@@ -134,7 +134,23 @@ export interface ClinicRank {
 }
 
 export type Language = 'ar' | 'en';
-export type GraphicsQuality = 'auto' | 'low' | 'high';
+export type GraphicsQuality = 'low';
+
+export type JoystickPreset =
+  | 'bottom-left'
+  | 'bottom-right'
+  | 'top-left'
+  | 'top-right'
+  | 'custom';
+
+export type JoystickSize = 'sm' | 'md' | 'lg';
+
+export interface JoystickConfig {
+  preset: JoystickPreset;
+  size: JoystickSize;
+  customX: number;
+  customY: number;
+}
 
 export type TechLocation = 'ROOM' | 'BOOTH';
 export type CassetteState =
