@@ -1,0 +1,115 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "clinics": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "profile": {
+          ".validate": "newData.hasChildren(['name', 'email', 'createdAt'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 100"
+          },
+          "email": {
+            ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 200"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "save": {
+          ".validate": "newData.hasChildren(['cash', 'totalRevenue', 'films', 'cartonsBought', 'patientsServed', 'retakesCount', 'filmDebt', 'soundEnabled'])",
+          "cash": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000"
+          },
+          "totalRevenue": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000"
+          },
+          "films": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+          },
+          "cartonsBought": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+          },
+          "patientsServed": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+          },
+          "retakesCount": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+          },
+          "filmDebt": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+          },
+          "soundEnabled": {
+            ".validate": "newData.isBoolean()"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          },
+          "ownedUpgrades": {
+            "$idx": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            }
+          },
+          "completedCases": {
+            "$idx": {
+              ".validate": "newData.hasChildren(['id', 'patientNameAr', 'examTitleAr', 'modality', 'earned', 'timestamp'])",
+              "id": {
+                ".validate": "newData.isString() && newData.val().length <= 64"
+              },
+              "patientNameAr": {
+                ".validate": "newData.isString() && newData.val().length <= 120"
+              },
+              "patientAvatarPath": {
+                ".validate": "newData.isString() && newData.val().length <= 20000"
+              },
+              "examTitleAr": {
+                ".validate": "newData.isString() && newData.val().length <= 200"
+              },
+              "examImagePath": {
+                ".validate": "newData.isString() && newData.val().length <= 20000"
+              },
+              "modality": {
+                ".validate": "newData.val() === 'XRAY' || newData.val() === 'CT' || newData.val() === 'MRI'"
+              },
+              "findingAr": {
+                ".validate": "newData.isString() && newData.val().length <= 600"
+              },
+              "earned": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+              },
+              "kvpUsed": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 300"
+              },
+              "masUsed": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000"
+              },
+              "shieldUsed": {
+                ".validate": "newData.isBoolean()"
+              },
+              "postureUsed": {
+                ".validate": "newData.isString() && newData.val().length <= 32"
+              },
+              "timestamp": {
+                ".validate": "newData.isNumber() && newData.val() > 0"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}

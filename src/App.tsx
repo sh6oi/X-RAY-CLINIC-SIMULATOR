@@ -174,10 +174,13 @@ export default function App() {
   const [caseApproved, setCaseApproved] = useState<boolean>(false);
   const [patientSpeech, setPatientSpeech] = useState<string | null>(null);
 
-  // Control Booth Console Drawer & Clinic PC Modal
+  // Control Booth Console Drawer, Clinic PC Modal & 10-Patient Designer Milestone
   const [consoleOpen, setConsoleOpen] = useState<boolean>(true);
   const [pcOpen, setPcOpen] = useState<boolean>(false);
   const [pcTab, setPcTab] = useState<WorkspaceTab>('IMAGE');
+  const [designerPopupOpen, setDesignerPopupOpen] = useState<boolean>(false);
+  const [designerMilestoneCount, setDesignerMilestoneCount] =
+    useState<number>(10);
 
   // Toast message
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -567,6 +570,7 @@ export default function App() {
     hydratedUidRef.current = null;
     await logoutTechAccount();
     setTechProfile(null);
+    setDesignerPopupOpen(false);
     setScreenMode('AUTH');
   };
 
@@ -1262,6 +1266,8 @@ export default function App() {
       timestamp: Date.now(),
     };
 
+    const nextServedCount = save.patientsServed + 1;
+
     commitSaveUpdate((prev) => ({
       ...prev,
       cash: prev.cash + netToCash,
@@ -1273,6 +1279,10 @@ export default function App() {
 
     setCaseApproved(true);
     setPcOpen(false);
+    if (nextServedCount > 0 && nextServedCount % 10 === 0) {
+      setDesignerMilestoneCount(nextServedCount);
+      setDesignerPopupOpen(true);
+    }
     showToast(
       debtRepayment > 0
         ? isAr
@@ -1511,7 +1521,11 @@ export default function App() {
         patientSpeech={patientSpeech}
         language={lang}
         graphicsQuality={graphicsQuality}
-        paused={pcOpen || (isPortraitPhone && !portraitDismissed)}
+        paused={
+          pcOpen ||
+          designerPopupOpen ||
+          (isPortraitPhone && !portraitDismissed)
+        }
         ownedUpgrades={save.ownedUpgrades}
         joystickRef={joystickRef}
         onTechZoneChange={handleTechZoneChange}
@@ -1719,9 +1733,6 @@ export default function App() {
           </div>
         )}
       </header>
-
-      {/* PERMANENT DESIGNER CREDIT & INSTAGRAM LINK */}
-      <DesignerCredit variant="floating" />
 
       {/* LOW FILMS QUICK WARNING STRIP */}
       {lowFilmsWarning && (
@@ -2113,6 +2124,14 @@ export default function App() {
         completedCases={save.completedCases}
         totalRevenue={save.totalRevenue}
         retakesCount={save.retakesCount}
+      />
+
+      {/* DESIGNER CREDIT MILESTONE POPUP (EVERY 10 COMPLETED PATIENTS) */}
+      <DesignerCredit
+        variant="milestone"
+        open={designerPopupOpen}
+        patientsMilestone={designerMilestoneCount}
+        onClose={() => setDesignerPopupOpen(false)}
       />
 
       {/* MOBILE PORTRAIT -> LANDSCAPE GUIDANCE OVERLAY */}

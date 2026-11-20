@@ -4,6 +4,7 @@ import {
   browserLocalPersistence,
   createUserWithEmailAndPassword,
   getAuth,
+  sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
@@ -49,31 +50,51 @@ export interface AuthResult {
   saveState: ClinicSaveState | null;
 }
 
-export function mapFirebaseAuthError(error: unknown): string {
+export function mapFirebaseAuthError(
+  error: unknown,
+  lang: 'ar' | 'en' = 'ar'
+): string {
   const code =
     typeof error === 'object' && error !== null && 'code' in error
       ? String((error as {code: string}).code)
       : '';
+  const isEn = lang === 'en';
 
   switch (code) {
     case 'auth/email-already-in-use':
-      return 'هذا البريد الإلكتروني مسجل مسبقاً. جرّب تسجيل الدخول بدلاً من إنشاء حساب جديد.';
+      return isEn
+        ? 'This email is already registered. Try signing in instead.'
+        : 'هذا البريد الإلكتروني مسجل مسبقاً. جرّب تسجيل الدخول بدلاً من إنشاء حساب جديد.';
     case 'auth/invalid-email':
-      return 'صيغة البريد الإلكتروني غير صحيحة.';
+      return isEn
+        ? 'Invalid email address format.'
+        : 'صيغة البريد الإلكتروني غير صحيحة.';
     case 'auth/weak-password':
-      return 'كلمة المرور ضعيفة جداً؛ يجب أن تتكون من 6 أحرف على الأقل.';
+      return isEn
+        ? 'Password is too weak; it must be at least 6 characters.'
+        : 'كلمة المرور ضعيفة جداً؛ يجب أن تتكون من 6 أحرف على الأقل.';
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
-      return 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+      return isEn
+        ? 'Incorrect email or password.'
+        : 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
     case 'auth/too-many-requests':
-      return 'تم تجاوز عدد المحاولات المسموح بها مؤقتاً. انتظر قليلاً ثم أعد المحاولة.';
+      return isEn
+        ? 'Too many attempts temporarily. Please wait a moment and try again.'
+        : 'تم تجاوز عدد المحاولات المسموح بها مؤقتاً. انتظر قليلاً ثم أعد المحاولة.';
     case 'auth/network-request-failed':
-      return 'تعذر الاتصال بالشبكة. تحقق من اتصالك بالإنترنت وحاول مجدداً.';
+      return isEn
+        ? 'Network connection failed. Please check your internet and retry.'
+        : 'تعذر الاتصال بالشبكة. تحقق من اتصالك بالإنترنت وحاول مجدداً.';
     case 'auth/operation-not-allowed':
-      return 'يرجى تفعيل تسجيل الدخول بالبريد الإلكتروني وكلمة المرور في إعدادات Firebase Authentication.';
+      return isEn
+        ? 'Please enable Email/Password authentication in Firebase settings.'
+        : 'يرجى تفعيل تسجيل الدخول بالبريد الإلكتروني وكلمة المرور في إعدادات Firebase Authentication.';
     default:
-      return 'حدث خطأ أثناء المصادقة. تأكد من البيانات وحاول مرة أخرى.';
+      return isEn
+        ? 'Authentication error. Check your details and try again.'
+        : 'حدث خطأ أثناء المصادقة. تأكد من البيانات وحاول مرة أخرى.';
   }
 }
 
@@ -234,6 +255,14 @@ export async function loginTechAccount(params: {
     user: cred.user,
     saveState: loaded.saveState,
   };
+}
+
+export async function sendTechPasswordReset(
+  email: string,
+  lang: 'ar' | 'en' = 'ar'
+): Promise<void> {
+  auth.languageCode = lang;
+  await sendPasswordResetEmail(auth, email.trim());
 }
 
 export async function logoutTechAccount(): Promise<void> {

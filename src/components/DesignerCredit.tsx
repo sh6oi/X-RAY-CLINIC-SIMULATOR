@@ -1,19 +1,35 @@
 import React, {useState} from 'react';
-import {Check, Copy, ExternalLink, Instagram, X} from 'lucide-react';
+import {Award, Check, Copy, ExternalLink, Instagram, X} from 'lucide-react';
 import {DESIGNER_INSTAGRAM_URL, useLanguage} from '../i18n/translations';
 
 interface DesignerCreditProps {
-  variant?: 'floating' | 'footer';
+  variant?: 'footer' | 'milestone';
+  open?: boolean;
+  patientsMilestone?: number;
+  onClose?: () => void;
 }
 
 export const DesignerCredit: React.FC<DesignerCreditProps> = ({
-  variant = 'floating',
+  variant = 'footer',
+  open: controlledOpen = false,
+  patientsMilestone = 10,
+  onClose,
 }) => {
   const {lang} = useLanguage();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const isAr = lang === 'ar';
+  const isMilestone = variant === 'milestone';
+  const isOpen = isMilestone ? controlledOpen : internalOpen;
+
+  const handleClose = () => {
+    if (isMilestone) {
+      onClose?.();
+    } else {
+      setInternalOpen(false);
+    }
+  };
 
   const handleCopy = async () => {
     try {
@@ -27,28 +43,10 @@ export const DesignerCredit: React.FC<DesignerCreditProps> = ({
 
   return (
     <>
-      {variant === 'floating' ? (
+      {variant === 'footer' && (
         <button
           type="button"
-          onClick={() => setOpen(true)}
-          className="hud-credit-badge pointer-events-auto fixed bottom-[138px] right-2 sm:bottom-5 sm:left-5 sm:right-auto z-20 flex items-center gap-1.5 rounded-xl border border-cyan-500/40 bg-[#08121E]/95 hover:bg-[#0D1D31] px-2 sm:px-2.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-cyan-100 shadow-lg cursor-pointer transition-colors max-w-[54vw] sm:max-w-xs"
-          title={
-            isAr
-              ? 'اضغط لعرض حساب الإنستغرام للمصمم'
-              : 'Click to view designer Instagram'
-          }
-        >
-          <Instagram className="w-3.5 h-3.5 text-pink-400 shrink-0" />
-          <span className="truncate">
-            {isAr
-              ? 'تم تصميم هذه اللعبة من قبل التدريسي مجتبى كريم'
-              : 'Designed by Lecturer Mojtaba Kareem'}
-          </span>
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => setInternalOpen(true)}
           className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-[#0E1929] hover:bg-[#13233A] px-3.5 py-2 text-xs font-semibold text-cyan-100 cursor-pointer transition-colors"
         >
           <Instagram className="w-4 h-4 text-pink-400 shrink-0" />
@@ -60,25 +58,31 @@ export const DesignerCredit: React.FC<DesignerCreditProps> = ({
         </button>
       )}
 
-      {open && (
+      {isOpen && (
         <div
-          className="fixed inset-0 z-[70] bg-black/75 flex items-center justify-center p-4"
-          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-[75] bg-black/80 flex items-center justify-center p-4"
+          onClick={handleClose}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl border border-cyan-700/70 bg-[#0B1422] p-5 shadow-2xl space-y-4"
+            className="w-full max-w-md rounded-2xl border border-cyan-600/70 bg-[#0B1422] p-5 shadow-2xl space-y-4"
           >
             <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2 text-white font-bold text-sm">
                 <Instagram className="w-5 h-5 text-pink-400 shrink-0" />
                 <span>
-                  {isAr ? 'حساب المصمم على الإنستغرام' : 'Designer Instagram'}
+                  {isMilestone
+                    ? isAr
+                      ? `إنجاز جديد · إتمام فحص ${patientsMilestone} مرضى`
+                      : `Milestone · ${patientsMilestone} Patients Completed`
+                    : isAr
+                      ? 'حساب المصمم على الإنستغرام'
+                      : 'Designer Instagram'}
                 </span>
               </div>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={handleClose}
                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
                 aria-label={isAr ? 'إغلاق' : 'Close'}
               >
@@ -86,8 +90,19 @@ export const DesignerCredit: React.FC<DesignerCreditProps> = ({
               </button>
             </div>
 
+            {isMilestone && (
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3.5 py-2.5 flex items-center gap-2.5 text-xs font-semibold text-emerald-200">
+                <Award className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  {isAr
+                    ? `أحسنت! أكملت فحص ${patientsMilestone} مرضى بنجاح داخل العيادة.`
+                    : `Great job! You have completed ${patientsMilestone} patient exams.`}
+                </span>
+              </div>
+            )}
+
             <div className="space-y-2">
-              <p className="text-sm font-bold text-cyan-200 leading-relaxed">
+              <p className="text-sm sm:text-base font-bold text-cyan-200 leading-relaxed">
                 {isAr
                   ? 'تم تصميم هذه اللعبة من قبل التدريسي مجتبى كريم'
                   : 'This game was designed by Lecturer Mojtaba Kareem'}
@@ -114,7 +129,7 @@ export const DesignerCredit: React.FC<DesignerCreditProps> = ({
               >
                 <ExternalLink className="w-4 h-4 shrink-0" />
                 <span>
-                  {isAr ? 'فتح حساب الإنستغرام' : 'Open Instagram Profile'}
+                  {isAr ? 'الدخول لحساب الإنستغرام' : 'Open Instagram Profile'}
                 </span>
               </a>
 
@@ -136,6 +151,18 @@ export const DesignerCredit: React.FC<DesignerCreditProps> = ({
                 )}
               </button>
             </div>
+
+            {isMilestone && (
+              <button
+                type="button"
+                onClick={handleClose}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs sm:text-sm cursor-pointer transition-colors"
+              >
+                {isAr
+                  ? 'إغلاق ومتابعة اللعب بشكل طبيعي'
+                  : 'Close & Continue Playing'}
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -1,6 +1,8 @@
 import React, {useState} from 'react';
 import {
   AlertTriangle,
+  CheckCircle2,
+  KeyRound,
   Languages,
   Lock,
   LogIn,
@@ -19,11 +21,11 @@ import {
   loginTechAccount,
   mapFirebaseAuthError,
   registerTechAccount,
+  sendTechPasswordReset,
   type AuthResult,
 } from '../firebase';
 import type {ClinicSaveState} from '../types/radiology';
 import {useLanguage} from '../i18n/translations';
-import {DesignerCredit} from './DesignerCredit';
 
 interface AuthScreenProps {
   initialSave: ClinicSaveState;
@@ -37,17 +39,25 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const {lang, toggleLang} = useLanguage();
   const isAr = lang === 'ar';
 
-  const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('REGISTER');
+  const [mode, setMode] = useState<'LOGIN' | 'REGISTER' | 'RESET'>('REGISTER');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
   const [heroError, setHeroError] = useState(false);
+
+  const switchMode = (next: 'LOGIN' | 'REGISTER' | 'RESET') => {
+    setMode(next);
+    setErrorMsg(null);
+    setResetSuccessMsg(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setResetSuccessMsg(null);
 
     if (mode === 'REGISTER' && name.trim().length < 2) {
       setErrorMsg(
@@ -65,6 +75,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       );
       return;
     }
+
+    if (mode === 'RESET') {
+      setLoading(true);
+      try {
+        await sendTechPasswordReset(email, lang);
+        setResetSuccessMsg(
+          isAr
+            ? 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني بنجاح. يرجى التحقق من صندوق الوارد أو مجلد الرسائل غير المرغوب فيها (Spam).'
+            : 'Password reset link sent to your email. Please check your inbox or spam folder.'
+        );
+      } catch (err) {
+        setErrorMsg(mapFirebaseAuthError(err, lang));
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (password.length < 6) {
       setErrorMsg(
         isAr
@@ -90,7 +118,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             });
       onAuthenticated(result);
     } catch (err) {
-      setErrorMsg(mapFirebaseAuthError(err));
+      setErrorMsg(mapFirebaseAuthError(err, lang));
     } finally {
       setLoading(false);
     }
@@ -132,7 +160,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setMode(mode === 'LOGIN' ? 'REGISTER' : 'LOGIN')}
+              onClick={() =>
+                switchMode(mode === 'LOGIN' ? 'REGISTER' : 'LOGIN')
+              }
               className="px-3 sm:px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs whitespace-nowrap cursor-pointer transition-colors"
             >
               {mode === 'LOGIN'
@@ -158,18 +188,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     ? isAr
                       ? 'إنشاء حساب تقني الأشعة'
                       : 'Create Radiographer Account'
-                    : isAr
-                      ? 'تسجيل الدخول إلى عيادتك'
-                      : 'Sign In to Your Clinic'}
+                    : mode === 'RESET'
+                      ? isAr
+                        ? 'إعادة تعيين كلمة المرور'
+                        : 'Reset Password'
+                      : isAr
+                        ? 'تسجيل الدخول إلى عيادتك'
+                        : 'Sign In to Your Clinic'}
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
                   {mode === 'REGISTER'
                     ? isAr
                       ? 'سجّل اسمك وبريدك الإلكتروني ليتم حفظ رصيدك والأفلام والأجهزة في السحابة والعودة لها في أي وقت.'
                       : 'Register with your name and email so your cash, films, and clinic equipment stay saved in the cloud.'
-                    : isAr
-                      ? 'أدخل بريدك الإلكتروني وكلمة المرور لاستعادة عيادتك وإكمال التقدم من حيث توقفت.'
-                      : 'Enter your email and password to restore your clinic and continue where you left off.'}
+                    : mode === 'RESET'
+                      ? isAr
+                        ? 'اكتب بريدك الإلكتروني المسجّل وسنرسل لك رابطاً عبر البريد الإلكتروني لإعادة تعيين كلمة المرور.'
+                        : 'Enter your registered email address and we will send a password reset link to your inbox.'
+                      : isAr
+                        ? 'أدخل بريدك الإلكتروني وكلمة المرور لاستعادة عيادتك وإكمال التقدم من حيث توقفت.'
+                        : 'Enter your email and password to restore your clinic and continue where you left off.'}
                 </p>
               </div>
 
@@ -177,10 +215,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-[#0B111A] border border-slate-800">
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode('REGISTER');
-                    setErrorMsg(null);
-                  }}
+                  onClick={() => switchMode('REGISTER')}
                   className={`py-2 px-3 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                     mode === 'REGISTER'
                       ? 'bg-cyan-500 text-slate-950'
@@ -191,10 +226,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode('LOGIN');
-                    setErrorMsg(null);
-                  }}
+                  onClick={() => switchMode('LOGIN')}
                   className={`py-2 px-3 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                     mode === 'LOGIN'
                       ? 'bg-cyan-500 text-slate-950'
@@ -209,6 +241,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <div className="rounded-lg border border-amber-600/60 bg-amber-950/35 p-3.5 flex items-start gap-2.5 text-xs text-amber-200 leading-relaxed">
                   <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                   <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {resetSuccessMsg && (
+                <div className="rounded-lg border border-emerald-500/60 bg-emerald-950/35 p-3.5 flex items-start gap-2.5 text-xs text-emerald-200 leading-relaxed">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span>{resetSuccessMsg}</span>
                 </div>
               )}
 
@@ -274,34 +313,49 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="tech-password"
-                    className="block text-xs font-medium text-slate-300"
-                  >
-                    {isAr ? 'كلمة المرور' : 'Password'}
-                  </label>
-                  <div className="relative">
-                    <Lock
-                      className={`w-4 h-4 text-slate-500 absolute top-1/2 -translate-y-1/2 pointer-events-none ${
-                        isAr ? 'right-3.5' : 'left-3.5'
-                      }`}
-                    />
-                    <input
-                      id="tech-password"
-                      type="password"
-                      required
-                      minLength={6}
-                      dir="ltr"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className={`w-full rounded-lg border border-slate-700 bg-[#0B111A] py-2.5 text-base sm:text-sm text-white text-left placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 ${
-                        isAr ? 'pr-10 pl-3.5' : 'pl-10 pr-3.5'
-                      }`}
-                    />
+                {mode !== 'RESET' && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <label
+                        htmlFor="tech-password"
+                        className="block text-xs font-medium text-slate-300"
+                      >
+                        {isAr ? 'كلمة المرور' : 'Password'}
+                      </label>
+                      {mode === 'LOGIN' && (
+                        <button
+                          type="button"
+                          onClick={() => switchMode('RESET')}
+                          className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 underline-offset-4 hover:underline cursor-pointer transition-colors"
+                        >
+                          {isAr
+                            ? 'نسيت كلمة المرور؟ إعادة تعيين'
+                            : 'Forgot password? Reset'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Lock
+                        className={`w-4 h-4 text-slate-500 absolute top-1/2 -translate-y-1/2 pointer-events-none ${
+                          isAr ? 'right-3.5' : 'left-3.5'
+                        }`}
+                      />
+                      <input
+                        id="tech-password"
+                        type="password"
+                        required
+                        minLength={6}
+                        dir="ltr"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className={`w-full rounded-lg border border-slate-700 bg-[#0B111A] py-2.5 text-base sm:text-sm text-white text-left placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 ${
+                          isAr ? 'pr-10 pl-3.5' : 'pl-10 pr-3.5'
+                        }`}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <button
                   type="submit"
@@ -323,6 +377,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                           : 'Create Account & Start Clinic'}
                       </span>
                     </>
+                  ) : mode === 'RESET' ? (
+                    <>
+                      <KeyRound className="w-4 h-4 shrink-0" />
+                      <span>
+                        {isAr
+                          ? 'إرسال رابط إعادة تعيين كلمة المرور'
+                          : 'Send Password Reset Link'}
+                      </span>
+                    </>
                   ) : (
                     <>
                       <LogIn className="w-4 h-4 shrink-0" />
@@ -334,16 +397,25 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     </>
                   )}
                 </button>
+
+                {mode === 'RESET' && (
+                  <button
+                    type="button"
+                    onClick={() => switchMode('LOGIN')}
+                    className="w-full py-2 px-4 rounded-lg border border-slate-700 bg-slate-900/70 hover:bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer transition-colors"
+                  >
+                    {isAr ? 'العودة إلى تسجيل الدخول' : 'Back to Sign In'}
+                  </button>
+                )}
               </form>
             </div>
 
-            <div className="pt-3 border-t border-slate-800 space-y-3">
+            <div className="pt-3 border-t border-slate-800">
               <p className="text-xs text-slate-400 leading-relaxed">
                 {isAr
                   ? 'تُحفظ بيانات جلستك تلقائياً؛ عند العودة بعد أيام ستبقى مسجلاً أو يمكنك الدخول بنفس البريد لاسترجاع رصيدك والأفلام والتجهيزات.'
                   : 'Your clinic session saves automatically; sign in anytime with the same email to restore your funds, films, and upgrades.'}
               </p>
-              <DesignerCredit variant="footer" />
             </div>
           </div>
 
