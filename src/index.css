@@ -199,7 +199,8 @@ input[type="range"].radiology-slider::-moz-range-thumb {
     font-size: 11px !important;
   }
   .hud-bottom-dock {
-    padding: 0 max(6px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)) !important;
+    padding-top: 0 !important;
+    padding-bottom: max(5px, env(safe-area-inset-bottom)) !important;
     gap: 4px !important;
   }
   .hud-position-panel {

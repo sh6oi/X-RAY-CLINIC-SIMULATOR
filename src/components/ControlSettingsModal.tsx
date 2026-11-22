@@ -1,5 +1,14 @@
 import React from 'react';
-import {Gamepad2, Hand, Maximize, RotateCcw, X} from 'lucide-react';
+import {
+  Gamepad2,
+  Hand,
+  Maximize,
+  Minus,
+  Plus,
+  RotateCcw,
+  Sun,
+  X,
+} from 'lucide-react';
 import {useLanguage} from '../i18n/translations';
 import type {
   JoystickConfig,
@@ -14,6 +23,9 @@ interface ControlSettingsModalProps {
   onChangeJoystickConfig: (next: JoystickConfig) => void;
   onResetJoystickConfig: () => void;
   onStartFreeDrag: () => void;
+  brightness: number;
+  onChangeBrightness: (next: number) => void;
+  onResetBrightness: () => void;
 }
 
 export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
@@ -23,6 +35,9 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
   onChangeJoystickConfig,
   onResetJoystickConfig,
   onStartFreeDrag,
+  brightness,
+  onChangeBrightness,
+  onResetBrightness,
 }) => {
   const {lang} = useLanguage();
   const isAr = lang === 'ar';
@@ -43,6 +58,8 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
     {id: 'lg', ar: 'كبير', en: 'Large'},
   ];
 
+  const brightnessPct = Math.round(brightness * 100);
+
   return (
     <div
       className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-2.5 sm:p-4"
@@ -60,12 +77,12 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-display font-bold text-white">
-                {isAr ? 'إعدادات التحكم' : 'Control Settings'}
+                {isAr ? 'إعدادات التحكم والسطوع' : 'Controls & Brightness'}
               </h2>
               <p className="text-[11px] text-slate-400">
                 {isAr
-                  ? 'خصّص موقع وحجم زر تحريك التقني'
-                  : 'Customize technician movement button placement and size'}
+                  ? 'خصّص موقع وحجم زر تحريك التقني ومستوى سطوع الإضاءة'
+                  : 'Customize joystick placement, size, and scene brightness'}
               </p>
             </div>
           </div>
@@ -80,7 +97,75 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Joystick Placement */}
+        {/* Section 1: Brightness Slider (Pure Exposure Only) */}
+        <div className="rounded-xl border border-slate-800 bg-[#0E1929] p-3.5 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Sun className="w-4 h-4 text-amber-300 shrink-0" />
+              <span className="text-xs sm:text-sm font-bold text-white">
+                {isAr ? 'التحكم بالسطوع' : 'Brightness Control'}
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/40 text-amber-200 font-mono-num text-[11px] font-bold">
+                {brightnessPct}%
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={onResetBrightness}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold cursor-pointer transition-colors"
+            >
+              <RotateCcw className="w-3 h-3 shrink-0" />
+              <span>{isAr ? 'الافتراضي' : 'Reset'}</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2.5" dir="ltr">
+            <button
+              type="button"
+              onClick={() =>
+                onChangeBrightness(
+                  Math.max(0.5, Number((brightness - 0.1).toFixed(2)))
+                )
+              }
+              aria-label={isAr ? 'خفض السطوع' : 'Decrease Brightness'}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer transition-colors"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+
+            <input
+              type="range"
+              min={50}
+              max={200}
+              step={5}
+              value={brightnessPct}
+              onChange={(e) => onChangeBrightness(Number(e.target.value) / 100)}
+              className="radiology-slider flex-1"
+            />
+
+            <button
+              type="button"
+              onClick={() =>
+                onChangeBrightness(
+                  Math.min(2.0, Number((brightness + 0.1).toFixed(2)))
+                )
+              }
+              aria-label={isAr ? 'رفع السطوع' : 'Increase Brightness'}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+
+          <p className="text-[11px] text-slate-400">
+            {isAr
+              ? 'يعدّل السطوع فقط دون تغيير جودة الصورة أو الهياكل داخل الغرفة.'
+              : 'Adjusts display brightness only without affecting image quality or structures.'}
+          </p>
+        </div>
+
+        {/* Section 2: Joystick Placement */}
         <div className="rounded-xl border border-slate-800 bg-[#0E1929] p-3.5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">

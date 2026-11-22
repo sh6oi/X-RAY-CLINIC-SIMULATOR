@@ -13,16 +13,20 @@ import {
   LogOut,
   Maximize2,
   Minimize2,
+  Minus,
   Monitor,
   Package,
+  Plus,
   RotateCcw,
   ScanLine,
   Shield,
   Sliders,
   Smartphone,
+  Sun,
   UserCheck,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
 import type {
   BodyRegion,
@@ -180,6 +184,7 @@ export default function App() {
   const [pcOpen, setPcOpen] = useState<boolean>(false);
   const [pcTab, setPcTab] = useState<WorkspaceTab>('IMAGE');
   const [controlsModalOpen, setControlsModalOpen] = useState<boolean>(false);
+  const [brightnessOpen, setBrightnessOpen] = useState<boolean>(false);
   const [isRepositioningJoystick, setIsRepositioningJoystick] =
     useState<boolean>(false);
   const [draftJoystickCoords, setDraftJoystickCoords] = useState<{
@@ -243,6 +248,22 @@ export default function App() {
       // Ignore storage errors
     }
     return getDefaultJoystickConfig();
+  });
+
+  const DEFAULT_BRIGHTNESS = 1.25;
+  const [brightness, setBrightness] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem('clinic_brightness_v1');
+      if (raw) {
+        const val = Number(raw);
+        if (Number.isFinite(val)) {
+          return Math.min(2.0, Math.max(0.5, val));
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
+    return DEFAULT_BRIGHTNESS;
   });
 
   const joystickRef = useRef<{x: number; y: number}>({x: 0, y: 0});
@@ -309,6 +330,16 @@ export default function App() {
     setJoystickConfig(next);
     try {
       localStorage.setItem('clinic_joystick_config_v2', JSON.stringify(next));
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
+
+  const updateBrightness = useCallback((next: number) => {
+    const clamped = Math.min(2.0, Math.max(0.5, Number(next.toFixed(2))));
+    setBrightness(clamped);
+    try {
+      localStorage.setItem('clinic_brightness_v1', String(clamped));
     } catch {
       // Ignore storage errors
     }
@@ -1532,6 +1563,7 @@ export default function App() {
         isExposing={isExposing}
         patientSpeech={patientSpeech}
         language={lang}
+        brightness={brightness}
         paused={
           pcOpen ||
           designerPopupOpen ||
@@ -1627,6 +1659,22 @@ export default function App() {
               ) : (
                 <VolumeX className="w-3.5 h-3.5 text-slate-500" />
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setBrightnessOpen((v) => !v)}
+              title={isAr ? 'التحكم بالسطوع' : 'Brightness Control'}
+              className={`flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-lg border text-[10.5px] sm:text-xs font-semibold cursor-pointer transition-colors ${
+                brightnessOpen
+                  ? 'bg-amber-500/20 border-amber-400 text-amber-200'
+                  : 'bg-slate-800/90 hover:bg-slate-700 border-slate-700 hover:border-amber-400/50 text-slate-200'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span className="hidden sm:inline">
+                {isAr ? 'السطوع' : 'Brightness'}
+              </span>
             </button>
 
             <button
@@ -1747,6 +1795,56 @@ export default function App() {
             className="px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer"
           >
             {isAr ? 'المتجر' : 'Shop'}
+          </button>
+        </div>
+      )}
+
+      {/* LIVE FLOATING BRIGHTNESS BAR (PURE EXPOSURE ONLY, DOES NOT PAUSE SCENE) */}
+      {brightnessOpen && !pcOpen && !controlsModalOpen && (
+        <div className="pointer-events-auto fixed top-[52px] sm:top-[68px] left-1/2 -translate-x-1/2 z-30 rounded-xl border border-amber-500/60 bg-[#08101C]/95 px-3 py-2 shadow-2xl flex items-center gap-2 w-[min(92vw,340px)]">
+          <Sun className="w-4 h-4 text-amber-300 shrink-0" />
+          <span className="text-[11px] font-bold text-slate-200 whitespace-nowrap">
+            {isAr ? 'السطوع' : 'Bright'}
+          </span>
+          <div className="flex items-center gap-1.5 flex-1" dir="ltr">
+            <button
+              type="button"
+              onClick={() => updateBrightness(brightness - 0.1)}
+              aria-label={isAr ? 'خفض السطوع' : 'Decrease Brightness'}
+              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <input
+              type="range"
+              min={50}
+              max={200}
+              step={5}
+              value={Math.round(brightness * 100)}
+              onChange={(e) =>
+                updateBrightness(Number(e.target.value) / 100)
+              }
+              className="radiology-slider flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => updateBrightness(brightness + 0.1)}
+              aria-label={isAr ? 'رفع السطوع' : 'Increase Brightness'}
+              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <span className="font-mono-num text-[11px] font-bold text-amber-200 w-9 text-center shrink-0">
+            {Math.round(brightness * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => setBrightnessOpen(false)}
+            aria-label={isAr ? 'إغلاق' : 'Close'}
+            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
@@ -1931,9 +2029,9 @@ export default function App() {
       <footer
         className={`hud-bottom-dock pointer-events-none fixed bottom-0 inset-x-0 z-20 px-2 pt-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] sm:p-4 flex flex-col items-center gap-1 sm:gap-2 ${
           joystickConfig.preset === 'bottom-left'
-            ? 'max-[900px]:pl-[104px]'
+            ? 'max-[1200px]:pl-[106px]'
             : joystickConfig.preset === 'bottom-right'
-              ? 'max-[900px]:pr-[104px]'
+              ? 'max-[1200px]:pr-[106px]'
               : ''
         }`}
       >
@@ -2265,6 +2363,16 @@ export default function App() {
           setDraftJoystickCoords(startCoords);
           setControlsModalOpen(false);
           setIsRepositioningJoystick(true);
+        }}
+        brightness={brightness}
+        onChangeBrightness={updateBrightness}
+        onResetBrightness={() => {
+          updateBrightness(DEFAULT_BRIGHTNESS);
+          showToast(
+            isAr
+              ? 'تم إرجاع السطوع إلى الوضع الافتراضي.'
+              : 'Brightness reset to default.'
+          );
         }}
       />
 

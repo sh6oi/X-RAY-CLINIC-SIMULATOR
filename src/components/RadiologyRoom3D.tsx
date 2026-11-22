@@ -1,6 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
 import * as THREE from 'three';
-import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import type {
   BodyRegion,
   CassetteState,
@@ -46,6 +45,7 @@ interface RadiologyRoom3DProps {
   isExposing: boolean;
   patientSpeech: string | null;
   language: Language;
+  brightness?: number;
   paused?: boolean;
   ownedUpgrades: UpgradeId[];
   joystickRef: React.MutableRefObject<{x: number; y: number}>;
@@ -276,8 +276,8 @@ function createTileFloorTexture(): THREE.CanvasTexture {
   canvas.width = 1024;
   canvas.height = 1024;
   const ctx = canvas.getContext('2d')!;
-  // Luxury clinical slate-terrazzo porcelain base
-  ctx.fillStyle = '#182436';
+  // Balanced medium clinical slate-porcelain base (neither dark nor glaring)
+  ctx.fillStyle = '#24354c';
   ctx.fillRect(0, 0, 1024, 1024);
 
   const tiles = 4;
@@ -290,11 +290,11 @@ function createTileFloorTexture(): THREE.CanvasTexture {
       const tileGrad = ctx.createLinearGradient(tx, ty, tx + step, ty + step);
       tileGrad.addColorStop(
         0,
-        toneShift ? 'rgba(42, 62, 90, 0.48)' : 'rgba(26, 40, 60, 0.44)'
+        toneShift ? 'rgba(66, 94, 130, 0.56)' : 'rgba(46, 68, 96, 0.52)'
       );
       tileGrad.addColorStop(
         1,
-        toneShift ? 'rgba(30, 46, 68, 0.36)' : 'rgba(20, 32, 49, 0.36)'
+        toneShift ? 'rgba(50, 74, 104, 0.44)' : 'rgba(38, 56, 80, 0.44)'
       );
       ctx.fillStyle = tileGrad;
       ctx.fillRect(tx + 4, ty + 4, step - 8, step - 8);
@@ -325,7 +325,7 @@ function createTileFloorTexture(): THREE.CanvasTexture {
     ctx.stroke();
   }
 
-  // Crisp grout seams
+  // Clean matte-satin grout seams
   ctx.strokeStyle = '#111B29';
   ctx.lineWidth = 6;
   for (let i = 0; i <= 1024; i += step) {
@@ -339,109 +339,14 @@ function createTileFloorTexture(): THREE.CanvasTexture {
     ctx.stroke();
   }
 
-  // Fine mineral terrazzo flecks
-  for (let i = 0; i < 1600; i++) {
-    ctx.fillStyle =
-      i % 5 === 0
-        ? 'rgba(103, 232, 249, 0.08)'
-        : i % 2 === 0
-          ? 'rgba(226, 232, 240, 0.075)'
-          : 'rgba(148, 163, 184, 0.055)';
-    ctx.fillRect((i * 137) % 1024, (i * 293) % 1024, 2.5, 2.5);
-  }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(9, 9);
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
   tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function createTileFloorPbrMaps(): {
-  roughnessMap: THREE.CanvasTexture;
-  bumpMap: THREE.CanvasTexture;
-} {
-  const rCanvas = document.createElement('canvas');
-  rCanvas.width = 512;
-  rCanvas.height = 512;
-  const rCtx = rCanvas.getContext('2d')!;
-  // Smooth polished porcelain (~0.24 roughness)
-  rCtx.fillStyle = '#3d3d3d';
-  rCtx.fillRect(0, 0, 512, 512);
-
-  // Subtle tile-to-tile gloss variation
-  const step = 128;
-  for (let gx = 0; gx < 4; gx++) {
-    for (let gy = 0; gy < 4; gy++) {
-      rCtx.fillStyle = (gx + gy) % 2 === 0 ? '#363636' : '#454545';
-      rCtx.fillRect(gx * step + 3, gy * step + 3, step - 6, step - 6);
-    }
-  }
-  // Matte grout lines (~0.88 roughness)
-  rCtx.strokeStyle = '#e0e0e0';
-  rCtx.lineWidth = 4;
-  for (let i = 0; i <= 512; i += step) {
-    rCtx.beginPath();
-    rCtx.moveTo(i, 0);
-    rCtx.lineTo(i, 512);
-    rCtx.stroke();
-    rCtx.beginPath();
-    rCtx.moveTo(0, i);
-    rCtx.lineTo(512, i);
-    rCtx.stroke();
-  }
-
-  const bCanvas = document.createElement('canvas');
-  bCanvas.width = 512;
-  bCanvas.height = 512;
-  const bCtx = bCanvas.getContext('2d')!;
-  bCtx.fillStyle = '#c8c8c8';
-  bCtx.fillRect(0, 0, 512, 512);
-  bCtx.strokeStyle = '#383838';
-  bCtx.lineWidth = 5;
-  for (let i = 0; i <= 512; i += step) {
-    bCtx.beginPath();
-    bCtx.moveTo(i, 0);
-    bCtx.lineTo(i, 512);
-    bCtx.stroke();
-    bCtx.beginPath();
-    bCtx.moveTo(0, i);
-    bCtx.lineTo(512, i);
-    bCtx.stroke();
-  }
-
-  const roughnessMap = new THREE.CanvasTexture(rCanvas);
-  roughnessMap.wrapS = THREE.RepeatWrapping;
-  roughnessMap.wrapT = THREE.RepeatWrapping;
-  roughnessMap.repeat.set(9, 9);
-  roughnessMap.colorSpace = THREE.NoColorSpace;
-
-  const bumpMap = new THREE.CanvasTexture(bCanvas);
-  bumpMap.wrapS = THREE.RepeatWrapping;
-  bumpMap.wrapT = THREE.RepeatWrapping;
-  bumpMap.repeat.set(9, 9);
-  bumpMap.colorSpace = THREE.NoColorSpace;
-
-  return {roughnessMap, bumpMap};
-}
-
-function createWallPlasterBumpTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#808080';
-  ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 2400; i++) {
-    const shade = 112 + ((i * 37) % 32);
-    ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
-    ctx.fillRect((i * 53) % 256, (i * 97) % 256, 2, 2);
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(6, 3);
-  tex.colorSpace = THREE.NoColorSpace;
   return tex;
 }
 
@@ -1016,6 +921,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   isExposing,
   patientSpeech,
   language,
+  brightness = 1.25,
   paused = false,
   ownedUpgrades,
   joystickRef,
@@ -1044,6 +950,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   const isExposingRef = useRef<boolean>(isExposing);
   const patientSpeechRef = useRef<string | null>(patientSpeech);
   const languageRef = useRef<Language>(language);
+  const brightnessRef = useRef<number>(brightness);
+  const applyBrightnessRef = useRef<((val: number) => void) | null>(null);
   const pausedRef = useRef<boolean>(paused);
   const modalityRef = useRef(requestedExam.modality);
   const ownedUpgradesRef = useRef<UpgradeId[]>(ownedUpgrades);
@@ -1158,6 +1066,10 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     onTechZoneChangeRef.current = onTechZoneChange;
   }, [onTechZoneChange]);
   useEffect(() => {
+    brightnessRef.current = brightness;
+    applyBrightnessRef.current?.(brightness);
+  }, [brightness]);
+  useEffect(() => {
     pausedRef.current = paused;
     if (!paused) {
       resumeLoopRef.current?.();
@@ -1243,20 +1155,20 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     const initWidth = container.clientWidth || 1200;
     const initHeight = container.clientHeight || 720;
 
-    // Balanced medium resolution ideal for mobile screens: crisp without glare or heavy GPU load
-    const getBalancedPixelRatio = (): number => {
+    // High-resolution rendering across devices
+    const getHighPixelRatio = (): number => {
       if (isSoftwareGl) return 1;
       const dpr = window.devicePixelRatio || 1;
-      return Math.min(dpr, 1.5);
+      return Math.min(dpr, 2.25);
     };
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
-    renderer.setPixelRatio(getBalancedPixelRatio());
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = brightnessRef.current;
+    renderer.setPixelRatio(getHighPixelRatio());
     renderer.setSize(initWidth, initHeight);
     renderer.shadowMap.enabled = !isSoftwareGl;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.style.touchAction = 'none';
     container.appendChild(renderer.domElement);
 
@@ -1266,14 +1178,6 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x09111c);
     scene.fog = new THREE.FogExp2(0x09111c, 0.018);
-
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmremGenerator.fromScene(
-      new RoomEnvironment(),
-      0.04
-    ).texture;
-    scene.environmentIntensity = 0.85;
-    pmremGenerator.dispose();
 
     const camera = new THREE.PerspectiveCamera(
       56,
@@ -1315,36 +1219,36 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     let walkPhase = 0;
 
     // =========================================================================
-    // BALANCED MOBILE-FRIENDLY MEDICAL LIGHTING RIG (NO GLARE / NO OVEREXPOSURE)
+    // MODERATE, EVEN CLINICAL LIGHTING RIG (NEITHER DARK NOR GLARING)
     // =========================================================================
-    const hemiLight = new THREE.HemisphereLight(0xe6f4ff, 0x202f46, 0.92);
+    const hemiLight = new THREE.HemisphereLight(0xeef6ff, 0x3b5270, 1.28);
     scene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight(0xfff6ea, 1.32);
+    const keyLight = new THREE.DirectionalLight(0xfff9f0, 1.32);
     keyLight.position.set(2.4, 5.4, 3.4);
     if (!isSoftwareGl) {
       keyLight.castShadow = true;
-      keyLight.shadow.mapSize.width = 1024;
-      keyLight.shadow.mapSize.height = 1024;
+      keyLight.shadow.mapSize.width = 2048;
+      keyLight.shadow.mapSize.height = 2048;
       keyLight.shadow.camera.left = -5.8;
       keyLight.shadow.camera.right = 7.6;
       keyLight.shadow.camera.top = 6.8;
       keyLight.shadow.camera.bottom = -5.8;
       keyLight.shadow.bias = -0.0005;
       keyLight.shadow.normalBias = 0.02;
-      keyLight.shadow.radius = 1.8;
+      keyLight.shadow.radius = 2.2;
     }
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.62);
+    const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.68);
     rimLight.position.set(-3.6, 3.2, -3.4);
     scene.add(rimLight);
 
-    const ceilingFillLight = new THREE.PointLight(0xeef8ff, 1.05, 14);
+    const ceilingFillLight = new THREE.PointLight(0xf0f8ff, 1.18, 20);
     ceilingFillLight.position.set(1.2, 3.85, -0.3);
     scene.add(ceilingFillLight);
 
-    const boothLight = new THREE.PointLight(0xbae6fd, 0.9, 5.5);
+    const boothLight = new THREE.PointLight(0xdbeafe, 1.05, 7.5);
     boothLight.position.set(-2.45, 2.35, 3.15);
     scene.add(boothLight);
 
@@ -1361,7 +1265,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     };
 
     const maxDeviceAniso = renderer.capabilities.getMaxAnisotropy();
-    const texAniso = isSoftwareGl ? 1 : Math.min(4, maxDeviceAniso);
+    const texAniso = isSoftwareGl ? 1 : maxDeviceAniso;
 
     const floorTex = track(createTileFloorTexture());
     floorTex.anisotropy = texAniso;
@@ -1446,102 +1350,85 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     mriUnlockedBadgeTex.anisotropy = texAniso;
 
-    const floorPbrMaps = createTileFloorPbrMaps();
-    track(floorPbrMaps.roughnessMap);
-    track(floorPbrMaps.bumpMap);
-    const wallBumpTex = track(createWallPlasterBumpTexture());
-
     const matFloor = track(
       new THREE.MeshStandardMaterial({
         map: floorTex,
-        roughnessMap: floorPbrMaps.roughnessMap,
-        bumpMap: floorPbrMaps.bumpMap,
-        bumpScale: 0.01,
-        roughness: 0.74,
-        metalness: 0.12,
-        envMapIntensity: 0.9,
+        roughness: 0.82,
+        metalness: 0.03,
       })
     );
     const matWall = track(
       new THREE.MeshStandardMaterial({
-        color: 0x223247,
-        bumpMap: wallBumpTex,
-        bumpScale: 0.005,
-        roughness: 0.74,
-        metalness: 0.05,
+        color: 0x2f4562,
+        roughness: 0.84,
+        metalness: 0.02,
       })
     );
     const matWallLower = track(
       new THREE.MeshStandardMaterial({
-        color: 0x2b405a,
-        bumpMap: wallBumpTex,
-        bumpScale: 0.005,
-        roughness: 0.56,
-        metalness: 0.14,
+        color: 0x3b5678,
+        roughness: 0.72,
+        metalness: 0.05,
       })
     );
     const matCeiling = track(
       new THREE.MeshStandardMaterial({
-        color: 0x1a2738,
-        roughness: 0.84,
-        metalness: 0.04,
+        color: 0x24364d,
+        roughness: 0.86,
+        metalness: 0.02,
       })
     );
     const matCeilingPanel = track(
       new THREE.MeshStandardMaterial({
-        color: 0xe2eef8,
-        emissive: 0xcfe4fa,
-        emissiveIntensity: 0.68,
-        roughness: 0.28,
+        color: 0xe6f0fa,
+        emissive: 0xcbe2fb,
+        emissiveIntensity: 0.72,
+        roughness: 0.32,
       })
     );
     const matWarmWood = track(
       new THREE.MeshStandardMaterial({
-        color: 0x7c5438,
-        roughness: 0.6,
-        metalness: 0.06,
+        color: 0x8a6042,
+        roughness: 0.62,
+        metalness: 0.04,
       })
     );
     const matTrim = track(
       new THREE.MeshStandardMaterial({
-        color: 0x3b526b,
-        roughness: 0.34,
-        metalness: 0.64,
-        envMapIntensity: 0.95,
+        color: 0x4d6888,
+        roughness: 0.38,
+        metalness: 0.24,
       })
     );
     const matClinicalWhite = track(
       new THREE.MeshStandardMaterial({
-        color: 0xe6eef6,
-        roughness: 0.28,
-        metalness: 0.14,
-        envMapIntensity: 0.9,
+        color: 0xdce5ef,
+        roughness: 0.45,
+        metalness: 0.05,
       })
     );
     const matRadiolucentDeck = track(
       new THREE.MeshStandardMaterial({
-        color: 0x132032,
-        roughness: 0.2,
-        metalness: 0.22,
+        color: 0x17263b,
+        roughness: 0.28,
+        metalness: 0.14,
         transparent: true,
-        opacity: 0.72,
-        envMapIntensity: 1.0,
+        opacity: 0.75,
       })
     );
     const matFoliage = track(
       new THREE.MeshStandardMaterial({
-        color: 0x15803d,
-        roughness: 0.64,
-        metalness: 0.03,
+        color: 0x16a34a,
+        roughness: 0.66,
+        metalness: 0.02,
         side: THREE.DoubleSide,
       })
     );
     const matChrome = track(
       new THREE.MeshStandardMaterial({
-        color: 0xdbe4ee,
-        roughness: 0.18,
-        metalness: 0.88,
-        envMapIntensity: 1.05,
+        color: 0xd4dee9,
+        roughness: 0.26,
+        metalness: 0.34,
       })
     );
     const matDarkPad = track(
@@ -2219,7 +2106,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     waitingRoomGroup.add(waitingNorthWall);
 
     // Warm Inviting Waiting Lounge Lighting + Wood Slats + TV Display
-    const waitingRoomLight = new THREE.PointLight(0xfff1d6, 1.55, 13.5);
+    const waitingRoomLight = new THREE.PointLight(0xfff3de, 1.65, 16.0);
     waitingRoomLight.position.set(-2.1, 3.7, -6.7);
     scene.add(waitingRoomLight);
 
@@ -2754,7 +2641,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     });
 
     // Monumental CT Suite Interior & Colossal 64-Slice CT Scanner (x ~ 1.48, z ~ 5.25)
-    const ctRoomLight = new THREE.PointLight(0xbae6fd, 1.55, 12.5);
+    const ctRoomLight = new THREE.PointLight(0xdbeafe, 1.65, 15.0);
     ctRoomLight.position.set(1.48, 3.7, 4.4);
     scene.add(ctRoomLight);
 
@@ -2815,7 +2702,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     diagnosticSuitesGroup.add(ctSuiteModel);
 
     // Monumental MRI Suite Interior & Colossal 1.5T Cryogenic MRI (x ~ 5.42, z ~ 5.35)
-    const mriRoomLight = new THREE.PointLight(0xa7f3d0, 1.55, 12.5);
+    const mriRoomLight = new THREE.PointLight(0xd1fae5, 1.65, 15.0);
     mriRoomLight.position.set(5.42, 3.7, 4.4);
     scene.add(mriRoomLight);
 
@@ -5168,6 +5055,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
+    applyBrightnessRef.current = (val: number) => {
+      renderer.toneMappingExposure = val;
+      if (pausedRef.current || document.hidden) {
+        renderer.render(scene, camera);
+      }
+    };
+
     const resizeObserver = new ResizeObserver(() => {
       if (!container) return;
       const w = container.clientWidth;
@@ -5175,7 +5069,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       if (w <= 0 || h <= 0) return;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(getBalancedPixelRatio());
+      renderer.setPixelRatio(getHighPixelRatio());
       renderer.setSize(w, h);
     });
     resizeObserver.observe(container);
@@ -6098,6 +5992,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      applyBrightnessRef.current = null;
       disposables.forEach((d) => d.dispose());
       renderer.dispose();
       if (renderer.domElement.parentNode === container) {
