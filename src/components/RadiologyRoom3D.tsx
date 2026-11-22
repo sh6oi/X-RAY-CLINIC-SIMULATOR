@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import * as THREE from 'three';
+import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type {
   BodyRegion,
   CassetteState,
@@ -277,8 +278,8 @@ function createTileFloorTexture(): THREE.CanvasTexture {
   canvas.height = 512;
   const ctx = canvas.getContext('2d')!;
   ctx.scale(0.5, 0.5);
-  // Balanced medium clinical slate-porcelain base (neither dark nor glaring)
-  ctx.fillStyle = '#24354c';
+  // Calm architectural clinical terrazzo-vinyl floor (clean light slate-stone)
+  ctx.fillStyle = '#536475';
   ctx.fillRect(0, 0, 1024, 1024);
 
   const tiles = 4;
@@ -291,44 +292,58 @@ function createTileFloorTexture(): THREE.CanvasTexture {
       const tileGrad = ctx.createLinearGradient(tx, ty, tx + step, ty + step);
       tileGrad.addColorStop(
         0,
-        toneShift ? 'rgba(66, 94, 130, 0.56)' : 'rgba(46, 68, 96, 0.52)'
+        toneShift ? '#7c8d9e' : '#718293'
       );
       tileGrad.addColorStop(
         1,
-        toneShift ? 'rgba(50, 74, 104, 0.44)' : 'rgba(38, 56, 80, 0.44)'
+        toneShift ? '#708192' : '#667788'
       );
       ctx.fillStyle = tileGrad;
-      ctx.fillRect(tx + 4, ty + 4, step - 8, step - 8);
+      ctx.fillRect(tx + 3, ty + 3, step - 6, step - 6);
 
       // Subtle architectural bevel highlight on tile edge
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.09)';
+      ctx.strokeStyle = 'rgba(226, 232, 240, 0.14)';
       ctx.lineWidth = 2;
-      ctx.strokeRect(tx + 5, ty + 5, step - 10, step - 10);
+      ctx.strokeRect(tx + 4, ty + 4, step - 8, step - 8);
     }
   }
 
-  // Delicate clinical marble veining across porcelain slabs
-  ctx.strokeStyle = 'rgba(186, 230, 253, 0.055)';
+  // Fine medical terrazzo mineral flecks for tactile floor realism
+  for (let i = 0; i < 240; i++) {
+    const fx = (i * 197 + (i % 7) * 31) % 1024;
+    const fy = (i * 283 + (i % 11) * 23) % 1024;
+    const sz = i % 3 === 0 ? 3 : 2;
+    ctx.fillStyle =
+      i % 4 === 0
+        ? 'rgba(241, 245, 249, 0.14)'
+        : i % 4 === 1
+          ? 'rgba(51, 65, 85, 0.16)'
+          : 'rgba(148, 163, 184, 0.12)';
+    ctx.fillRect(fx, fy, sz, sz);
+  }
+
+  // Subtle translucent mineral veining across vinyl slabs
+  ctx.strokeStyle = 'rgba(226, 232, 240, 0.08)';
   ctx.lineWidth = 2;
-  for (let v = 0; v < 18; v++) {
-    const startX = (v * 173) % 1024;
-    const startY = (v * 251) % 1024;
+  for (let v = 0; v < 14; v++) {
+    const startX = (v * 181) % 1024;
+    const startY = (v * 257) % 1024;
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.bezierCurveTo(
-      startX + 48,
-      startY + 24,
-      startX + 95,
-      startY - 18,
-      startX + 145,
-      startY + 36
+      startX + 42,
+      startY + 20,
+      startX + 86,
+      startY - 14,
+      startX + 132,
+      startY + 28
     );
     ctx.stroke();
   }
 
-  // Clean matte-satin grout seams
-  ctx.strokeStyle = '#111B29';
-  ctx.lineWidth = 6;
+  // Clean hairline satin weld seams
+  ctx.strokeStyle = '#475768';
+  ctx.lineWidth = 4;
   for (let i = 0; i <= 1024; i += step) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
@@ -356,19 +371,19 @@ function createWallChartTexture(): THREE.CanvasTexture {
   canvas.width = 512;
   canvas.height = 384;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#0D1B2E';
+  ctx.fillStyle = '#0F2233';
   ctx.fillRect(0, 0, 512, 384);
-  ctx.strokeStyle = '#38BDF8';
+  ctx.strokeStyle = '#2DD4BF';
   ctx.lineWidth = 4;
   ctx.strokeRect(12, 12, 488, 360);
-  ctx.fillStyle = '#132742';
+  ctx.fillStyle = '#153147';
   ctx.fillRect(24, 24, 464, 52);
-  ctx.fillStyle = '#E0F2FE';
-  ctx.font = 'bold 24px sans-serif';
+  ctx.fillStyle = '#ECFEFF';
+  ctx.font = 'bold 23px sans-serif';
   ctx.fillText('CLINICAL RADIOGRAPHY GUIDE', 42, 58);
 
   // Stylized spine & thorax schematic on chart
-  ctx.strokeStyle = '#67E8F9';
+  ctx.strokeStyle = '#5EEAD4';
   ctx.lineWidth = 3;
   ctx.strokeRect(36, 96, 190, 248);
   ctx.beginPath();
@@ -386,15 +401,15 @@ function createWallChartTexture(): THREE.CanvasTexture {
   ];
   cards.forEach(([title, sub], idx) => {
     const y = 96 + idx * 86;
-    ctx.fillStyle = '#142B47';
+    ctx.fillStyle = '#16344B';
     ctx.fillRect(246, y, 232, 72);
-    ctx.strokeStyle = '#0EA5E9';
+    ctx.strokeStyle = '#14B8A6';
     ctx.lineWidth = 2;
     ctx.strokeRect(246, y, 232, 72);
     ctx.fillStyle = '#38BDF8';
     ctx.font = 'bold 19px monospace';
     ctx.fillText(title, 264, y + 30);
-    ctx.fillStyle = '#CBD5E1';
+    ctx.fillStyle = '#E2E8F0';
     ctx.font = '15px monospace';
     ctx.fillText(sub, 264, y + 55);
   });
@@ -409,18 +424,18 @@ function createSuiteHeaderTexture(): THREE.CanvasTexture {
   canvas.width = 512;
   canvas.height = 96;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#0B1728';
+  ctx.fillStyle = '#0F2233';
   ctx.fillRect(0, 0, 512, 96);
-  ctx.strokeStyle = '#22D3EE';
+  ctx.strokeStyle = '#2DD4BF';
   ctx.lineWidth = 4;
   ctx.strokeRect(4, 4, 504, 88);
-  ctx.fillStyle = '#67E8F9';
-  ctx.font = 'bold 28px sans-serif';
+  ctx.fillStyle = '#99F6E4';
+  ctx.font = 'bold 27px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('RADIOLOGY SUITE 01 · X-RAY', 256, 46);
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = 'bold 16px monospace';
-  ctx.fillText('DIGITAL IMAGING & SHIELDED CONTROL', 256, 74);
+  ctx.fillText('RADIOLOGY SUITE 01 · DIGITAL X-RAY', 256, 46);
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = 'bold 15px monospace';
+  ctx.fillText('SHIELDED CONTROL & DIAGNOSTIC IMAGING', 256, 74);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -875,6 +890,134 @@ function createDoorStatusBadgeTexture(
   return tex;
 }
 
+function createTubeHeadDisplayTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#091522';
+  ctx.fillRect(0, 0, 256, 128);
+  ctx.strokeStyle = '#14B8A6';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(6, 6, 244, 116);
+  ctx.fillStyle = '#10283D';
+  ctx.fillRect(14, 14, 228, 30);
+  ctx.fillStyle = '#5EEAD4';
+  ctx.font = 'bold 15px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('DR TUBE HEAD · SID 110cm', 128, 34);
+  ctx.fillStyle = '#38BDF8';
+  ctx.font = 'bold 28px monospace';
+  ctx.fillText('120 kVp', 72, 78);
+  ctx.fillStyle = '#34D399';
+  ctx.fillText('4.0 mAs', 184, 78);
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = 'bold 13px monospace';
+  ctx.fillText('0.0° TILT · COLLIMATOR ON', 128, 108);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createHospitalClockTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#F8FAFC';
+  ctx.beginPath();
+  ctx.arc(128, 128, 122, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 10;
+  ctx.stroke();
+
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const r1 = i % 3 === 0 ? 86 : 94;
+    const r2 = 108;
+    ctx.strokeStyle = i % 3 === 0 ? '#0F172A' : '#64748B';
+    ctx.lineWidth = i % 3 === 0 ? 5 : 3;
+    ctx.beginPath();
+    ctx.moveTo(128 + Math.cos(a) * r1, 128 + Math.sin(a) * r1);
+    ctx.lineTo(128 + Math.cos(a) * r2, 128 + Math.sin(a) * r2);
+    ctx.stroke();
+  }
+  // Hour hand
+  ctx.strokeStyle = '#0F172A';
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(128, 128);
+  ctx.lineTo(94, 86);
+  ctx.stroke();
+  // Minute hand
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(128, 128);
+  ctx.lineTo(186, 84);
+  ctx.stroke();
+  // Teal Sweep hand
+  ctx.strokeStyle = '#0D9488';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(128, 146);
+  ctx.lineTo(164, 182);
+  ctx.stroke();
+  ctx.fillStyle = '#0F172A';
+  ctx.beginPath();
+  ctx.arc(128, 128, 7, 0, Math.PI * 2);
+  ctx.fill();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createRadiationHazardTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#FACC15';
+  ctx.fillRect(0, 0, 256, 256);
+  ctx.strokeStyle = '#1E293B';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(8, 8, 240, 240);
+
+  // Radiation trefoil symbol
+  ctx.fillStyle = '#1E293B';
+  const cx = 128;
+  const cy = 98;
+  [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3].forEach((ang) => {
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(ang - 0.42) * 18, cy + Math.sin(ang - 0.42) * 18);
+    ctx.arc(cx, cy, 56, ang - 0.42, ang + 0.42);
+    ctx.lineTo(cx + Math.cos(ang + 0.42) * 18, cy + Math.sin(ang + 0.42) * 18);
+    ctx.closePath();
+    ctx.fill();
+  });
+  ctx.fillStyle = '#FACC15';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1E293B';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#0F172A';
+  ctx.font = 'bold 21px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('CAUTION · X-RAY', 128, 194);
+  ctx.font = 'bold 19px Tahoma, sans-serif';
+  ctx.fillText('منطقة أشعة سينية', 128, 224);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function buildCassetteMesh(
   track: <T extends {dispose: () => void}>(item: T) => T,
   matBody: THREE.Material,
@@ -1220,8 +1363,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x09111c);
-    scene.fog = new THREE.FogExp2(0x09111c, 0.015);
+    scene.background = new THREE.Color(0x162230);
+    scene.fog = new THREE.FogExp2(0x162230, 0.012);
 
     const camera = new THREE.PerspectiveCamera(
       56,
@@ -1262,13 +1405,25 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     let velZ = 0;
     let walkPhase = 0;
 
+    // Lightweight Prefiltered Studio IBL (zero extra runtime shader lights)
+    let envRenderTarget: THREE.WebGLRenderTarget | null = null;
+    const hasEnvMap = !isVeryLowEnd && !isSoftwareGl;
+    if (hasEnvMap) {
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      pmremGenerator.compileEquirectangularShader();
+      envRenderTarget = pmremGenerator.fromScene(new RoomEnvironment(), 0.04);
+      scene.environment = envRenderTarget.texture;
+      scene.environmentIntensity = 0.42;
+      pmremGenerator.dispose();
+    }
+
     // =========================================================================
     // LIGHTWEIGHT, EVEN CLINICAL LIGHTING RIG (3 LIGHTS TOTAL FOR FAST SHADERS)
     // =========================================================================
-    const hemiLight = new THREE.HemisphereLight(0xf1f7ff, 0x455f80, 1.55);
+    const hemiLight = new THREE.HemisphereLight(0xf6fafe, 0x677a8c, 1.32);
     scene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight(0xfff9f0, 1.28);
+    const keyLight = new THREE.DirectionalLight(0xfff9f0, 1.18);
     keyLight.position.set(2.4, 5.4, 3.4);
     if (!isLowPower) {
       keyLight.castShadow = true;
@@ -1283,7 +1438,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     }
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x93c5fd, 0.54);
+    const rimLight = new THREE.DirectionalLight(0x9bd6ff, 0.48);
     rimLight.position.set(-3.6, 3.2, -3.4);
     scene.add(rimLight);
 
@@ -1383,93 +1538,111 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       )
     );
     mriUnlockedBadgeTex.anisotropy = texAniso;
+    const tubeHeadHudTex = track(createTubeHeadDisplayTexture());
+    tubeHeadHudTex.anisotropy = texAniso;
+    const hospitalClockTex = track(createHospitalClockTexture());
+    const radiationSignTex = track(createRadiationHazardTexture());
 
     const matFloor = track(
       new THREE.MeshStandardMaterial({
         map: floorTex,
-        roughness: 0.82,
-        metalness: 0.03,
+        roughness: 0.68,
+        metalness: 0.04,
       })
     );
     const matWall = track(
       new THREE.MeshStandardMaterial({
-        color: 0x2f4562,
-        roughness: 0.84,
+        color: 0xbac9d8,
+        roughness: 0.86,
         metalness: 0.02,
       })
     );
     const matWallLower = track(
       new THREE.MeshStandardMaterial({
-        color: 0x3b5678,
+        color: 0x38556b,
         roughness: 0.72,
-        metalness: 0.05,
+        metalness: 0.06,
+      })
+    );
+    const matBaseboard = track(
+      new THREE.MeshStandardMaterial({
+        color: 0x1a2633,
+        roughness: 0.78,
+        metalness: 0.06,
       })
     );
     const matCeiling = track(
       new THREE.MeshStandardMaterial({
-        color: 0x24364d,
-        roughness: 0.86,
+        color: 0xdce6f0,
+        roughness: 0.85,
         metalness: 0.02,
       })
     );
     const matCeilingPanel = track(
       new THREE.MeshStandardMaterial({
-        color: 0xe6f0fa,
-        emissive: 0xcbe2fb,
-        emissiveIntensity: 0.72,
-        roughness: 0.32,
+        color: 0xf4f9ff,
+        emissive: 0xd8ebff,
+        emissiveIntensity: 0.58,
+        roughness: 0.28,
       })
     );
     const matWarmWood = track(
       new THREE.MeshStandardMaterial({
-        color: 0x8a6042,
-        roughness: 0.62,
+        color: 0xa2744e,
+        roughness: 0.56,
         metalness: 0.04,
       })
     );
     const matTrim = track(
       new THREE.MeshStandardMaterial({
-        color: 0x4d6888,
-        roughness: 0.38,
-        metalness: 0.24,
+        color: 0x35495c,
+        roughness: 0.36,
+        metalness: hasEnvMap ? 0.38 : 0.24,
       })
     );
     const matClinicalWhite = track(
       new THREE.MeshStandardMaterial({
-        color: 0xdce5ef,
-        roughness: 0.45,
-        metalness: 0.05,
+        color: 0xedf3f8,
+        roughness: 0.34,
+        metalness: hasEnvMap ? 0.1 : 0.05,
       })
     );
     const matRadiolucentDeck = track(
       new THREE.MeshStandardMaterial({
-        color: 0x17263b,
-        roughness: 0.28,
-        metalness: 0.14,
+        color: 0x1b2b3d,
+        roughness: 0.26,
+        metalness: 0.16,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.78,
       })
     );
     const matFoliage = track(
       new THREE.MeshStandardMaterial({
-        color: 0x16a34a,
-        roughness: 0.66,
+        color: 0x15803d,
+        roughness: 0.64,
         metalness: 0.02,
         side: THREE.DoubleSide,
       })
     );
     const matChrome = track(
       new THREE.MeshStandardMaterial({
-        color: 0xd4dee9,
-        roughness: 0.26,
-        metalness: 0.34,
+        color: 0xd7e1ec,
+        roughness: 0.22,
+        metalness: hasEnvMap ? 0.78 : 0.36,
       })
     );
     const matDarkPad = track(
       new THREE.MeshStandardMaterial({
-        color: 0x141e2c,
-        roughness: 0.74,
+        color: 0x17212e,
+        roughness: 0.64,
         metalness: 0.08,
+      })
+    );
+    const matBellows = track(
+      new THREE.MeshStandardMaterial({
+        color: 0x1f2b38,
+        roughness: 0.78,
+        metalness: 0.06,
       })
     );
     const matSkin = track(
@@ -1502,7 +1675,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     const matScrubs = track(
       new THREE.MeshStandardMaterial({
-        color: 0x2563eb,
+        color: 0x0f766e,
         roughness: 0.72,
         metalness: 0.05,
       })
@@ -1516,16 +1689,16 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     const matLeadApron = track(
       new THREE.MeshStandardMaterial({
-        color: 0x0284c7,
-        roughness: 0.42,
-        metalness: 0.28,
+        color: 0x0c638c,
+        roughness: 0.4,
+        metalness: 0.22,
       })
     );
     const matLeadGlass = track(
       new THREE.MeshStandardMaterial({
         color: 0x67e8f9,
         transparent: true,
-        opacity: 0.18,
+        opacity: 0.16,
         roughness: 0.08,
         metalness: 0.1,
         depthWrite: false,
@@ -1535,7 +1708,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       new THREE.MeshStandardMaterial({
         color: 0xbae6fd,
         transparent: true,
-        opacity: 0.08,
+        opacity: 0.09,
         roughness: 0.06,
         metalness: 0.08,
         depthWrite: false,
@@ -1543,9 +1716,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     const matLedStrip = track(
       new THREE.MeshStandardMaterial({
-        color: 0x67e8f9,
-        emissive: 0x06b6d4,
-        emissiveIntensity: 1.1,
+        color: 0x5eead4,
+        emissive: 0x14b8a6,
+        emissiveIntensity: 0.95,
         roughness: 0.2,
       })
     );
@@ -1691,12 +1864,40 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     rightWainscot.position.set(7.29, 0.525, -1.35);
     scene.add(rightWainscot);
 
+    const rightDado = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.06, 0.055, 7.0)),
+      matChrome
+    );
+    rightDado.position.set(7.28, 1.07, -1.35);
+    scene.add(rightDado);
+
+    const rightBaseboard = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.07, 0.12, 7.02)),
+      matBaseboard
+    );
+    rightBaseboard.position.set(7.28, 0.06, -1.35);
+    scene.add(rightBaseboard);
+
     const leftWainscot = new THREE.Mesh(
       track(new THREE.BoxGeometry(0.05, 1.05, 13.9)),
       matWallLower
     );
     leftWainscot.position.set(-5.29, 0.525, -2.2);
     scene.add(leftWainscot);
+
+    const leftDado = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.06, 0.055, 13.9)),
+      matChrome
+    );
+    leftDado.position.set(-5.28, 1.07, -2.2);
+    scene.add(leftDado);
+
+    const leftBaseboard = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.07, 0.12, 13.92)),
+      matBaseboard
+    );
+    leftBaseboard.position.set(-5.28, 0.06, -2.2);
+    scene.add(leftBaseboard);
 
     // North-East Equipment Back Wall (x: +1.25 .. +7.40 at z = -4.80)
     const backWall = new THREE.Mesh(
@@ -1713,6 +1914,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     backWainscot.position.set(4.32, 0.525, -4.69);
     scene.add(backWainscot);
+
+    const backBaseboard = new THREE.Mesh(
+      track(new THREE.BoxGeometry(6.26, 0.12, 0.06)),
+      matBaseboard
+    );
+    backBaseboard.position.set(4.32, 0.06, -4.68);
+    scene.add(backBaseboard);
 
     const backLed = new THREE.Mesh(
       track(new THREE.BoxGeometry(6.0, 0.055, 0.04)),
@@ -1746,6 +1954,66 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       scene.add(slat);
     });
 
+    // Medical Gas & Power Headwall Utility Rail on Right Exam Wall (z = -0.45)
+    const headwallGroup = new THREE.Group();
+    headwallGroup.position.set(7.26, 1.24, -0.45);
+    const headwallBar = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.055, 0.18, 1.48)),
+      matChrome
+    );
+    headwallGroup.add(headwallBar);
+    const headwallAccent = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.062, 0.03, 1.44)),
+      matTrim
+    );
+    headwallAccent.position.y = -0.05;
+    headwallGroup.add(headwallAccent);
+    [
+      {z: -0.52, col: 0x10b981}, // Medical O2
+      {z: -0.34, col: 0xf59e0b}, // Medical Air
+      {z: -0.16, col: 0xe2e8f0}, // Vacuum
+    ].forEach((port) => {
+      const socket = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.032, 0.032, 0.04, 14)),
+        track(new THREE.MeshStandardMaterial({color: port.col, roughness: 0.35}))
+      );
+      socket.rotation.z = Math.PI / 2;
+      socket.position.set(-0.025, 0.015, port.z);
+      headwallGroup.add(socket);
+    });
+    [0.14, 0.36, 0.56].forEach((pz) => {
+      const outlet = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.035, 0.065, 0.095)),
+        matDarkPad
+      );
+      outlet.position.set(-0.02, 0.015, pz);
+      headwallGroup.add(outlet);
+    });
+    scene.add(headwallGroup);
+
+    // Modern Hospital Wall Clock above Back Wall (x = 4.35, y = 2.95)
+    const clockBezel = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.22, 0.22, 0.05, 24)),
+      matTrim
+    );
+    clockBezel.rotation.x = Math.PI / 2;
+    clockBezel.position.set(4.15, 2.96, -4.69);
+    scene.add(clockBezel);
+    const clockFace = new THREE.Mesh(
+      track(new THREE.CircleGeometry(0.19, 24)),
+      track(
+        new THREE.MeshStandardMaterial({
+          map: hospitalClockTex,
+          emissiveMap: hospitalClockTex,
+          emissive: new THREE.Color(0xffffff),
+          emissiveIntensity: 0.22,
+          roughness: 0.3,
+        })
+      )
+    );
+    clockFace.position.set(4.15, 2.96, -4.66);
+    scene.add(clockFace);
+
     // Architectural High Ceiling (4.20m) & Recessed LED Skylight Coffers
     const ceilingMesh = new THREE.Mesh(
       track(new THREE.PlaneGeometry(24, 24)),
@@ -1778,28 +2046,35 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       [5.42, 3.9],
       [5.42, 6.1],
     ].forEach(([lx, lz]) => {
+      const cofferOuter = new THREE.Mesh(
+        track(new THREE.BoxGeometry(1.44, 0.04, 0.9)),
+        matTrim
+      );
+      cofferOuter.position.set(lx, 4.19, lz);
+      scene.add(cofferOuter);
+
       const cofferFrame = new THREE.Mesh(
         track(new THREE.BoxGeometry(1.36, 0.05, 0.82)),
         matChrome
       );
-      cofferFrame.position.set(lx, 4.18, lz);
+      cofferFrame.position.set(lx, 4.17, lz);
       scene.add(cofferFrame);
 
       const cofferPanel = new THREE.Mesh(
-        track(new THREE.PlaneGeometry(1.26, 0.72)),
+        track(new THREE.PlaneGeometry(1.24, 0.7)),
         matCeilingPanel
       );
       cofferPanel.rotation.x = Math.PI / 2;
-      cofferPanel.position.set(lx, 4.15, lz);
+      cofferPanel.position.set(lx, 4.14, lz);
       scene.add(cofferPanel);
     });
 
     // Framed Radiography Reference Chart on Enlarged Right Wall
     const chartFrame = new THREE.Mesh(
       track(new THREE.BoxGeometry(0.05, 0.96, 1.28)),
-      matChrome
+      matTrim
     );
-    chartFrame.position.set(7.28, 1.92, -0.45);
+    chartFrame.position.set(7.28, 2.02, -0.45);
     scene.add(chartFrame);
 
     const chartPoster = new THREE.Mesh(
@@ -1815,17 +2090,47 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       )
     );
     chartPoster.rotation.y = -Math.PI / 2;
-    chartPoster.position.set(7.25, 1.92, -0.45);
+    chartPoster.position.set(7.25, 2.02, -0.45);
     scene.add(chartPoster);
+
+    // Clinical Floor Safety Zone Perimeter Around X-Ray Examination Table
+    const examZoneMat = track(
+      new THREE.MeshBasicMaterial({
+        color: 0x0d9488,
+        transparent: true,
+        opacity: 0.55,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      })
+    );
+    [-0.95, 0.95].forEach((ez) => {
+      const strip = new THREE.Mesh(
+        track(new THREE.PlaneGeometry(3.2, 0.045)),
+        examZoneMat
+      );
+      strip.rotation.x = -Math.PI / 2;
+      strip.position.set(0, 0.011, ez);
+      scene.add(strip);
+    });
+    [-1.6, 1.6].forEach((ex) => {
+      const strip = new THREE.Mesh(
+        track(new THREE.PlaneGeometry(0.045, 1.94)),
+        examZoneMat
+      );
+      strip.rotation.x = -Math.PI / 2;
+      strip.position.set(ex, 0.011, 0);
+      scene.add(strip);
+    });
 
     // Standing Zone Floor Decals (Erect Bucky Target + Lead Door Safety Threshold)
     const erectFloorRing = new THREE.Mesh(
       track(new THREE.RingGeometry(0.32, 0.38, 32)),
       track(
         new THREE.MeshBasicMaterial({
-          color: 0x38bdf8,
+          color: 0x14b8a6,
           transparent: true,
-          opacity: 0.42,
+          opacity: 0.52,
           side: THREE.DoubleSide,
           polygonOffset: true,
           polygonOffsetFactor: -1,
@@ -1843,7 +2148,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         new THREE.MeshBasicMaterial({
           color: 0xf59e0b,
           transparent: true,
-          opacity: 0.72,
+          opacity: 0.78,
           polygonOffset: true,
           polygonOffsetFactor: -1,
           polygonOffsetUnits: -1,
@@ -1856,8 +2161,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     // Wall Lightbox on Enlarged North Wall (x = 2.75, z = -4.67)
     const lightboxGroup = new THREE.Group();
+    const lightboxOuter = new THREE.Mesh(
+      track(new THREE.BoxGeometry(2.42, 1.28, 0.06)),
+      matTrim
+    );
+    lightboxGroup.add(lightboxOuter);
     const lightboxFrame = new THREE.Mesh(
-      track(new THREE.BoxGeometry(2.35, 1.22, 0.08)),
+      track(new THREE.BoxGeometry(2.32, 1.18, 0.08)),
       matChrome
     );
     lightboxGroup.add(lightboxFrame);
@@ -1877,78 +2187,137 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     lightboxGroup.position.set(2.75, 1.98, -4.67);
     scene.add(lightboxGroup);
 
-    // Back-Wall Clinical Cabinetry & Countertop (x = 5.05, z = -4.50)
+    // Back-Wall Clinical Cabinetry, Countertop, Sanitizer & Biohazard Bin (x = 5.05, z = -4.50)
     const cabinetGroup = new THREE.Group();
     cabinetGroup.position.set(5.05, 0, -4.5);
 
+    const cabinetToeKick = new THREE.Mesh(
+      track(new THREE.BoxGeometry(1.5, 0.1, 0.36)),
+      matBaseboard
+    );
+    cabinetToeKick.position.set(0, 0.05, -0.02);
+    cabinetGroup.add(cabinetToeKick);
+
     const baseCabinet = new THREE.Mesh(
-      track(new THREE.BoxGeometry(1.55, 0.84, 0.42)),
+      track(new THREE.BoxGeometry(1.55, 0.76, 0.42)),
       matClinicalWhite
     );
-    baseCabinet.position.y = 0.42;
+    baseCabinet.position.y = 0.48;
     baseCabinet.castShadow = true;
     cabinetGroup.add(baseCabinet);
 
-    const cabinetTop = new THREE.Mesh(
-      track(new THREE.BoxGeometry(1.6, 0.045, 0.46)),
-      matDarkPad
-    );
-    cabinetTop.position.y = 0.86;
-    cabinetGroup.add(cabinetTop);
-
-    [-0.38, 0.38].forEach((hx) => {
+    // Cabinet door seam dividers & brushed aluminum bar pulls
+    [-0.51, 0, 0.51].forEach((sx) => {
+      const seam = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.012, 0.68, 0.01)),
+        matTrim
+      );
+      seam.position.set(sx, 0.48, 0.212);
+      cabinetGroup.add(seam);
+    });
+    [-0.25, 0.25].forEach((hx) => {
       const handle = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.14, 0.022, 0.025)),
+        track(new THREE.BoxGeometry(0.14, 0.02, 0.025)),
         matChrome
       );
-      handle.position.set(hx, 0.72, 0.22);
+      handle.position.set(hx, 0.74, 0.22);
       cabinetGroup.add(handle);
     });
+
+    const cabinetTop = new THREE.Mesh(
+      track(new THREE.BoxGeometry(1.62, 0.045, 0.48)),
+      matDarkPad
+    );
+    cabinetTop.position.y = 0.88;
+    cabinetGroup.add(cabinetTop);
 
     const upperCabinet = new THREE.Mesh(
       track(new THREE.BoxGeometry(1.48, 0.62, 0.32)),
       matClinicalWhite
     );
-    upperCabinet.position.set(0, 2.02, -0.04);
+    upperCabinet.position.set(0, 2.04, -0.04);
     cabinetGroup.add(upperCabinet);
+
+    const upperSeam = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.014, 0.58, 0.012)),
+      matTrim
+    );
+    upperSeam.position.set(0, 2.04, 0.125);
+    cabinetGroup.add(upperSeam);
 
     const upperCabinetLed = new THREE.Mesh(
       track(new THREE.BoxGeometry(1.4, 0.025, 0.04)),
       matLedStrip
     );
-    upperCabinetLed.position.set(0, 1.69, 0.06);
+    upperCabinetLed.position.set(0, 1.71, 0.06);
     cabinetGroup.add(upperCabinetLed);
+
+    // Compact Clinical Waste Bin beside cabinet
+    const binBody = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.32, 0.54, 0.28)),
+      matTrim
+    );
+    binBody.position.set(-1.02, 0.27, 0.02);
+    binBody.castShadow = true;
+    cabinetGroup.add(binBody);
+    const binLid = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.34, 0.05, 0.3)),
+      track(new THREE.MeshStandardMaterial({color: 0xd97706, roughness: 0.4}))
+    );
+    binLid.position.set(-1.02, 0.565, 0.02);
+    cabinetGroup.add(binLid);
+
     scene.add(cabinetGroup);
+
+    // Wall-Mounted Hand Sanitizer Dispenser near Waiting Room Door
+    const sanitizerBox = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.14, 0.26, 0.11)),
+      matClinicalWhite
+    );
+    sanitizerBox.position.set(-1.35, 1.38, -4.67);
+    scene.add(sanitizerBox);
+    const sanitizerStripe = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.12, 0.04, 0.02)),
+      matLedStrip
+    );
+    sanitizerStripe.position.set(-1.35, 1.44, -4.61);
+    scene.add(sanitizerStripe);
 
     // Mobile Lead Apron & Shield Rack (x = -4.82, z = -2.25)
     const apronRackGroup = new THREE.Group();
     apronRackGroup.position.set(-4.82, 0, -2.25);
     const apronBase = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.24, 0.26, 0.04, 16)),
+      track(new THREE.CylinderGeometry(0.25, 0.28, 0.045, 16)),
       matTrim
     );
-    apronBase.position.y = 0.02;
+    apronBase.position.y = 0.022;
     apronRackGroup.add(apronBase);
     const apronPole = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.025, 0.03, 1.48, 12)),
+      track(new THREE.CylinderGeometry(0.025, 0.032, 1.5, 12)),
       matChrome
     );
-    apronPole.position.y = 0.76;
+    apronPole.position.y = 0.77;
     apronRackGroup.add(apronPole);
     const apronBar = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.02, 0.02, 0.56, 12)),
+      track(new THREE.CylinderGeometry(0.02, 0.02, 0.58, 12)),
       matChrome
     );
     apronBar.rotation.z = Math.PI / 2;
-    apronBar.position.y = 1.48;
+    apronBar.position.y = 1.5;
     apronRackGroup.add(apronBar);
     const hangingApron = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.42, 0.92, 0.07)),
+      track(new THREE.BoxGeometry(0.42, 0.92, 0.075)),
       matLeadApron
     );
-    hangingApron.position.set(0, 1.02, 0);
+    hangingApron.position.set(0, 1.03, 0);
     hangingApron.castShadow = true;
     apronRackGroup.add(hangingApron);
+    const apronStrap = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.43, 0.045, 0.085)),
+      matChrome
+    );
+    apronStrap.position.set(0, 1.32, 0);
+    apronRackGroup.add(apronStrap);
     scene.add(apronRackGroup);
 
     // Potted Clinic Foliage Planter (x = 6.72, z = -4.25)
@@ -1961,6 +2330,18 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     potBody.position.y = 0.21;
     potBody.castShadow = true;
     planterGroup.add(potBody);
+    const potRim = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.235, 0.225, 0.045, 18)),
+      matWarmWood
+    );
+    potRim.position.y = 0.41;
+    planterGroup.add(potRim);
+    const potSoil = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 16)),
+      matBaseboard
+    );
+    potSoil.position.y = 0.4;
+    planterGroup.add(potSoil);
     [0, 1.25, 2.5, 3.8, 5.1].forEach((ang, idx) => {
       const leaf = new THREE.Mesh(
         track(new THREE.ConeGeometry(0.09, 0.48, 6)),
@@ -2250,10 +2631,24 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     const boothBase = new THREE.Mesh(
       track(new THREE.BoxGeometry(3.84, 0.96, 0.14)),
-      matTrim
+      matWallLower
     );
     boothBase.position.set(-3.44, 0.48, 2.05);
     boothGroup.add(boothBase);
+
+    const boothBaseboard = new THREE.Mesh(
+      track(new THREE.BoxGeometry(3.86, 0.12, 0.17)),
+      matBaseboard
+    );
+    boothBaseboard.position.set(-3.44, 0.06, 2.05);
+    boothGroup.add(boothBaseboard);
+
+    const boothSill = new THREE.Mesh(
+      track(new THREE.BoxGeometry(3.84, 0.06, 0.2)),
+      matChrome
+    );
+    boothSill.position.set(-3.44, 0.96, 2.05);
+    boothGroup.add(boothSill);
 
     const boothGlass = new THREE.Mesh(
       track(new THREE.BoxGeometry(3.56, 1.28, 0.04)),
@@ -2262,8 +2657,18 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     boothGlass.position.set(-3.44, 1.58, 2.05);
     boothGroup.add(boothGlass);
 
+    // Brushed Dark-Titanium Window Mullions
+    [-5.22, -3.44, -1.64].forEach((mx) => {
+      const mullion = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.06, 1.32, 0.12)),
+        matTrim
+      );
+      mullion.position.set(mx, 1.6, 2.05);
+      boothGroup.add(mullion);
+    });
+
     const boothHeader = new THREE.Mesh(
-      track(new THREE.BoxGeometry(3.84, 0.14, 0.16)),
+      track(new THREE.BoxGeometry(3.84, 0.14, 0.18)),
       matTrim
     );
     boothHeader.position.set(-3.44, 2.28, 2.05);
@@ -2277,6 +2682,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     boothGroup.add(boothUpperWall);
 
     // Illuminated Suite Header Sign above Lead-Glass Window
+    const suiteSignFrame = new THREE.Mesh(
+      track(new THREE.BoxGeometry(2.3, 0.44, 0.04)),
+      matTrim
+    );
+    suiteSignFrame.position.set(-3.44, 2.62, 1.96);
+    boothGroup.add(suiteSignFrame);
+
     const suiteSignFace = new THREE.Mesh(
       track(new THREE.PlaneGeometry(2.2, 0.38)),
       track(
@@ -2289,7 +2701,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       )
     );
     suiteSignFace.rotation.y = Math.PI;
-    suiteSignFace.position.set(-3.44, 2.62, 1.95);
+    suiteSignFace.position.set(-3.44, 2.62, 1.935);
     boothGroup.add(suiteSignFace);
 
     // Door Frame & Overhead Warning Beacon (door opening at x: -1.48 to -0.58, z = 2.05)
@@ -2299,6 +2711,20 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     doorLintel.position.set(-1.02, 3.18, 2.05);
     boothGroup.add(doorLintel);
+
+    // Radiation Hazard Plaque Beside Lead Door
+    const radHazardSign = new THREE.Mesh(
+      track(new THREE.PlaneGeometry(0.32, 0.32)),
+      track(
+        new THREE.MeshStandardMaterial({
+          map: radiationSignTex,
+          roughness: 0.4,
+        })
+      )
+    );
+    radHazardSign.rotation.y = Math.PI;
+    radHazardSign.position.set(-1.72, 1.56, 1.96);
+    boothGroup.add(radHazardSign);
 
     const beaconMesh = new THREE.Mesh(
       track(new THREE.CylinderGeometry(0.065, 0.08, 0.12, 16)),
@@ -2322,6 +2748,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     doorSlab.userData.label = 'انقر لفتح/إغلاق الباب الرصاصي';
     leadDoorPivot.add(doorSlab);
     interactiveMeshes.push(doorSlab);
+
+    const doorKickPlate = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.84, 0.24, 0.088)),
+      matChrome
+    );
+    doorKickPlate.position.set(0.44, 0.13, 0);
+    leadDoorPivot.add(doorKickPlate);
 
     const doorSign = new THREE.Mesh(
       track(new THREE.PlaneGeometry(0.44, 0.22)),
@@ -2361,6 +2794,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     boothBackWall.position.set(-2.96, 2.1, 4.35);
     boothGroup.add(boothBackWall);
+
+    const boothBackWainscot = new THREE.Mesh(
+      track(new THREE.BoxGeometry(4.92, 1.05, 0.04)),
+      matWallLower
+    );
+    boothBackWainscot.position.set(-2.96, 0.525, 4.25);
+    boothGroup.add(boothBackWainscot);
 
     scene.add(boothGroup);
 
@@ -2697,6 +3137,23 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     ctGantryBody.position.set(0, 1.5, 0.28);
     ctSuiteModel.add(ctGantryBody);
 
+    const ctMetallicRim = new THREE.Mesh(
+      track(new THREE.TorusGeometry(0.76, 0.045, 10, 28)),
+      matChrome
+    );
+    ctMetallicRim.position.set(0, 1.5, 0.01);
+    ctSuiteModel.add(ctMetallicRim);
+
+    // Bilateral Gantry Control Keypads
+    [-0.96, 0.96].forEach((gx) => {
+      const keypad = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.18, 0.34, 0.05)),
+        matDarkPad
+      );
+      keypad.position.set(gx, 1.48, 0.06);
+      ctSuiteModel.add(keypad);
+    });
+
     const ctBoreInner = new THREE.Mesh(
       track(new THREE.CylinderGeometry(0.56, 0.56, 0.92, 20, 1, true)),
       matDarkPad
@@ -2725,6 +3182,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     ctCouch.position.set(0, 0.9, -0.75);
     ctSuiteModel.add(ctCouch);
+
+    const ctCouchTrim = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.84, 0.045, 2.72)),
+      matChrome
+    );
+    ctCouchTrim.position.set(0, 0.84, -0.75);
+    ctSuiteModel.add(ctCouchTrim);
     diagnosticSuitesGroup.add(ctSuiteModel);
 
     // Monumental MRI Suite Interior & Colossal 1.5T Cryogenic MRI (x ~ 5.42, z ~ 5.35)
@@ -2752,6 +3216,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     mriFrontCollar.position.set(0, 1.54, -0.68);
     mriSuiteModel.add(mriFrontCollar);
+
+    const mriMetallicTrim = new THREE.Mesh(
+      track(new THREE.TorusGeometry(1.12, 0.04, 10, 28)),
+      matChrome
+    );
+    mriMetallicTrim.position.set(0, 1.54, -0.68);
+    mriSuiteModel.add(mriMetallicTrim);
 
     const mriBackCollar = new THREE.Mesh(
       track(new THREE.TorusGeometry(0.92, 0.38, 14, 28)),
@@ -2802,6 +3273,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     mriCouchTop.position.set(0, 0.9, -0.92);
     mriSuiteModel.add(mriCouchTop);
+
+    const mriCouchTrim = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.84, 0.045, 2.72)),
+      matChrome
+    );
+    mriCouchTrim.position.set(0, 0.84, -0.92);
+    mriSuiteModel.add(mriCouchTrim);
     diagnosticSuitesGroup.add(mriSuiteModel);
 
     scene.add(diagnosticSuitesGroup);
@@ -2811,23 +3289,79 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     //    CR LASER DIGITIZER + DUAL-MONITOR PACS PC + HF kVp/mAs CONSOLE
     // =========================================================================
     const deskTop = new THREE.Mesh(
-      track(new THREE.BoxGeometry(3.46, 0.075, 0.78)),
-      matClinicalWhite
+      track(new THREE.BoxGeometry(3.48, 0.065, 0.8)),
+      matWarmWood
     );
-    deskTop.position.set(-3.44, 0.86, 2.66);
+    deskTop.position.set(-3.44, 0.865, 2.66);
     deskTop.castShadow = true;
     scene.add(deskTop);
 
-    // Desk Support Pedestals & Chrome Legs
+    const deskTrimEdge = new THREE.Mesh(
+      track(new THREE.BoxGeometry(3.5, 0.025, 0.82)),
+      matTrim
+    );
+    deskTrimEdge.position.set(-3.44, 0.835, 2.66);
+    scene.add(deskTrimEdge);
+
+    // Desk Modesty Panel & Pedestals
+    const deskModesty = new THREE.Mesh(
+      track(new THREE.BoxGeometry(3.12, 0.56, 0.05)),
+      matTrim
+    );
+    deskModesty.position.set(-3.44, 0.54, 2.31);
+    scene.add(deskModesty);
+
     [-5.05, -1.82].forEach((dx) => {
       const leg = new THREE.Mesh(
-        track(new THREE.BoxGeometry(0.14, 0.84, 0.68)),
+        track(new THREE.BoxGeometry(0.14, 0.82, 0.68)),
         matTrim
       );
-      leg.position.set(dx, 0.42, 2.66);
+      leg.position.set(dx, 0.41, 2.66);
       leg.castShadow = true;
       scene.add(leg);
+
+      const legFoot = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.18, 0.04, 0.72)),
+        matChrome
+      );
+      legFoot.position.set(dx, 0.02, 2.66);
+      scene.add(legFoot);
     });
+
+    // Tucked Ergonomic Operator Lab Stool inside Desk Bay (never blocks walking)
+    const stoolGroup = new THREE.Group();
+    stoolGroup.position.set(-3.26, 0, 2.94);
+    const stoolStar = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.24, 0.28, 0.04, 10)),
+      matChrome
+    );
+    stoolStar.position.y = 0.04;
+    stoolGroup.add(stoolStar);
+    const stoolPiston = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.028, 0.032, 0.42, 12)),
+      matDarkPad
+    );
+    stoolPiston.position.y = 0.26;
+    stoolGroup.add(stoolPiston);
+    const stoolSeat = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.21, 0.2, 0.065, 18)),
+      matDarkPad
+    );
+    stoolSeat.position.y = 0.49;
+    stoolGroup.add(stoolSeat);
+    const stoolBackPost = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.055, 0.34, 0.03)),
+      matChrome
+    );
+    stoolBackPost.position.set(0, 0.65, 0.19);
+    stoolGroup.add(stoolBackPost);
+    const stoolBack = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.36, 0.24, 0.045)),
+      matTrim
+    );
+    stoolBack.position.set(0, 0.78, 0.19);
+    stoolGroup.add(stoolBack);
+    scene.add(stoolGroup);
 
     // A) INDUSTRIAL CR CASSETTE READER (x = -4.52, z = 2.68, angled toward operator)
     const crReaderGroup = new THREE.Group();
@@ -2852,7 +3386,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     crReaderGroup.add(crBody);
     interactiveMeshes.push(crBody);
 
-    // Sculpted side armor plates + chrome corner rails + intake louver vents
+    // Sculpted side armor plates + cooling louver ribs
     [-0.245, 0.245].forEach((sx) => {
       const sidePanel = new THREE.Mesh(
         track(new THREE.BoxGeometry(0.025, 0.48, 0.4)),
@@ -2975,16 +3509,24 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     clinicPcGroup.add(pcStandBase);
 
     const pcStandSpine = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.026, 0.032, 0.38, 16)),
+      track(new THREE.CylinderGeometry(0.026, 0.032, 0.4, 16)),
       matChrome
     );
-    pcStandSpine.position.set(0, 0.2, -0.05);
+    pcStandSpine.position.set(0, 0.21, -0.05);
     clinicPcGroup.add(pcStandSpine);
+
+    // Dual-Monitor Articulated Aluminum VESA Cross-Arm
+    const pcArmBar = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.62, 0.028, 0.032)),
+      matChrome
+    );
+    pcArmBar.position.set(0.18, 0.37, -0.04);
+    clinicPcGroup.add(pcArmBar);
 
     // Primary 5MP Landscape Diagnostic Monitor
     const pcFrame = new THREE.Mesh(
       track(new THREE.BoxGeometry(0.76, 0.48, 0.042)),
-      matTrim
+      matDarkPad
     );
     pcFrame.position.set(-0.08, 0.38, 0);
     pcFrame.castShadow = true;
@@ -3014,7 +3556,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     const secFrame = new THREE.Mesh(
       track(new THREE.BoxGeometry(0.34, 0.46, 0.038)),
-      matTrim
+      matDarkPad
     );
     secFrame.castShadow = true;
     secFrame.layers.set(1);
@@ -3056,10 +3598,10 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     pcTowerGlow.position.set(-0.52, 0.21, 0.165);
     clinicPcGroup.add(pcTowerGlow);
 
-    // Low-Profile Backlit Keyboard + Mouse + Intercom Gooseneck Mic
+    // Low-Profile Backlit Keyboard + Mouse + Intercom Mic Stand
     const pcKeyboard = new THREE.Mesh(
       track(new THREE.BoxGeometry(0.42, 0.018, 0.14)),
-      matTrim
+      matDarkPad
     );
     pcKeyboard.position.set(-0.06, 0.014, 0.2);
     clinicPcGroup.add(pcKeyboard);
@@ -3080,6 +3622,21 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     pcMouse.position.set(0.24, 0.018, 0.21);
     clinicPcGroup.add(pcMouse);
 
+    // Desktop Patient Intercom Unit
+    const micBase = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.09, 0.028, 0.11)),
+      matDarkPad
+    );
+    micBase.position.set(0.38, 0.016, 0.18);
+    clinicPcGroup.add(micBase);
+    const micStem = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.007, 0.008, 0.16, 8)),
+      matChrome
+    );
+    micStem.rotation.x = 0.28;
+    micStem.position.set(0.38, 0.095, 0.16);
+    clinicPcGroup.add(micStem);
+
     scene.add(clinicPcGroup);
 
     // C) HOSPITAL-GRADE HF X-RAY GENERATOR CONSOLE (kVp / mAs) (x = -2.22, z = 2.65)
@@ -3088,7 +3645,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     xrayConsoleGroup.rotation.y = -0.24;
 
     const consoleBase = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.72, 0.075, 0.44)),
+      track(new THREE.BoxGeometry(0.74, 0.075, 0.46)),
       matTrim
     );
     consoleBase.position.y = 0.038;
@@ -3107,6 +3664,14 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     xrayConsoleGroup.add(consoleBox);
     interactiveMeshes.push(consoleBox);
 
+    const consoleBezel = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.61, 0.02, 0.32)),
+      matDarkPad
+    );
+    consoleBezel.position.set(0, 0.195, -0.008);
+    consoleBezel.rotation.x = 0.26;
+    xrayConsoleGroup.add(consoleBezel);
+
     const consoleScreen = new THREE.Mesh(
       track(new THREE.PlaneGeometry(0.58, 0.3)),
       track(
@@ -3118,7 +3683,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         })
       )
     );
-    consoleScreen.position.set(0, 0.205, -0.005);
+    consoleScreen.position.set(0, 0.207, -0.005);
     consoleScreen.rotation.x = -Math.PI / 2 + 0.26;
     xrayConsoleGroup.add(consoleScreen);
 
@@ -3192,16 +3757,33 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     const rackGroup = new THREE.Group();
     rackGroup.position.set(-3.2, 0, -1.55);
 
+    const rackPlinth = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.76, 0.08, 0.48)),
+      matBaseboard
+    );
+    rackPlinth.position.y = 0.04;
+    rackGroup.add(rackPlinth);
+
     const rackCabinet = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.74, 0.84, 0.46)),
+      track(new THREE.BoxGeometry(0.74, 0.78, 0.46)),
       matTrim
     );
-    rackCabinet.position.y = 0.42;
+    rackCabinet.position.y = 0.45;
     rackCabinet.castShadow = true;
     rackGroup.add(rackCabinet);
 
+    // Vertical cassette divider slots inside front bay
+    [-0.18, 0, 0.18].forEach((rx) => {
+      const divider = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.016, 0.42, 0.02)),
+        matChrome
+      );
+      divider.position.set(rx, 0.52, 0.235);
+      rackGroup.add(divider);
+    });
+
     const rackTop = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.78, 0.04, 0.5)),
+      track(new THREE.BoxGeometry(0.8, 0.045, 0.52)),
       matClinicalWhite
     );
     rackTop.position.y = 0.86;
@@ -3257,23 +3839,51 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     const tableBaseGroup = new THREE.Group();
     const tableFoot = new THREE.Mesh(
-      track(new THREE.BoxGeometry(1.42, 0.1, 0.88)),
+      track(new THREE.BoxGeometry(1.48, 0.09, 0.92)),
       matTrim
     );
-    tableFoot.position.y = 0.05;
+    tableFoot.position.y = 0.045;
     tableFoot.castShadow = true;
     tableBaseGroup.add(tableFoot);
 
+    const tableFootSkirt = new THREE.Mesh(
+      track(new THREE.BoxGeometry(1.52, 0.03, 0.96)),
+      matChrome
+    );
+    tableFootSkirt.position.y = 0.095;
+    tableBaseGroup.add(tableFootSkirt);
+
+    // Dual Motorized Foot Control Pedal Bar on Front Floor Edge
+    [-0.18, 0.18].forEach((px) => {
+      const pedal = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.24, 0.035, 0.14)),
+        matDarkPad
+      );
+      pedal.position.set(px, 0.025, 0.54);
+      pedal.rotation.x = 0.18;
+      tableBaseGroup.add(pedal);
+    });
+
     const hydraulicPedestal = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.64, 0.68, 0.58)),
+      track(new THREE.BoxGeometry(0.68, 0.66, 0.6)),
       matClinicalWhite
     );
     hydraulicPedestal.position.y = 0.42;
     hydraulicPedestal.castShadow = true;
     tableBaseGroup.add(hydraulicPedestal);
 
+    // Sculpted Hydraulic Accordion Bellows Ribs around Column
+    [0.24, 0.38, 0.52].forEach((by) => {
+      const rib = new THREE.Mesh(
+        track(new THREE.BoxGeometry(0.73, 0.055, 0.64)),
+        matBellows
+      );
+      rib.position.y = by;
+      tableBaseGroup.add(rib);
+    });
+
     const buckyHousing = new THREE.Mesh(
-      track(new THREE.BoxGeometry(2.55, 0.09, 0.94)),
+      track(new THREE.BoxGeometry(2.58, 0.095, 0.94)),
       matTrim
     );
     buckyHousing.position.y = 0.77;
@@ -3302,9 +3912,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     );
     tableBuckyDrawerGroup.add(drawerFrame);
 
-    // Ergonomic Front Handle + Glowing Cyan Alignment Marker on Bucky Tray
+    // Ergonomic Front Handle + Glowing Teal/Cyan Alignment Marker on Bucky Tray
     const drawerHandle = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.32, 0.032, 0.04)),
+      track(new THREE.BoxGeometry(0.34, 0.036, 0.045)),
       matTrim
     );
     drawerHandle.position.set(0, 0, 0.28);
@@ -3350,7 +3960,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     scene.add(tableBuckyDrawerGroup);
 
     const slidingTableGroup = new THREE.Group();
-    // Side clinical white table rails framing the radiolucent carbon deck
+    // Side clinical white table rails + brushed steel accessory side bars
     [-0.4, 0.4].forEach((tz) => {
       const sideRail = new THREE.Mesh(
         track(new THREE.BoxGeometry(2.75, 0.065, 0.08)),
@@ -3359,7 +3969,22 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       sideRail.position.set(0, 0.885, tz);
       sideRail.castShadow = true;
       slidingTableGroup.add(sideRail);
+
+      const accessoryBar = new THREE.Mesh(
+        track(new THREE.BoxGeometry(2.5, 0.02, 0.018)),
+        matChrome
+      );
+      accessoryBar.position.set(0, 0.885, tz + (tz > 0 ? 0.055 : -0.055));
+      slidingTableGroup.add(accessoryBar);
     });
+
+    // Red emergency stop tab on front accessory rail
+    const eStopBtn = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.08, 0.032, 0.025)),
+      track(new THREE.MeshStandardMaterial({color: 0xdc2626, roughness: 0.35}))
+    );
+    eStopBtn.position.set(1.12, 0.885, 0.455);
+    slidingTableGroup.add(eStopBtn);
 
     const tabletop = new THREE.Mesh(
       track(new THREE.BoxGeometry(2.72, 0.055, 0.72)),
@@ -3373,11 +3998,11 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       track(new THREE.BoxGeometry(2.58, 0.028, 0.66)),
       track(
         new THREE.MeshStandardMaterial({
-          color: 0x0f1a29,
+          color: 0x162230,
           roughness: 0.55,
           metalness: 0.1,
           transparent: true,
-          opacity: 0.76,
+          opacity: 0.78,
         })
       )
     );
@@ -3400,29 +4025,65 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     wallBuckyGroup.position.set(ERECT_STAND_X, 0, ERECT_Z);
 
     const footPlatform = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.76, 0.04, 0.78)),
+      track(new THREE.BoxGeometry(0.8, 0.045, 0.82)),
       matTrim
     );
-    footPlatform.position.set(-0.46, 0.02, 0);
+    footPlatform.position.set(-0.46, 0.022, 0);
     wallBuckyGroup.add(footPlatform);
 
+    const footMat = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.68, 0.012, 0.68)),
+      matDarkPad
+    );
+    footMat.position.set(-0.46, 0.048, 0);
+    wallBuckyGroup.add(footMat);
+
     const standColumn = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.16, 2.25, 0.22)),
+      track(new THREE.BoxGeometry(0.18, 2.28, 0.24)),
       matClinicalWhite
     );
     standColumn.position.set(0.12, 1.15, 0);
     standColumn.castShadow = true;
     wallBuckyGroup.add(standColumn);
 
+    const standGuideTrack = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.03, 2.18, 0.08)),
+      matChrome
+    );
+    standGuideTrack.position.set(0.025, 1.15, 0);
+    wallBuckyGroup.add(standGuideTrack);
+
+    const standTopCap = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.22, 0.07, 0.28)),
+      matTrim
+    );
+    standTopCap.position.set(0.12, 2.31, 0);
+    wallBuckyGroup.add(standTopCap);
+
     const erectBuckyCarriage = new THREE.Group();
     erectBuckyCarriage.position.set(-0.08, 1.28, 0);
 
     const detectorHousing = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.1, 0.56, 0.54)),
+      track(new THREE.BoxGeometry(0.1, 0.58, 0.56)),
       matClinicalWhite
     );
     detectorHousing.castShadow = true;
     erectBuckyCarriage.add(detectorHousing);
+
+    const detectorBezel = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.02, 0.54, 0.52)),
+      matTrim
+    );
+    detectorBezel.position.x = -0.044;
+    erectBuckyCarriage.add(detectorBezel);
+
+    // Ergonomic Molded Chin-Rest Pad on Top of Wall Detector
+    const chinRestPad = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.11, 0.035, 0.22)),
+      matDarkPad
+    );
+    chinRestPad.position.set(-0.02, 0.305, 0);
+    erectBuckyCarriage.add(chinRestPad);
 
     const detectorFace = new THREE.Mesh(
       track(new THREE.PlaneGeometry(0.48, 0.5)),
@@ -3436,7 +4097,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       )
     );
     detectorFace.rotation.y = -Math.PI / 2;
-    detectorFace.position.x = -0.053;
+    detectorFace.position.x = -0.056;
     erectBuckyCarriage.add(detectorFace);
 
     // Cassette inserted upright into Wall Bucky
@@ -3456,7 +4117,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       track(matHighlightGlow.clone())
     );
     wallBuckyGlow.rotation.y = -Math.PI / 2;
-    wallBuckyGlow.position.set(-0.062, 0, 0);
+    wallBuckyGlow.position.set(-0.064, 0, 0);
     erectBuckyCarriage.add(wallBuckyGlow);
 
     const wallBuckyHitbox = new THREE.Mesh(
@@ -3475,7 +4136,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     [-0.31, 0.31].forEach((hz) => {
       const grip = new THREE.Mesh(
-        track(new THREE.CylinderGeometry(0.018, 0.018, 0.36, 12)),
+        track(new THREE.CylinderGeometry(0.018, 0.018, 0.38, 12)),
         matChrome
       );
       grip.position.set(-0.07, 0.05, hz);
@@ -4346,60 +5007,183 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     });
 
     // =========================================================================
-    // 8. OVERHEAD CEILING X-RAY TUBE CRANE + OPTIONAL UPGRADES
+    // 8. OVERHEAD CEILING X-RAY TUBE CRANE + PRECISION COLLIMATOR + UPGRADES
     // =========================================================================
     const railGroup = new THREE.Group();
     [-0.7, 0.7].forEach((rz) => {
       const rail = new THREE.Mesh(
-        track(new THREE.BoxGeometry(5.4, 0.08, 0.08)),
+        track(new THREE.BoxGeometry(5.5, 0.08, 0.09)),
         matChrome
       );
       rail.position.set(0.4, 4.02, rz);
       railGroup.add(rail);
+
+      // End-stop bumpers & ceiling support stanchions
+      [-2.32, 3.12].forEach((rx) => {
+        const stop = new THREE.Mesh(
+          track(new THREE.BoxGeometry(0.08, 0.14, 0.11)),
+          matTrim
+        );
+        stop.position.set(rx, 4.08, rz);
+        railGroup.add(stop);
+      });
     });
     scene.add(railGroup);
 
     const gantryCarriage = new THREE.Group();
     const bridgeBar = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.3, 0.1, 1.54)),
+      track(new THREE.BoxGeometry(0.34, 0.11, 1.56)),
       matTrim
     );
     bridgeBar.position.set(0, 3.97, 0);
     gantryCarriage.add(bridgeBar);
 
+    const bridgeTrim = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.36, 0.04, 1.48)),
+      matChrome
+    );
+    bridgeTrim.position.set(0, 3.91, 0);
+    gantryCarriage.add(bridgeTrim);
+
     const tubeAssembly = new THREE.Group();
+    // Telescopic chrome inner column + ribbed rubber bellows rings
     const teleColumn = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.075, 0.088, 2.85, 18)),
+      track(new THREE.CylinderGeometry(0.068, 0.082, 2.85, 16)),
       matChrome
     );
     teleColumn.position.set(0, 1.48, 0);
     tubeAssembly.add(teleColumn);
 
+    const upperSleeve = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.115, 0.115, 1.25, 16)),
+      matClinicalWhite
+    );
+    upperSleeve.position.set(0, 2.08, 0);
+    tubeAssembly.add(upperSleeve);
+
+    [0.65, 0.85, 1.05, 1.25].forEach((ry) => {
+      const bellowsRing = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.105, 0.105, 0.075, 16)),
+        matBellows
+      );
+      bellowsRing.position.set(0, ry, 0);
+      tubeAssembly.add(bellowsRing);
+    });
+
+    // Articulated Fork Yoke Bracket holding Tube Head
+    const yokeArm = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.16, 0.24, 0.34)),
+      matTrim
+    );
+    yokeArm.position.set(0, 0.26, 0);
+    tubeAssembly.add(yokeArm);
+
     const tubePivot = new THREE.Group();
     const tubeCylinder = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.145, 0.145, 0.48, 24)),
+      track(new THREE.CylinderGeometry(0.15, 0.15, 0.5, 22)),
       matClinicalWhite
     );
     tubeCylinder.rotation.z = Math.PI / 2;
     tubeCylinder.castShadow = true;
     tubePivot.add(tubeCylinder);
 
-    [-0.25, 0.25].forEach((ex) => {
+    // Sculpted Anodized Gunmetal End Caps & Cooling Fin Rings
+    [-0.26, 0.26].forEach((ex) => {
       const cap = new THREE.Mesh(
-        track(new THREE.CylinderGeometry(0.14, 0.14, 0.045, 24)),
-        matChrome
+        track(new THREE.CylinderGeometry(0.145, 0.145, 0.065, 22)),
+        matTrim
       );
       cap.rotation.z = Math.PI / 2;
       cap.position.set(ex, 0, 0);
       tubePivot.add(cap);
+
+      const hvBoot = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.042, 0.052, 0.1, 12)),
+        matBellows
+      );
+      hvBoot.position.set(ex * 0.85, 0.16, 0);
+      tubePivot.add(hvBoot);
     });
 
+    // Arched High-Voltage Power Cable Conduit
+    const hvBridge = new THREE.Mesh(
+      track(new THREE.TorusGeometry(0.21, 0.018, 8, 16, Math.PI)),
+      matBellows
+    );
+    hvBridge.position.set(0, 0.2, 0);
+    tubePivot.add(hvBridge);
+
+    // Front Digital Tube-Head LCD Status Readout (SID / kVp / mAs)
+    const tubeHudBacking = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.28, 0.14, 0.03)),
+      matDarkPad
+    );
+    tubeHudBacking.position.set(0, 0.01, 0.148);
+    tubePivot.add(tubeHudBacking);
+
+    const tubeHudFace = new THREE.Mesh(
+      track(new THREE.PlaneGeometry(0.25, 0.12)),
+      track(
+        new THREE.MeshStandardMaterial({
+          map: tubeHeadHudTex,
+          emissiveMap: tubeHeadHudTex,
+          emissive: new THREE.Color(0xffffff),
+          emissiveIntensity: 0.72,
+        })
+      )
+    );
+    tubeHudFace.position.set(0, 0.01, 0.165);
+    tubePivot.add(tubeHudFace);
+
+    // Ergonomic Wrap-Around Chrome Handlebar & Release Grip
+    [-0.22, 0.22].forEach((hx) => {
+      const handleSide = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.014, 0.014, 0.24, 10)),
+        matChrome
+      );
+      handleSide.rotation.x = Math.PI / 2;
+      handleSide.position.set(hx, -0.09, 0.14);
+      tubePivot.add(handleSide);
+    });
+    const handleFront = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.015, 0.015, 0.45, 10)),
+      matChrome
+    );
+    handleFront.rotation.z = Math.PI / 2;
+    handleFront.position.set(0, -0.09, 0.25);
+    tubePivot.add(handleFront);
+
+    // Multi-Tiered Precision Collimator Housing + Side Field Knobs
+    const collimatorFlange = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.25, 0.04, 0.25)),
+      matChrome
+    );
+    collimatorFlange.position.set(0, -0.145, 0);
+    tubePivot.add(collimatorFlange);
+
     const collimatorBox = new THREE.Mesh(
-      track(new THREE.BoxGeometry(0.22, 0.17, 0.22)),
+      track(new THREE.BoxGeometry(0.23, 0.15, 0.23)),
       matTrim
     );
-    collimatorBox.position.set(0, -0.19, 0);
+    collimatorBox.position.set(0, -0.21, 0);
     tubePivot.add(collimatorBox);
+
+    const collimatorRing = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.1, 0.12, 0.04, 18)),
+      matDarkPad
+    );
+    collimatorRing.position.set(0, -0.295, 0);
+    tubePivot.add(collimatorRing);
+
+    [-0.13, 0.13].forEach((kx) => {
+      const colKnob = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(0.022, 0.022, 0.035, 12)),
+        matChrome
+      );
+      colKnob.rotation.z = Math.PI / 2;
+      colKnob.position.set(kx, -0.21, 0.05);
+      tubePivot.add(colKnob);
+    });
 
     const beamMat = track(
       new THREE.MeshBasicMaterial({
@@ -4414,7 +5198,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       track(new THREE.ConeGeometry(0.34, 0.92, 24, 1, true)),
       beamMat
     );
-    beamCone.position.set(0, -0.72, 0);
+    beamCone.position.set(0, -0.74, 0);
     tubePivot.add(beamCone);
 
     tubeAssembly.add(tubePivot);
@@ -6026,6 +6810,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       applyBrightnessRef.current = null;
+      envRenderTarget?.dispose();
       disposables.forEach((d) => d.dispose());
       renderer.dispose();
       if (renderer.domElement.parentNode === container) {
@@ -6035,7 +6820,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   }, []);
 
   return (
-    <div className="relative w-full h-full bg-[#09111C] select-none overflow-hidden">
+    <div className="relative w-full h-full bg-[#162230] select-none overflow-hidden">
       {!webglUnavailable ? (
         <div ref={mountRef} className="w-full h-full" />
       ) : (
