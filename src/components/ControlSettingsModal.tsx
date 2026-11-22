@@ -1,10 +1,13 @@
 import React from 'react';
 import {
+  CheckCircle2,
+  Download,
   Gamepad2,
   Hand,
   Maximize,
   Minus,
   Plus,
+  RefreshCw,
   RotateCcw,
   Sun,
   X,
@@ -26,6 +29,12 @@ interface ControlSettingsModalProps {
   brightness: number;
   onChangeBrightness: (next: number) => void;
   onResetBrightness: () => void;
+  appVersion: string;
+  updateAvailable: boolean;
+  checkingUpdate: boolean;
+  updateOutcome: 'update' | 'up-to-date' | 'error' | null;
+  onCheckForUpdates: () => void;
+  onApplyUpdate: () => void;
 }
 
 export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
@@ -38,6 +47,12 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
   brightness,
   onChangeBrightness,
   onResetBrightness,
+  appVersion,
+  updateAvailable,
+  checkingUpdate,
+  updateOutcome,
+  onCheckForUpdates,
+  onApplyUpdate,
 }) => {
   const {lang} = useLanguage();
   const isAr = lang === 'ar';
@@ -307,6 +322,71 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
                 );
               })}
             </div>
+          </div>
+        </div>
+
+        {/* Section 3: Game Updates */}
+        <div className="rounded-xl border border-slate-800 bg-[#0E1929] p-3.5 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <CheckCircle2
+                className={`w-4 h-4 shrink-0 ${
+                  updateAvailable ? 'text-emerald-400' : 'text-cyan-400'
+                }`}
+              />
+              <span className="text-xs sm:text-sm font-bold text-white">
+                {isAr ? 'تحديثات اللعبة' : 'Game Updates'}
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-300 font-mono-num text-[10.5px]">
+                v{appVersion}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              {updateAvailable
+                ? isAr
+                  ? 'يتوفر إصدار أحدث من اللعبة — اضغط تحديث الآن.'
+                  : 'A newer version is available — tap Update Now.'
+                : updateOutcome === 'up-to-date'
+                  ? isAr
+                    ? 'أنت تستخدم أحدث إصدار متاح حاليًا ✓'
+                    : 'You are on the latest version ✓'
+                  : isAr
+                    ? 'يتم التحقق تلقائيًا من التحديثات الجديدة أثناء اللعب.'
+                    : 'Automatically checks for new updates while you play.'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {updateAvailable ? (
+              <button
+                type="button"
+                onClick={onApplyUpdate}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer transition-colors"
+              >
+                <Download className="w-3.5 h-3.5 shrink-0" />
+                <span>{isAr ? 'تحديث الآن' : 'Update Now'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={checkingUpdate}
+                onClick={onCheckForUpdates}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-200 font-semibold text-xs cursor-pointer transition-colors disabled:opacity-60"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 shrink-0 ${checkingUpdate ? 'animate-spin' : ''}`}
+                />
+                <span>
+                  {checkingUpdate
+                    ? isAr
+                      ? 'جاري الفحص...'
+                      : 'Checking...'
+                    : isAr
+                      ? 'فحص التحديثات'
+                      : 'Check Updates'}
+                </span>
+              </button>
+            )}
           </div>
         </div>
 

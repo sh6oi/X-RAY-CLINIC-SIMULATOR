@@ -83,8 +83,10 @@ import {ClinicPCModal} from './components/ClinicPCModal';
 import {ControlSettingsModal} from './components/ControlSettingsModal';
 import {DaySummaryModal} from './components/DaySummaryModal';
 import {ExposureConsolePanel} from './components/ExposureConsolePanel';
+import {UpdateNotificationBanner} from './components/UpdateNotificationBanner';
 import {VirtualJoystick} from './components/VirtualJoystick';
 import {DesignerCredit} from './components/DesignerCredit';
+import {useAppUpdate} from './hooks/useAppUpdate';
 import {soundFx} from './utils/soundFx';
 
 function rollDailyTargetPatients(ownedUpgrades: UpgradeId[]): number {
@@ -214,6 +216,7 @@ const REGION_OPTIONS: BodyRegion[] = [
 export default function App() {
   const {lang, toggleLang} = useLanguage();
   const isAr = lang === 'ar';
+  const appUpdate = useAppUpdate();
 
   const [authChecking, setAuthChecking] = useState<boolean>(true);
   const [techProfile, setTechProfile] = useState<TechProfile | null>(null);
@@ -1744,10 +1747,18 @@ export default function App() {
   // =========================================================================
   if (screenMode === 'AUTH' || !techProfile) {
     return (
-      <AuthScreen
-        initialSave={INITIAL_SAVE}
-        onAuthenticated={handleAuthenticated}
-      />
+      <>
+        <UpdateNotificationBanner
+          visible={appUpdate.isBannerVisible}
+          remoteVersion={appUpdate.remoteVersion}
+          onUpdateNow={appUpdate.applyUpdate}
+          onDismiss={appUpdate.dismissBanner}
+        />
+        <AuthScreen
+          initialSave={INITIAL_SAVE}
+          onAuthenticated={handleAuthenticated}
+        />
+      </>
     );
   }
 
@@ -1946,11 +1957,14 @@ export default function App() {
             <button
               type="button"
               onClick={() => setControlsModalOpen(true)}
-              title={isAr ? 'إعدادات التحكم' : 'Control Settings'}
-              className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 text-slate-200 text-[10.5px] sm:text-xs font-semibold cursor-pointer transition-colors"
+              title={isAr ? 'إعدادات التحكم والتحديثات' : 'Controls & Updates'}
+              className="relative flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 text-slate-200 text-[10.5px] sm:text-xs font-semibold cursor-pointer transition-colors"
             >
               <Gamepad2 className="w-3.5 h-3.5 text-amber-300 shrink-0" />
               <span>{isAr ? 'إعدادات التحكم' : 'Controls'}</span>
+              {appUpdate.updateAvailable && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              )}
             </button>
 
             <button
@@ -2696,6 +2710,44 @@ export default function App() {
               : 'Brightness reset to default.'
           );
         }}
+        appVersion={appUpdate.currentVersion}
+        updateAvailable={appUpdate.updateAvailable}
+        checkingUpdate={appUpdate.checking}
+        updateOutcome={appUpdate.lastOutcome}
+        onCheckForUpdates={() => {
+          void appUpdate.checkForUpdates(true).then((outcome) => {
+            if (outcome === 'update') {
+              showToast(
+                isAr
+                  ? 'يتوفر تحديث جديد للعبة! اضغط "تحديث الآن".'
+                  : 'New update found! Tap Update Now.'
+              );
+            } else if (outcome === 'up-to-date') {
+              showToast(
+                isAr
+                  ? 'أنت تستخدم أحدث إصدار من اللعبة ✓'
+                  : 'You are on the latest game version ✓'
+              );
+            } else {
+              showToast(
+                isAr
+                  ? 'تعذر التحقق من التحديثات الآن، حاول مجدداً.'
+                  : 'Could not check for updates right now.'
+              );
+            }
+          });
+        }}
+        onApplyUpdate={() => {
+          void appUpdate.applyUpdate();
+        }}
+      />
+
+      {/* GAME UPDATE AVAILABLE BANNER */}
+      <UpdateNotificationBanner
+        visible={appUpdate.isBannerVisible}
+        remoteVersion={appUpdate.remoteVersion}
+        onUpdateNow={appUpdate.applyUpdate}
+        onDismiss={appUpdate.dismissBanner}
       />
 
       {/* END OF DAY FINANCIAL REPORT & NEW DAY MODAL */}
