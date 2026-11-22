@@ -163,6 +163,20 @@ export type CassetteState =
 export type ScreenMode = 'AUTH' | 'PLAYING';
 export type WorkspaceTab = 'IMAGE' | 'LOG' | 'SHOP' | 'PROTOCOLS';
 
+export interface DaySummaryRecord {
+  dayNumber: number;
+  patientsTarget: number;
+  patientsCompleted: number;
+  earned: number;
+  spentPurchases: number;
+  spentExpenses: number;
+  doctorDeduction: number;
+  netProfit: number;
+  retakes: number;
+  filmsUsed: number;
+  endedAt: number;
+}
+
 export interface ClinicSaveState {
   cash: number;
   totalRevenue: number;
@@ -175,4 +189,14 @@ export interface ClinicSaveState {
   completedCases: CompletedCase[];
   soundEnabled: boolean;
   updatedAt?: number;
+  currentDay?: number;
+  dailyTargetPatients?: number;
+  dailyPatientsHandled?: number;
+  dailyEarned?: number;
+  dailySpentPurchases?: number;
+  dailySpentExpenses?: number;
+  dailyRetakes?: number;
+  dailyFilmsUsed?: number;
+  dayCompletedAwaitingNext?: boolean;
+  dayHistory?: DaySummaryRecord[];
 }

@@ -258,8 +258,8 @@ export const UPGRADE_EN: Record<
   waiting_room: {
     title: 'Waiting Room Expansion',
     description:
-      'Increases clinic patient queue capacity from 3 to 6 patients with steady referrals.',
-    benefit: '6-patient waiting capacity',
+      'Increases clinic waiting room capacity from 3 to 6 seats and boosts daily clinic visitors from 10–15 to 20–25 patients per day.',
+    benefit: '20–25 patients/day · 6 seats',
   },
   tube_cooler: {
     title: 'High-Capacity Tube Cooling',

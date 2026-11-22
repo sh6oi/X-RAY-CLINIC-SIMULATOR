@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {onAuthStateChanged} from 'firebase/auth';
 import {
   ArrowLeftRight,
+  CalendarCheck2,
   CheckCircle2,
   Coins,
   DoorClosed,
@@ -33,6 +34,7 @@ import type {
   CassetteState,
   ClinicSaveState,
   CompletedCase,
+  DaySummaryRecord,
   JoystickConfig,
   PatientCase,
   PatientPosture,
@@ -79,10 +81,18 @@ import {
 } from './components/RadiologyRoom3D';
 import {ClinicPCModal} from './components/ClinicPCModal';
 import {ControlSettingsModal} from './components/ControlSettingsModal';
+import {DaySummaryModal} from './components/DaySummaryModal';
 import {ExposureConsolePanel} from './components/ExposureConsolePanel';
 import {VirtualJoystick} from './components/VirtualJoystick';
 import {DesignerCredit} from './components/DesignerCredit';
 import {soundFx} from './utils/soundFx';
+
+function rollDailyTargetPatients(ownedUpgrades: UpgradeId[]): number {
+  const hasWaitingRoom = ownedUpgrades.includes('waiting_room');
+  return hasWaitingRoom
+    ? 20 + Math.floor(Math.random() * 6) // 20..25
+    : 10 + Math.floor(Math.random() * 6); // 10..15
+}
 
 const INITIAL_SAVE: ClinicSaveState = {
   cash: 0,
@@ -95,28 +105,89 @@ const INITIAL_SAVE: ClinicSaveState = {
   ownedUpgrades: [],
   completedCases: [],
   soundEnabled: true,
+  currentDay: 1,
+  dailyTargetPatients: 12,
+  dailyPatientsHandled: 0,
+  dailyEarned: 0,
+  dailySpentPurchases: 0,
+  dailySpentExpenses: 0,
+  dailyRetakes: 0,
+  dailyFilmsUsed: 0,
+  dayCompletedAwaitingNext: false,
+  dayHistory: [],
 };
 
 function sanitizeSaveState(
   raw: Partial<ClinicSaveState> | null
 ): ClinicSaveState {
-  if (!raw) return {...INITIAL_SAVE};
+  if (!raw) {
+    return {
+      ...INITIAL_SAVE,
+      dailyTargetPatients: rollDailyTargetPatients([]),
+    };
+  }
+  const upgrades = Array.isArray(raw.ownedUpgrades) ? raw.ownedUpgrades : [];
+  const hasWaiting = upgrades.includes('waiting_room');
+  const rawTarget =
+    typeof raw.dailyTargetPatients === 'number' && raw.dailyTargetPatients > 0
+      ? raw.dailyTargetPatients
+      : rollDailyTargetPatients(upgrades);
+  const adjustedTarget =
+    hasWaiting && rawTarget < 20
+      ? rollDailyTargetPatients(upgrades)
+      : rawTarget;
+
   return {
     ...INITIAL_SAVE,
     ...raw,
-    ownedUpgrades: Array.isArray(raw.ownedUpgrades) ? raw.ownedUpgrades : [],
+    ownedUpgrades: upgrades,
     completedCases: Array.isArray(raw.completedCases)
       ? raw.completedCases
       : [],
+    currentDay:
+      typeof raw.currentDay === 'number' && raw.currentDay >= 1
+        ? raw.currentDay
+        : 1,
+    dailyTargetPatients: adjustedTarget,
+    dailyPatientsHandled:
+      typeof raw.dailyPatientsHandled === 'number' &&
+      raw.dailyPatientsHandled >= 0
+        ? raw.dailyPatientsHandled
+        : 0,
+    dailyEarned: typeof raw.dailyEarned === 'number' ? raw.dailyEarned : 0,
+    dailySpentPurchases:
+      typeof raw.dailySpentPurchases === 'number'
+        ? raw.dailySpentPurchases
+        : 0,
+    dailySpentExpenses:
+      typeof raw.dailySpentExpenses === 'number' ? raw.dailySpentExpenses : 0,
+    dailyRetakes:
+      typeof raw.dailyRetakes === 'number' ? raw.dailyRetakes : 0,
+    dailyFilmsUsed:
+      typeof raw.dailyFilmsUsed === 'number' ? raw.dailyFilmsUsed : 0,
+    dayCompletedAwaitingNext: Boolean(raw.dayCompletedAwaitingNext),
+    dayHistory: Array.isArray(raw.dayHistory) ? raw.dayHistory : [],
   };
 }
 
-function buildStarterQueue(upgrades: UpgradeId[]): PatientCase[] {
-  return [
-    {...generatePatient(upgrades), examId: 'chest_pa'},
-    {...generatePatient(upgrades), examId: 'lumbar_ap'},
-    {...generatePatient(upgrades), examId: 'cervical_lat'},
-  ];
+function buildDayInitialQueue(
+  upgrades: UpgradeId[],
+  targetPatients: number,
+  handledToday: number,
+  maxQueueSize: number
+): PatientCase[] {
+  const remaining = Math.max(0, targetPatients - handledToday);
+  const count = Math.min(maxQueueSize, remaining);
+  if (count <= 0) return [];
+
+  if (handledToday === 0) {
+    const starterPool = ['chest_pa', 'lumbar_ap', 'cervical_lat'];
+    return Array.from({length: count}, (_, i) => {
+      const p = generatePatient(upgrades);
+      return i < starterPool.length ? {...p, examId: starterPool[i]} : p;
+    });
+  }
+  return Array.from({length: count}, () => generatePatient(upgrades));
 }
 
 const POSTURE_KEYS: PatientPosture[] = [
@@ -148,8 +219,13 @@ export default function App() {
   const [techProfile, setTechProfile] = useState<TechProfile | null>(null);
   const [screenMode, setScreenMode] = useState<ScreenMode>('AUTH');
 
-  const [save, setSave] = useState<ClinicSaveState>(INITIAL_SAVE);
-  const [queue, setQueue] = useState<PatientCase[]>(() => buildStarterQueue([]));
+  const [save, setSave] = useState<ClinicSaveState>(() => ({
+    ...INITIAL_SAVE,
+    dailyTargetPatients: rollDailyTargetPatients([]),
+  }));
+  const [queue, setQueue] = useState<PatientCase[]>(() =>
+    buildDayInitialQueue([], 12, 0, 3)
+  );
   const [activePatientId, setActivePatientId] = useState<string | null>(null);
 
   // First-Person 3D Clinical Workflow State
@@ -179,11 +255,14 @@ export default function App() {
   const [caseApproved, setCaseApproved] = useState<boolean>(false);
   const [patientSpeech, setPatientSpeech] = useState<string | null>(null);
 
-  // Control Booth Console Drawer, Clinic PC Modal, Control Settings & 10-Patient Designer Milestone
+  // Control Booth Console Drawer, Clinic PC Modal, Control Settings, End-of-Day Summary & 10-Patient Designer Milestone
   const [consoleOpen, setConsoleOpen] = useState<boolean>(true);
   const [pcOpen, setPcOpen] = useState<boolean>(false);
   const [pcTab, setPcTab] = useState<WorkspaceTab>('IMAGE');
   const [controlsModalOpen, setControlsModalOpen] = useState<boolean>(false);
+  const [daySummaryOpen, setDaySummaryOpen] = useState<boolean>(false);
+  const [activeDaySummary, setActiveDaySummary] =
+    useState<DaySummaryRecord | null>(null);
   const [brightnessOpen, setBrightnessOpen] = useState<boolean>(false);
   const [isRepositioningJoystick, setIsRepositioningJoystick] =
     useState<boolean>(false);
@@ -443,7 +522,21 @@ export default function App() {
       const restored = sanitizeSaveState(loaded.saveState);
       hydratedUidRef.current = user.uid;
       setSave(restored);
-      setQueue(buildStarterQueue(restored.ownedUpgrades));
+      const maxCap = restored.ownedUpgrades.includes('waiting_room') ? 6 : 3;
+      if (restored.dayCompletedAwaitingNext && restored.dayHistory?.length) {
+        setQueue([]);
+        setActiveDaySummary(restored.dayHistory[0]);
+        setDaySummaryOpen(true);
+      } else {
+        setQueue(
+          buildDayInitialQueue(
+            restored.ownedUpgrades,
+            restored.dailyTargetPatients ?? 12,
+            restored.dailyPatientsHandled ?? 0,
+            maxCap
+          )
+        );
+      }
       setScreenMode('PLAYING');
       setAuthChecking(false);
     });
@@ -504,11 +597,13 @@ export default function App() {
     if (screenMode !== 'PLAYING' || !hasAssistant || !techProfile) return;
     const interval = window.setInterval(() => {
       commitSaveUpdate((prev) => {
+        if (prev.dayCompletedAwaitingNext) return prev;
         const fee = prev.ownedUpgrades.includes('digital_dr') ? 25 : 15;
         return {
           ...prev,
           cash: prev.cash + fee,
           totalRevenue: prev.totalRevenue + fee,
+          dailyEarned: (prev.dailyEarned ?? 0) + fee,
           patientsServed: prev.patientsServed + 1,
         };
       });
@@ -516,7 +611,18 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, [screenMode, hasAssistant, techProfile, commitSaveUpdate]);
 
-  const maxQueueSize = save.ownedUpgrades.includes('waiting_room') ? 6 : 3;
+  const hasWaitingRoom = save.ownedUpgrades.includes('waiting_room');
+  const maxQueueSize = hasWaitingRoom ? 6 : 3;
+  const currentDay = save.currentDay ?? 1;
+  const dailyTargetPatients = save.dailyTargetPatients ?? (hasWaitingRoom ? 22 : 12);
+  const dailyPatientsHandled = save.dailyPatientsHandled ?? 0;
+  const remainingPatientsToday = Math.max(
+    0,
+    dailyTargetPatients - dailyPatientsHandled
+  );
+  const allDayPatientsDone =
+    remainingPatientsToday === 0 && queue.length === 0;
+
   const hasDR = save.ownedUpgrades.includes('digital_dr');
   const hasAutoProc = save.ownedUpgrades.includes('auto_processor');
   const hasProtocolAssist = save.ownedUpgrades.includes('protocol_assist');
@@ -526,16 +632,27 @@ export default function App() {
   const hasCT = save.ownedUpgrades.includes('ct_scanner');
   const hasMRI = save.ownedUpgrades.includes('mri_suite');
 
-  // Keep queue topped up
+  // Keep queue topped up ONLY up to today's remaining daily quota
   useEffect(() => {
-    if (queue.length < maxQueueSize) {
-      const needed = maxQueueSize - queue.length;
+    if (save.dayCompletedAwaitingNext) {
+      if (queue.length > 0) setQueue([]);
+      return;
+    }
+    const desiredQueueSize = Math.min(maxQueueSize, remainingPatientsToday);
+    if (queue.length < desiredQueueSize) {
+      const needed = desiredQueueSize - queue.length;
       const newcomers = Array.from({length: needed}, () =>
         generatePatient(save.ownedUpgrades)
       );
       setQueue((prev) => [...prev, ...newcomers]);
     }
-  }, [queue.length, maxQueueSize, save.ownedUpgrades]);
+  }, [
+    queue.length,
+    maxQueueSize,
+    remainingPatientsToday,
+    save.ownedUpgrades,
+    save.dayCompletedAwaitingNext,
+  ]);
 
   const activePatient = useMemo(() => {
     if (queue.length === 0) return null;
@@ -600,7 +717,22 @@ export default function App() {
     setTechProfile(profile);
     setSave(restored);
     saveClinicProgressLocal(profile.uid, restored);
-    setQueue(buildStarterQueue(restored.ownedUpgrades));
+    const maxCap = restored.ownedUpgrades.includes('waiting_room') ? 6 : 3;
+    if (restored.dayCompletedAwaitingNext && restored.dayHistory?.length) {
+      setQueue([]);
+      setActiveDaySummary(restored.dayHistory[0]);
+      setDaySummaryOpen(true);
+    } else {
+      setQueue(
+        buildDayInitialQueue(
+          restored.ownedUpgrades,
+          restored.dailyTargetPatients ?? 12,
+          restored.dailyPatientsHandled ?? 0,
+          maxCap
+        )
+      );
+      setDaySummaryOpen(false);
+    }
     setScreenMode('PLAYING');
   };
 
@@ -614,6 +746,7 @@ export default function App() {
     await logoutTechAccount();
     setTechProfile(null);
     setDesignerPopupOpen(false);
+    setDaySummaryOpen(false);
     setScreenMode('AUTH');
   };
 
@@ -1235,6 +1368,11 @@ export default function App() {
         retakesCount: evaluation.success
           ? prev.retakesCount
           : prev.retakesCount + 1,
+        dailyFilmsUsed:
+          (prev.dailyFilmsUsed ?? 0) + evaluation.filmConsumed,
+        dailyRetakes: evaluation.success
+          ? (prev.dailyRetakes ?? 0)
+          : (prev.dailyRetakes ?? 0) + 1,
       }));
     }
 
@@ -1317,6 +1455,8 @@ export default function App() {
       totalRevenue: prev.totalRevenue + gross,
       filmDebt: prev.filmDebt - debtRepayment,
       patientsServed: prev.patientsServed + 1,
+      dailyEarned: (prev.dailyEarned ?? 0) + gross,
+      dailySpentExpenses: (prev.dailySpentExpenses ?? 0) + debtRepayment,
       completedCases: [record, ...prev.completedCases].slice(0, 60),
     }));
 
@@ -1326,21 +1466,31 @@ export default function App() {
       setDesignerMilestoneCount(nextServedCount);
       setDesignerPopupOpen(true);
     }
+    const isLastToday = dailyPatientsHandled + 1 >= dailyTargetPatients;
     showToast(
       debtRepayment > 0
         ? isAr
-          ? `تم اعتماد الصورة وتحصيل $${gross} (سُدّد $${debtRepayment}). اضغط "انتهاء الفحص" لاستقبال المريض التالي.`
-          : `Approved & earned $${gross} ($${debtRepayment} credit repaid). Press Finish Exam for next patient.`
+          ? `تم اعتماد الصورة وتحصيل $${gross} (سُدّد $${debtRepayment}). ${isLastToday ? 'اضغط "انتهاء الفحص" ثم "إنهاء اليوم".' : 'اضغط "انتهاء الفحص" لاستقبال المريض التالي.'}`
+          : `Approved & earned $${gross} ($${debtRepayment} credit repaid). Press Finish Exam.`
         : isAr
-          ? `تم اعتماد الصورة واستلام $${gross}. اضغط "انتهاء الفحص" لاستقبال المريض التالي.`
-          : `Approved & collected $${gross}. Press Finish Exam for the next patient.`
+          ? `تم اعتماد الصورة واستلام $${gross}. ${isLastToday ? 'اضغط "انتهاء الفحص" ثم "إنهاء اليوم".' : 'اضغط "انتهاء الفحص" لاستقبال المريض التالي.'}`
+          : `Approved & collected $${gross}. Press Finish Exam.`
     );
   };
 
   const handleFinishExamAndNextPatient = () => {
     if (!activePatient || isExposing || isDeveloping) return;
 
-    setQueue((prev) => prev.filter((p) => p.id !== activePatient.id));
+    const departingId = activePatient.id;
+    const willFinishAllToday =
+      dailyPatientsHandled + 1 >= dailyTargetPatients && queue.length <= 1;
+
+    setQueue((prev) => prev.filter((p) => p.id !== departingId));
+    commitSaveUpdate((prev) => ({
+      ...prev,
+      dailyPatientsHandled: (prev.dailyPatientsHandled ?? 0) + 1,
+    }));
+
     setActivePatientId(null);
     setCurrentEvaluation(null);
     pendingCrEvalRef.current = null;
@@ -1354,9 +1504,95 @@ export default function App() {
     setPatientSpeech(null);
     soundFx.playPurchase();
     showToast(
+      willFinishAllToday
+        ? isAr
+          ? 'تم إتمام جميع مراجعي اليوم! اضغط على زر "إنهاء اليوم" لعرض الإحصائيات.'
+          : 'All daily patients completed! Press "End Day" to view the daily report.'
+        : isAr
+          ? 'غادر المريض غرفة الفحص ودخل المريض التالي.'
+          : 'Patient departed — next patient entered the room.'
+    );
+  };
+
+  const handleEndDay = () => {
+    if (!allDayPatientsDone || isExposing || isDeveloping) return;
+
+    if (save.dayCompletedAwaitingNext && save.dayHistory?.length) {
+      setActiveDaySummary(save.dayHistory[0]);
+      setDaySummaryOpen(true);
+      return;
+    }
+
+    const earned = save.dailyEarned ?? 0;
+    const spentPurchases = save.dailySpentPurchases ?? 0;
+    const spentExpenses = save.dailySpentExpenses ?? 0;
+    const profitBeforeDoctor = earned - spentPurchases - spentExpenses;
+    const doctorDeduction =
+      profitBeforeDoctor > 0 ? Math.round(profitBeforeDoctor * 0.1) : 0;
+    const netProfit = profitBeforeDoctor - doctorDeduction;
+
+    const record: DaySummaryRecord = {
+      dayNumber: currentDay,
+      patientsTarget: dailyTargetPatients,
+      patientsCompleted: dailyPatientsHandled,
+      earned,
+      spentPurchases,
+      spentExpenses,
+      doctorDeduction,
+      netProfit,
+      retakes: save.dailyRetakes ?? 0,
+      filmsUsed: save.dailyFilmsUsed ?? 0,
+      endedAt: Date.now(),
+    };
+
+    soundFx.playCashEarned();
+    commitSaveUpdate((prev) => ({
+      ...prev,
+      cash: Math.max(0, prev.cash - doctorDeduction),
+      dayCompletedAwaitingNext: true,
+      dayHistory: [record, ...(prev.dayHistory ?? [])].slice(0, 30),
+    }));
+
+    setActiveDaySummary(record);
+    setDaySummaryOpen(true);
+  };
+
+  const handleStartNewDay = () => {
+    const nextDay = currentDay + 1;
+    const nextTarget = rollDailyTargetPatients(save.ownedUpgrades);
+
+    commitSaveUpdate((prev) => ({
+      ...prev,
+      currentDay: nextDay,
+      dailyTargetPatients: nextTarget,
+      dailyPatientsHandled: 0,
+      dailyEarned: 0,
+      dailySpentPurchases: 0,
+      dailySpentExpenses: 0,
+      dailyRetakes: 0,
+      dailyFilmsUsed: 0,
+      dayCompletedAwaitingNext: false,
+    }));
+
+    setQueue(buildDayInitialQueue(save.ownedUpgrades, nextTarget, 0, maxQueueSize));
+    setActivePatientId(null);
+    setCurrentEvaluation(null);
+    pendingCrEvalRef.current = null;
+    setCrExposedPending(false);
+    setCaseApproved(false);
+    setBreathHeld(false);
+    setCassetteState('RACK');
+    setDoorClosed(false);
+    setTechLocation('ROOM');
+    moveCountRef.current = 0;
+    setPatientSpeech(null);
+    setDaySummaryOpen(false);
+    setActiveDaySummary(null);
+    soundFx.playPurchase();
+    showToast(
       isAr
-        ? 'غادر المريض غرفة الفحص ودخل المريض التالي.'
-        : 'Patient departed — next patient entered the room.'
+        ? `بدأ اليوم #${nextDay} — وصل اليوم ${nextTarget} مراجعاً للعيادة!`
+        : `Day #${nextDay} started — ${nextTarget} patients arriving today!`
     );
   };
 
@@ -1378,6 +1614,7 @@ export default function App() {
       cash: prev.cash - cost,
       films: prev.films + filmsToAdd,
       cartonsBought: prev.cartonsBought + count,
+      dailySpentExpenses: (prev.dailySpentExpenses ?? 0) + cost,
     }));
     showToast(
       isAr
@@ -1432,11 +1669,24 @@ export default function App() {
     }
 
     soundFx.playPurchase();
-    commitSaveUpdate((prev) => ({
-      ...prev,
-      cash: prev.cash - upgrade.cost,
-      ownedUpgrades: [...prev.ownedUpgrades, id],
-    }));
+    commitSaveUpdate((prev) => {
+      const nextUpgrades = [...prev.ownedUpgrades, id];
+      let nextDailyTarget = prev.dailyTargetPatients ?? 12;
+      if (
+        id === 'waiting_room' &&
+        !prev.dayCompletedAwaitingNext &&
+        nextDailyTarget < 20
+      ) {
+        nextDailyTarget = rollDailyTargetPatients(nextUpgrades);
+      }
+      return {
+        ...prev,
+        cash: prev.cash - upgrade.cost,
+        ownedUpgrades: nextUpgrades,
+        dailySpentPurchases: (prev.dailySpentPurchases ?? 0) + upgrade.cost,
+        dailyTargetPatients: nextDailyTarget,
+      };
+    });
 
     if (id === 'lead_shield') setShieldUsed(true);
     if (id === 'digital_dr') {
@@ -1457,6 +1707,12 @@ export default function App() {
         isAr
           ? 'تم تركيب جهاز الرنين المغناطيسي وفتح باب غرفة الـ MRI!'
           : '1.5T MRI Suite installed & unlocked!'
+      );
+    } else if (id === 'waiting_room') {
+      showToast(
+        isAr
+          ? 'تمت توسعة صالة الاستقبال — ارتفع عدد المراجعين اليومي إلى 20–25 مريضاً!'
+          : 'Waiting Room expanded — daily visitors increased to 20–25 patients!'
       );
     } else {
       showToast(
@@ -1568,6 +1824,7 @@ export default function App() {
           pcOpen ||
           designerPopupOpen ||
           controlsModalOpen ||
+          daySummaryOpen ||
           (isPortraitPhone && !portraitDismissed)
         }
         ownedUpgrades={save.ownedUpgrades}
@@ -1611,9 +1868,18 @@ export default function App() {
 
             <span className="text-slate-700">|</span>
 
-            <div className="flex items-center gap-1 text-[11px] sm:text-xs text-slate-300 font-mono-num">
+            <div
+              className={`flex items-center gap-1 text-[11px] sm:text-xs font-mono-num font-semibold ${
+                allDayPatientsDone ? 'text-emerald-300' : 'text-cyan-200'
+              }`}
+              title={isAr ? 'مراجعو اليوم' : 'Daily Patients'}
+            >
               <UserCheck className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              <span>{save.patientsServed}</span>
+              <span>
+                {isAr
+                  ? `اليوم ${currentDay}: ${dailyPatientsHandled}/${dailyTargetPatients}`
+                  : `Day ${currentDay}: ${dailyPatientsHandled}/${dailyTargetPatients}`}
+              </span>
             </div>
           </div>
 
@@ -1734,8 +2000,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Active Patient Request Card */}
-        {activePatient && (
+        {/* Active Patient Request Card OR End-of-Day Ready Banner */}
+        {activePatient ? (
           <div className="hud-patient-card pointer-events-auto rounded-xl border border-slate-800 bg-[#08101C]/95 p-1.5 sm:p-3 shadow-xl sm:max-w-sm w-full sm:w-auto flex items-center gap-2 sm:gap-3">
             <img
               src={activePatient.avatarPath}
@@ -1769,6 +2035,28 @@ export default function App() {
                 </span>
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="hud-patient-card pointer-events-auto rounded-xl border border-emerald-500/70 bg-[#081C18]/95 px-3 py-2 sm:p-3 shadow-xl sm:max-w-sm w-full sm:w-auto flex items-center justify-between gap-3">
+            <div className="space-y-0.5 text-[11px] sm:text-xs">
+              <div className="font-bold text-emerald-300">
+                {isAr
+                  ? `اكتمل جميع مرضى اليوم #${currentDay} (${dailyPatientsHandled}/${dailyTargetPatients})`
+                  : `All Day #${currentDay} Patients Served (${dailyPatientsHandled}/${dailyTargetPatients})`}
+              </div>
+              <div className="text-slate-300">
+                {isAr
+                  ? 'اضغط "إنهاء اليوم" لعرض التقرير المالي وبدء يوم جديد.'
+                  : 'Press "End Day" to view stats and start a new day.'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleEndDay}
+              className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+            >
+              {isAr ? 'إنهاء اليوم' : 'End Day'}
+            </button>
           </div>
         )}
       </header>
@@ -2036,7 +2324,10 @@ export default function App() {
         }`}
       >
         {/* Inside Exam Room: Quick Positioning & Region Controls */}
-        {techLocation === 'ROOM' && !caseApproved && !crExposedPending && (
+        {!allDayPatientsDone &&
+          techLocation === 'ROOM' &&
+          !caseApproved &&
+          !crExposedPending && (
           <div className="hud-position-panel pointer-events-auto max-w-5xl w-full rounded-2xl border border-slate-800 bg-[#08101C]/95 px-2 sm:px-3 py-1 sm:py-2 shadow-2xl flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-1 sm:gap-2.5">
             {/* Postures */}
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
@@ -2107,7 +2398,33 @@ export default function App() {
 
         {/* Primary Clinical Step Action Bar */}
         <div className="hud-action-bar pointer-events-auto max-w-full rounded-2xl border border-slate-700/80 bg-[#08101C]/95 px-2.5 sm:px-4 py-1.5 sm:py-2 shadow-2xl flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
-          {caseApproved ? (
+          {allDayPatientsDone ? (
+            <>
+              <button
+                type="button"
+                onClick={handleEndDay}
+                className="flex items-center gap-2 px-5 sm:px-7 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-400 hover:from-emerald-400 hover:to-cyan-300 text-slate-950 font-bold text-xs sm:text-sm whitespace-nowrap shrink-0 cursor-pointer transition-all shadow-lg"
+              >
+                <CalendarCheck2 className="w-4 h-4 shrink-0" />
+                <span>
+                  {isAr
+                    ? `إنهاء اليوم #${currentDay} وعرض الإحصائيات`
+                    : `End Day #${currentDay} & View Stats`}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPcTab('SHOP');
+                  setPcOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+              >
+                <Monitor className="w-4 h-4 shrink-0" />
+                <span>{isAr ? 'المتجر والحاسوب' : 'Clinic PC / Shop'}</span>
+              </button>
+            </>
+          ) : caseApproved ? (
             <button
               type="button"
               onClick={handleFinishExamAndNextPatient}
@@ -2115,9 +2432,14 @@ export default function App() {
             >
               <UserCheck className="w-4 h-4 shrink-0" />
               <span>
-                {isAr
-                  ? 'انتهاء الفحص — استقبال المريض التالي'
-                  : 'Finish Exam — Next Patient'}
+                {dailyPatientsHandled + 1 >= dailyTargetPatients &&
+                queue.length <= 1
+                  ? isAr
+                    ? 'انتهاء الفحص — تجهيز إنهاء اليوم'
+                    : 'Finish Exam — Complete Day'
+                  : isAr
+                    ? 'انتهاء الفحص — استقبال المريض التالي'
+                    : 'Finish Exam — Next Patient'}
               </span>
             </button>
           ) : techLocation === 'ROOM' ? (
@@ -2374,6 +2696,16 @@ export default function App() {
               : 'Brightness reset to default.'
           );
         }}
+      />
+
+      {/* END OF DAY FINANCIAL REPORT & NEW DAY MODAL */}
+      <DaySummaryModal
+        isOpen={daySummaryOpen}
+        summary={activeDaySummary}
+        currentCash={save.cash}
+        hasWaitingRoom={hasWaitingRoom}
+        dayHistory={save.dayHistory ?? []}
+        onStartNewDay={handleStartNewDay}
       />
 
       {/* DESIGNER CREDIT MILESTONE POPUP (EVERY 10 COMPLETED PATIENTS) */}

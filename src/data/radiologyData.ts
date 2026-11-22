@@ -756,10 +756,10 @@ export const UPGRADES: UpgradeItem[] = [
     titleAr: 'توسعة صالة استقبال المرضى',
     subtitleAr: 'Waiting Room Expansion',
     descriptionAr:
-      'زيادة سعة قائمة الانتظار من 3 إلى 6 مرضى مع استقطاب تحويلات طبية أكثر للعيادة.',
+      'زيادة سعة صالة الانتظار إلى 6 مرضى مع رفع عدد المراجعين اليومي للعيادة من 10–15 إلى 20–25 مريضاً في اليوم.',
     cost: 1200,
     category: 'efficiency',
-    benefitSummaryAr: 'سعة 6 مرضى في قائمة الانتظار',
+    benefitSummaryAr: '20–25 مريضاً يومياً · سعة 6 مقاعد',
     imagePath: ASSETS.clinicReceptionImg,
   },
   {

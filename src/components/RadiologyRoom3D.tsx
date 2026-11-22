@@ -273,9 +273,10 @@ function dampAngle(
 
 function createTileFloorTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 1024;
+  canvas.width = 512;
+  canvas.height = 512;
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(0.5, 0.5);
   // Balanced medium clinical slate-porcelain base (neither dark nor glaring)
   ctx.fillStyle = '#24354c';
   ctx.fillRect(0, 0, 1024, 1024);
@@ -309,7 +310,7 @@ function createTileFloorTexture(): THREE.CanvasTexture {
   // Delicate clinical marble veining across porcelain slabs
   ctx.strokeStyle = 'rgba(186, 230, 253, 0.055)';
   ctx.lineWidth = 2;
-  for (let v = 0; v < 26; v++) {
+  for (let v = 0; v < 18; v++) {
     const startX = (v * 173) % 1024;
     const startY = (v * 251) % 1024;
     ctx.beginPath();
@@ -516,9 +517,10 @@ function createDetectorPanelTexture(): THREE.CanvasTexture {
 
 function createPcScreenTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 640;
+  canvas.width = 512;
+  canvas.height = 320;
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(0.5, 0.5);
   ctx.fillStyle = '#060E1A';
   ctx.fillRect(0, 0, 1024, 640);
 
@@ -645,9 +647,10 @@ function createPcSecondaryScreenTexture(): THREE.CanvasTexture {
 
 function createConsoleTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 768;
-  canvas.height = 420;
+  canvas.width = 512;
+  canvas.height = 280;
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(512 / 768, 280 / 420);
   ctx.fillStyle = '#071220';
   ctx.fillRect(0, 0, 768, 420);
   ctx.strokeStyle = '#38BDF8';
@@ -966,10 +969,12 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     id: string;
     gender: 'M' | 'F';
     age: number;
+    hasPatient: boolean;
   }>({
     id: patient?.id ?? 'default-m',
     gender: patient?.gender ?? 'M',
     age: patient?.age ?? 32,
+    hasPatient: Boolean(patient),
   });
   const waitingPatientsRef = useRef<
     {id: string; gender: 'M' | 'F'; age: number}[]
@@ -1081,9 +1086,10 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       id: patient?.id ?? 'default-m',
       gender: patient?.gender ?? 'M',
       age: patient?.age ?? 32,
+      hasPatient: Boolean(patient),
     };
     applyPatientAppearanceRef.current?.();
-    patientEnterAnimRef.current = 1.0;
+    patientEnterAnimRef.current = patient ? 1.0 : 0;
     cameraMoveActiveRef.current = true;
   }, [patient?.id, patient?.gender, patient?.age]);
 
@@ -1108,7 +1114,16 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     const container = mountRef.current;
     if (!container) return;
 
-    const detectSoftwareRenderer = (): boolean => {
+    const detectHardwareProfile = (): {
+      isSoftwareGl: boolean;
+      isVeryLowEnd: boolean;
+      isLowPower: boolean;
+    } => {
+      const cores = navigator.hardwareConcurrency || 4;
+      const mem =
+        (navigator as Navigator & {deviceMemory?: number}).deviceMemory || 4;
+      const isMobileUa =
+        /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent);
       try {
         const probe = document.createElement('canvas');
         const gl2 = probe.getContext('webgl2');
@@ -1116,32 +1131,51 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
           gl2 ||
           probe.getContext('webgl') ||
           (probe.getContext('experimental-webgl') as WebGLRenderingContext | null);
-        if (!gl) return true;
+        if (!gl) {
+          return {isSoftwareGl: true, isVeryLowEnd: true, isLowPower: true};
+        }
         const ext = gl.getExtension('WEBGL_debug_renderer_info');
         const param = ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER;
         const gpu = String(gl.getParameter(param) || '');
+        const maxTex = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096);
         gl.getExtension('WEBGL_lose_context')?.loseContext();
-        return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
+        const isSoftwareGl =
+          /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
+        const isLegacyGpu =
+          maxTex <= 4096 ||
+          /Mali-4|Mali-T|Adreno\s*[2345]|PowerVR|SGX|Apple\s*A[789]|Intel.*HD\s*(2|3|4|5[0-9]{2})/i.test(
+            gpu
+          );
+        const isVeryLowEnd =
+          isSoftwareGl || isLegacyGpu || cores <= 2 || mem <= 2;
+        const isLowPower =
+          isVeryLowEnd || isMobileUa || cores <= 4 || mem <= 4;
+        return {isSoftwareGl, isVeryLowEnd, isLowPower};
       } catch {
-        return true;
+        return {
+          isSoftwareGl: true,
+          isVeryLowEnd: true,
+          isLowPower: true,
+        };
       }
     };
 
-    const isSoftwareGl = detectSoftwareRenderer();
+    const {isSoftwareGl, isVeryLowEnd, isLowPower} = detectHardwareProfile();
+    let runtimeLowSpec = isLowPower;
 
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({
-        antialias: !isSoftwareGl,
-        powerPreference: 'default',
-        precision: isSoftwareGl ? 'mediump' : 'highp',
+        antialias: !isLowPower,
+        powerPreference: isLowPower ? 'low-power' : 'high-performance',
+        precision: isLowPower ? 'mediump' : 'highp',
         stencil: false,
       });
     } catch {
       try {
         renderer = new THREE.WebGLRenderer({
           antialias: false,
-          powerPreference: 'default',
+          powerPreference: 'low-power',
           precision: 'mediump',
           depth: true,
           stencil: false,
@@ -1155,20 +1189,22 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     const initWidth = container.clientWidth || 1200;
     const initHeight = container.clientHeight || 720;
 
-    // High-resolution rendering across devices
-    const getHighPixelRatio = (): number => {
-      if (isSoftwareGl) return 1;
+    // Lightweight DPR cap so every device (including older hardware) stays fast & sharp
+    const getOptimalPixelRatio = (): number => {
+      if (isSoftwareGl || isVeryLowEnd || runtimeLowSpec) {
+        return isSoftwareGl || isVeryLowEnd ? 1 : Math.min(window.devicePixelRatio || 1, 1.25);
+      }
       const dpr = window.devicePixelRatio || 1;
-      return Math.min(dpr, 2.25);
+      return Math.min(dpr, 1.5);
     };
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NeutralToneMapping;
     renderer.toneMappingExposure = brightnessRef.current;
-    renderer.setPixelRatio(getHighPixelRatio());
+    renderer.setPixelRatio(getOptimalPixelRatio());
     renderer.setSize(initWidth, initHeight);
-    renderer.shadowMap.enabled = !isSoftwareGl;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = !isLowPower;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.style.touchAction = 'none';
     container.appendChild(renderer.domElement);
 
@@ -1177,13 +1213,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x09111c);
-    scene.fog = new THREE.FogExp2(0x09111c, 0.018);
+    scene.fog = new THREE.FogExp2(0x09111c, 0.015);
 
     const camera = new THREE.PerspectiveCamera(
       56,
       initWidth / initHeight,
       0.08,
-      60
+      55
     );
     camera.rotation.order = 'YXZ';
     camera.position.set(0.35, 1.56, 1.58);
@@ -1219,41 +1255,29 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     let walkPhase = 0;
 
     // =========================================================================
-    // MODERATE, EVEN CLINICAL LIGHTING RIG (NEITHER DARK NOR GLARING)
+    // LIGHTWEIGHT, EVEN CLINICAL LIGHTING RIG (3 LIGHTS TOTAL FOR FAST SHADERS)
     // =========================================================================
-    const hemiLight = new THREE.HemisphereLight(0xeef6ff, 0x3b5270, 1.28);
+    const hemiLight = new THREE.HemisphereLight(0xf1f7ff, 0x455f80, 1.55);
     scene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight(0xfff9f0, 1.32);
+    const keyLight = new THREE.DirectionalLight(0xfff9f0, 1.28);
     keyLight.position.set(2.4, 5.4, 3.4);
-    if (!isSoftwareGl) {
+    if (!isLowPower) {
       keyLight.castShadow = true;
-      keyLight.shadow.mapSize.width = 2048;
-      keyLight.shadow.mapSize.height = 2048;
-      keyLight.shadow.camera.left = -5.8;
-      keyLight.shadow.camera.right = 7.6;
-      keyLight.shadow.camera.top = 6.8;
-      keyLight.shadow.camera.bottom = -5.8;
-      keyLight.shadow.bias = -0.0005;
-      keyLight.shadow.normalBias = 0.02;
-      keyLight.shadow.radius = 2.2;
+      keyLight.shadow.mapSize.width = 1024;
+      keyLight.shadow.mapSize.height = 1024;
+      keyLight.shadow.camera.left = -5.5;
+      keyLight.shadow.camera.right = 7.2;
+      keyLight.shadow.camera.top = 6.5;
+      keyLight.shadow.camera.bottom = -5.5;
+      keyLight.shadow.bias = -0.0006;
+      keyLight.shadow.normalBias = 0.025;
     }
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.68);
+    const rimLight = new THREE.DirectionalLight(0x93c5fd, 0.54);
     rimLight.position.set(-3.6, 3.2, -3.4);
     scene.add(rimLight);
-
-    const ceilingFillLight = new THREE.PointLight(0xf0f8ff, 1.18, 20);
-    ceilingFillLight.position.set(1.2, 3.85, -0.3);
-    scene.add(ceilingFillLight);
-
-    const boothLight = new THREE.PointLight(0xdbeafe, 1.05, 7.5);
-    boothLight.position.set(-2.45, 2.35, 3.15);
-    scene.add(boothLight);
-
-    const exposureFlashLight = new THREE.PointLight(0x22d3ee, 0, 4.5);
-    scene.add(exposureFlashLight);
 
     // =========================================================================
     // PROCEDURAL MATERIALS & TEXTURES
@@ -1265,7 +1289,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     };
 
     const maxDeviceAniso = renderer.capabilities.getMaxAnisotropy();
-    const texAniso = isSoftwareGl ? 1 : maxDeviceAniso;
+    const texAniso = isLowPower
+      ? Math.min(2, maxDeviceAniso)
+      : Math.min(8, maxDeviceAniso);
 
     const floorTex = track(createTileFloorTexture());
     floorTex.anisotropy = texAniso;
@@ -2105,10 +2131,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     waitingNorthWall.position.set(-2.08, 2.1, -8.8);
     waitingRoomGroup.add(waitingNorthWall);
 
-    // Warm Inviting Waiting Lounge Lighting + Wood Slats + TV Display
-    const waitingRoomLight = new THREE.PointLight(0xfff3de, 1.65, 16.0);
-    waitingRoomLight.position.set(-2.1, 3.7, -6.7);
-    scene.add(waitingRoomLight);
+    // Warm Inviting Waiting Lounge Wood Slats + TV Display
 
     [-4.2, -4.04, -3.88, -0.3, -0.14, 0.02].forEach((sx) => {
       const wSlat = new THREE.Mesh(
@@ -2641,10 +2664,6 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     });
 
     // Monumental CT Suite Interior & Colossal 64-Slice CT Scanner (x ~ 1.48, z ~ 5.25)
-    const ctRoomLight = new THREE.PointLight(0xdbeafe, 1.65, 15.0);
-    ctRoomLight.position.set(1.48, 3.7, 4.4);
-    scene.add(ctRoomLight);
-
     const ctSuiteModel = new THREE.Group();
     ctSuiteModel.position.set(1.48, 0, 5.25);
 
@@ -2661,18 +2680,17 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       matClinicalWhite
     );
     ctGantryShoulder.position.set(0, 1.48, 0.46);
-    ctGantryShoulder.castShadow = true;
     ctSuiteModel.add(ctGantryShoulder);
 
     const ctGantryBody = new THREE.Mesh(
-      track(new THREE.TorusGeometry(0.92, 0.42, 24, 48)),
+      track(new THREE.TorusGeometry(0.92, 0.42, 14, 28)),
       matClinicalWhite
     );
     ctGantryBody.position.set(0, 1.5, 0.28);
     ctSuiteModel.add(ctGantryBody);
 
     const ctBoreInner = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.56, 0.56, 0.92, 32, 1, true)),
+      track(new THREE.CylinderGeometry(0.56, 0.56, 0.92, 20, 1, true)),
       matDarkPad
     );
     ctBoreInner.rotation.x = Math.PI / 2;
@@ -2680,7 +2698,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     ctSuiteModel.add(ctBoreInner);
 
     const ctBoreGlow = new THREE.Mesh(
-      track(new THREE.TorusGeometry(0.64, 0.045, 14, 40)),
+      track(new THREE.TorusGeometry(0.64, 0.045, 10, 24)),
       matLedStrip
     );
     ctBoreGlow.position.set(0, 1.5, 0.02);
@@ -2702,10 +2720,6 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     diagnosticSuitesGroup.add(ctSuiteModel);
 
     // Monumental MRI Suite Interior & Colossal 1.5T Cryogenic MRI (x ~ 5.42, z ~ 5.35)
-    const mriRoomLight = new THREE.PointLight(0xd1fae5, 1.65, 15.0);
-    mriRoomLight.position.set(5.42, 3.7, 4.4);
-    scene.add(mriRoomLight);
-
     const mriSuiteModel = new THREE.Group();
     mriSuiteModel.position.set(5.42, 0, 5.35);
 
@@ -2717,30 +2731,29 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     mriSuiteModel.add(mriBase);
 
     const mriTunnel = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(1.28, 1.28, 2.05, 36, 1, true)),
+      track(new THREE.CylinderGeometry(1.28, 1.28, 2.05, 22, 1, true)),
       matClinicalWhite
     );
     mriTunnel.rotation.x = Math.PI / 2;
     mriTunnel.position.set(0, 1.54, 0.32);
-    mriTunnel.castShadow = true;
     mriSuiteModel.add(mriTunnel);
 
     const mriFrontCollar = new THREE.Mesh(
-      track(new THREE.TorusGeometry(0.92, 0.38, 24, 48)),
+      track(new THREE.TorusGeometry(0.92, 0.38, 14, 28)),
       matClinicalWhite
     );
     mriFrontCollar.position.set(0, 1.54, -0.68);
     mriSuiteModel.add(mriFrontCollar);
 
     const mriBackCollar = new THREE.Mesh(
-      track(new THREE.TorusGeometry(0.92, 0.38, 24, 48)),
+      track(new THREE.TorusGeometry(0.92, 0.38, 14, 28)),
       matClinicalWhite
     );
     mriBackCollar.position.set(0, 1.54, 1.32);
     mriSuiteModel.add(mriBackCollar);
 
     const mriBoreLiner = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.58, 0.58, 2.08, 32, 1, true)),
+      track(new THREE.CylinderGeometry(0.58, 0.58, 2.08, 20, 1, true)),
       matDarkPad
     );
     mriBoreLiner.rotation.x = Math.PI / 2;
@@ -3573,18 +3586,17 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     // Pelvis & Lower Hip Base
     const pPelvis = new THREE.Mesh(
-      track(new THREE.CapsuleGeometry(0.142, 0.145, 14, 22)),
+      track(new THREE.CapsuleGeometry(0.142, 0.145, 8, 14)),
       matPatientBottom
     );
     pPelvis.rotation.z = Math.PI / 2;
     pPelvis.scale.set(1, 1.04, 0.78);
     pPelvis.position.set(0, -0.04, 0);
-    pPelvis.castShadow = true;
     patientLocalBody.add(pPelvis);
 
     // Waistband Belt / Sash + Chrome Buckle
     const pBelt = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.153, 0.156, 0.04, 22)),
+      track(new THREE.CylinderGeometry(0.153, 0.156, 0.04, 14)),
       matPatientBelt
     );
     pBelt.scale.set(1.06, 1, 0.76);
@@ -3600,12 +3612,11 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     // Flared tunic / blouse hem for female patients
     const pTunicSkirt = new THREE.Mesh(
-      track(new THREE.CylinderGeometry(0.158, 0.222, 0.3, 24)),
+      track(new THREE.CylinderGeometry(0.158, 0.222, 0.3, 14)),
       matPatientTop
     );
     pTunicSkirt.scale.set(1.12, 1, 0.82);
     pTunicSkirt.position.set(0, -0.06, 0);
-    pTunicSkirt.castShadow = true;
     pTunicSkirt.visible = false;
     patientLocalBody.add(pTunicSkirt);
 
@@ -3615,12 +3626,11 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     patientLocalBody.add(pSpinePivot);
 
     const pAbdomen = new THREE.Mesh(
-      track(new THREE.CapsuleGeometry(0.138, 0.17, 14, 22)),
+      track(new THREE.CapsuleGeometry(0.138, 0.17, 8, 14)),
       matPatientTop
     );
     pAbdomen.scale.set(1.1, 1, 0.78);
     pAbdomen.position.set(0, 0.07, 0);
-    pAbdomen.castShadow = true;
     pSpinePivot.add(pAbdomen);
 
     // Sculpted Ribcage + Shoulder Clavicle Bridge
@@ -3629,11 +3639,11 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     pSpinePivot.add(pChestGroup);
 
     const pChest = new THREE.Mesh(
-      track(new THREE.CapsuleGeometry(0.165, 0.21, 16, 24)),
+      track(new THREE.CapsuleGeometry(0.165, 0.21, 10, 16)),
       matPatientTop
     );
     pChest.scale.set(1.18, 1, 0.78);
-    pChest.castShadow = true;
+    pChest.castShadow = !isLowPower;
     pChestGroup.add(pChest);
 
     const pClavicleBridge = new THREE.Mesh(
@@ -3699,17 +3709,17 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     pHeadGroup.add(pNeck);
 
     const pHead = new THREE.Mesh(
-      track(new THREE.SphereGeometry(0.126, 28, 24)),
+      track(new THREE.SphereGeometry(0.126, 18, 14)),
       matPatientSkin
     );
     pHead.scale.set(0.92, 1.07, 0.98);
     pHead.position.set(0, 0.222, 0.01);
-    pHead.castShadow = true;
+    pHead.castShadow = !isLowPower;
     pHeadGroup.add(pHead);
 
     // Sculpted Jaw / Chin + Subtle Cheekbones
     const pJaw = new THREE.Mesh(
-      track(new THREE.SphereGeometry(0.095, 20, 16)),
+      track(new THREE.SphereGeometry(0.095, 14, 12)),
       matPatientSkin
     );
     pJaw.scale.set(0.85, 0.76, 0.9);
@@ -4181,6 +4191,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     const applyPatientAppearance = () => {
       const info = patientAppearanceRef.current;
+      patientWorldAnchor.visible = info.hasPatient;
+      if (!info.hasPatient) return;
       const seed = hashPatientSeed(info.id);
       const isFemale = info.gender === 'F';
 
@@ -4405,7 +4417,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     // Optional CT/MRI & Auto-Processor
     const ctMriGantryGroup = new THREE.Group();
     const outerRing = new THREE.Mesh(
-      track(new THREE.TorusGeometry(0.88, 0.22, 20, 48)),
+      track(new THREE.TorusGeometry(0.88, 0.22, 12, 28)),
       matClinicalWhite
     );
     outerRing.rotation.y = Math.PI / 2;
@@ -5018,8 +5030,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         return;
       }
 
+      if (e.pointerType === 'touch') return;
       const now = performance.now();
-      if (now - lastHoverTime < 45) return;
+      if (now - lastHoverTime < 90) return;
       lastHoverTime = now;
 
       const hits = getIntersects(e.clientX, e.clientY);
@@ -5069,7 +5082,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       if (w <= 0 || h <= 0) return;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(getHighPixelRatio());
+      renderer.setPixelRatio(getOptimalPixelRatio());
       renderer.setSize(w, h);
     });
     resizeObserver.observe(container);
@@ -5083,16 +5096,17 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     let loopRunning = false;
     let erectBlend = isErectPosture(selectedPostureRef.current) ? 1 : 0;
     let frameCounter = 0;
+    let slowFrameStreak = 0;
 
     function afterDraw(cb: () => void) {
       const gl = renderer.getContext() as WebGL2RenderingContext;
       if (!renderer.capabilities.isWebGL2 || typeof gl?.fenceSync !== 'function') {
-        frameId = window.setTimeout(cb, 80);
+        frameId = window.setTimeout(cb, 66);
         return;
       }
       const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
       if (!sync) {
-        frameId = window.setTimeout(cb, 80);
+        frameId = window.setTimeout(cb, 66);
         return;
       }
       gl.flush();
@@ -5103,7 +5117,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
           frameId = window.setTimeout(poll, 5);
         } else {
           gl.deleteSync(sync);
-          frameId = window.setTimeout(cb, 80);
+          frameId = window.setTimeout(cb, 66);
         }
       };
       frameId = window.setTimeout(poll, 5);
@@ -5146,6 +5160,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         loopRunning = false;
         return;
       }
+      const frameStartMs = performance.now();
       const rawDelta = clock.getDelta();
       const delta = Math.min(rawDelta, 0.05);
       const elapsed = clock.getElapsedTime();
@@ -5396,9 +5411,10 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         delta
       );
 
-      // Lifelike idle breathing, blinking, phone glances & weight-shifting in Waiting Room
-      if (!isSoftwareGl || frameCounter % 2 === 0) {
-        const rigDelta = isSoftwareGl ? Math.min(delta * 2, 0.08) : delta;
+      // Lifelike idle breathing, blinking, phone glances & weight-shifting in Waiting Room (throttled for low CPU usage)
+      const waitStride = runtimeLowSpec ? 4 : 2;
+      if (frameCounter % waitStride === 0) {
+        const rigDelta = Math.min(delta * waitStride, 0.09);
         waitingPatientRigs.forEach((rig, idx) => {
           if (!rig.root.visible) return;
           const phase = elapsed * 1.35 + idx * 1.7;
@@ -5887,20 +5903,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       // 7. Exposure Beam Flash + Warning Beacon
       beamMat.opacity = THREE.MathUtils.damp(
         beamMat.opacity,
-        isExposingRef.current ? 0.68 : 0.14,
+        isExposingRef.current ? 0.72 : 0.14,
         15,
         delta
-      );
-      exposureFlashLight.intensity = THREE.MathUtils.damp(
-        exposureFlashLight.intensity,
-        isExposingRef.current ? 2.8 : 0,
-        14,
-        delta
-      );
-      exposureFlashLight.position.set(
-        gantryCarriage.position.x + (erectBlend > 0.5 ? 0.55 : 0),
-        tubeAssembly.position.y - (erectBlend > 0.5 ? 0 : 0.45),
-        tubeAssembly.position.z
       );
       matWarningBeacon.emissiveIntensity = THREE.MathUtils.damp(
         matWarningBeacon.emissiveIntensity,
@@ -5914,9 +5919,16 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       processorGroup.visible =
         ownedUpgradesRef.current.includes('auto_processor');
       leadApronMesh.visible =
-        shieldUsedRef.current && selectedRegionRef.current !== 'pelvis';
+        patientWorldAnchor.visible &&
+        shieldUsedRef.current &&
+        selectedRegionRef.current !== 'pelvis';
 
       hotspotRings.forEach(({region, mesh}) => {
+        if (!patientWorldAnchor.visible) {
+          mesh.visible = false;
+          return;
+        }
+        mesh.visible = true;
         const mat = mesh.material as THREE.MeshBasicMaterial;
         const isSel = region === selectedRegionRef.current;
         mat.color.setHex(isSel ? 0x22d3ee : 0x64748b);
@@ -5927,10 +5939,23 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
       renderer.render(scene, camera);
 
+      // Adaptive performance guard: automatically lighten older devices if frame time stays high
+      const renderMs = performance.now() - frameStartMs;
+      if (!runtimeLowSpec && renderMs > 28) {
+        slowFrameStreak += 1;
+        if (slowFrameStreak >= 16) {
+          runtimeLowSpec = true;
+          renderer.shadowMap.enabled = false;
+          renderer.setPixelRatio(1);
+        }
+      } else if (slowFrameStreak > 0 && renderMs < 18) {
+        slowFrameStreak -= 1;
+      }
+
       // Project large, high-contrast 3D speech bubble clearly above patient's head
       const bubbleEl = speechBubbleRef.current;
       if (bubbleEl) {
-        if (patientSpeechRef.current) {
+        if (patientSpeechRef.current && patientWorldAnchor.visible) {
           pHeadGroup.getWorldPosition(_headWorldPos);
           _headWorldPos.y += isErect ? 0.54 : 0.44;
           _headProj.copy(_headWorldPos).project(camera);
