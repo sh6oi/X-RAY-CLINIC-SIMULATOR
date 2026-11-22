@@ -924,7 +924,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   isExposing,
   patientSpeech,
   language,
-  brightness = 1.25,
+  brightness = 2.0,
   paused = false,
   ownedUpgrades,
   joystickRef,
@@ -1198,9 +1198,17 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       return Math.min(dpr, 1.5);
     };
 
+    const mapBrightnessToExposure = (val: number): number => {
+      const clamped = Math.min(2.0, Math.max(0.5, val));
+      if (clamped <= 1.0) {
+        return 0.45 + ((clamped - 0.5) / 0.5) * 0.5;
+      }
+      return 0.95 + (clamped - 1.0) * 1.95;
+    };
+
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NeutralToneMapping;
-    renderer.toneMappingExposure = brightnessRef.current;
+    renderer.toneMappingExposure = mapBrightnessToExposure(brightnessRef.current);
     renderer.setPixelRatio(getOptimalPixelRatio());
     renderer.setSize(initWidth, initHeight);
     renderer.shadowMap.enabled = !isLowPower;
@@ -5069,7 +5077,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     window.addEventListener('keyup', onKeyUp);
 
     applyBrightnessRef.current = (val: number) => {
-      renderer.toneMappingExposure = val;
+      renderer.toneMappingExposure = mapBrightnessToExposure(val);
       if (pausedRef.current || document.hidden) {
         renderer.render(scene, camera);
       }

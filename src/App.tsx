@@ -332,10 +332,10 @@ export default function App() {
     return getDefaultJoystickConfig();
   });
 
-  const DEFAULT_BRIGHTNESS = 1.25;
+  const DEFAULT_BRIGHTNESS = 2.0;
   const [brightness, setBrightness] = useState<number>(() => {
     try {
-      const raw = localStorage.getItem('clinic_brightness_v1');
+      const raw = localStorage.getItem('clinic_brightness_v3');
       if (raw) {
         const val = Number(raw);
         if (Number.isFinite(val)) {
@@ -421,7 +421,7 @@ export default function App() {
     const clamped = Math.min(2.0, Math.max(0.5, Number(next.toFixed(2))));
     setBrightness(clamped);
     try {
-      localStorage.setItem('clinic_brightness_v1', String(clamped));
+      localStorage.setItem('clinic_brightness_v3', String(clamped));
     } catch {
       // Ignore storage errors
     }
