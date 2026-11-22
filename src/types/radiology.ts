@@ -134,7 +134,6 @@ export interface ClinicRank {
 }
 
 export type Language = 'ar' | 'en';
-export type GraphicsQuality = 'low';
 
 export type JoystickPreset =
   | 'bottom-left'

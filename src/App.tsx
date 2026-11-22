@@ -23,14 +23,12 @@ import {
   UserCheck,
   Volume2,
   VolumeX,
-  Zap,
 } from 'lucide-react';
 import type {
   BodyRegion,
   CassetteState,
   ClinicSaveState,
   CompletedCase,
-  GraphicsQuality,
   JoystickConfig,
   PatientCase,
   PatientPosture,
@@ -247,8 +245,6 @@ export default function App() {
     return getDefaultJoystickConfig();
   });
 
-  const [graphicsQuality] = useState<GraphicsQuality>('low');
-
   const joystickRef = useRef<{x: number; y: number}>({x: 0, y: 0});
   const exposeTimerRef = useRef<number | null>(null);
   const developTimerRef = useRef<number | null>(null);
@@ -317,34 +313,6 @@ export default function App() {
       // Ignore storage errors
     }
   }, []);
-
-  const handleSelectGraphicsQuality = useCallback(
-    (_next: GraphicsQuality) => {
-      try {
-        localStorage.setItem('clinic_graphics_quality_v3', 'low');
-      } catch {
-        // Ignore storage failures
-      }
-      showToast(
-        isAr
-          ? 'جودة الرسوميات: الوضع الخفيف ⚡ (مفعل دائماً لأعلى سلاسة)'
-          : 'Graphics Quality: Fast Mode ⚡ (Locked for optimal performance)'
-      );
-    },
-    [isAr, showToast]
-  );
-
-  const handleCycleGraphicsQuality = () => {
-    handleSelectGraphicsQuality('low');
-  };
-
-  const handleAutoDowngradeQuality = useCallback(() => {
-    showToast(
-      isAr
-        ? 'تم تفعيل الوضع الخفيف تلقائياً لضمان سلاسة اللعب على جهازك ⚡'
-        : 'Switched to Fast mode automatically for smoother FPS ⚡'
-    );
-  }, [isAr, showToast]);
 
   const triggerPatientSpeech = useCallback(
     (msgAr: string, msgEn: string, durationMs = 6500) => {
@@ -1564,7 +1532,6 @@ export default function App() {
         isExposing={isExposing}
         patientSpeech={patientSpeech}
         language={lang}
-        graphicsQuality={graphicsQuality}
         paused={
           pcOpen ||
           designerPopupOpen ||
@@ -1575,7 +1542,6 @@ export default function App() {
         joystickRef={joystickRef}
         onTechZoneChange={handleTechZoneChange}
         onSceneInteract={handleSceneInteract}
-        onAutoDowngradeQuality={handleAutoDowngradeQuality}
       />
 
       {/* TOP BAR HUD */}
@@ -1661,20 +1627,6 @@ export default function App() {
               ) : (
                 <VolumeX className="w-3.5 h-3.5 text-slate-500" />
               )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleCycleGraphicsQuality}
-              title={
-                isAr
-                  ? 'جودة الرسوميات: خفيف (الوضع المتاح)'
-                  : 'Graphics Mode: Fast'
-              }
-              className="flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-lg text-[10.5px] sm:text-xs font-semibold cursor-pointer transition-colors bg-emerald-500/20 border border-emerald-500/50 text-emerald-300"
-            >
-              <Zap className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              <span>{isAr ? 'خفيف' : 'Fast'}</span>
             </button>
 
             <button
@@ -2314,8 +2266,6 @@ export default function App() {
           setControlsModalOpen(false);
           setIsRepositioningJoystick(true);
         }}
-        graphicsQuality={graphicsQuality}
-        onChangeGraphicsQuality={handleSelectGraphicsQuality}
       />
 
       {/* DESIGNER CREDIT MILESTONE POPUP (EVERY 10 COMPLETED PATIENTS) */}

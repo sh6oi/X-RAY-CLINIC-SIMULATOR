@@ -1,15 +1,7 @@
 import React from 'react';
-import {
-  Gamepad2,
-  Hand,
-  Maximize,
-  RotateCcw,
-  X,
-  Zap,
-} from 'lucide-react';
+import {Gamepad2, Hand, Maximize, RotateCcw, X} from 'lucide-react';
 import {useLanguage} from '../i18n/translations';
 import type {
-  GraphicsQuality,
   JoystickConfig,
   JoystickPreset,
   JoystickSize,
@@ -22,8 +14,6 @@ interface ControlSettingsModalProps {
   onChangeJoystickConfig: (next: JoystickConfig) => void;
   onResetJoystickConfig: () => void;
   onStartFreeDrag: () => void;
-  graphicsQuality: GraphicsQuality;
-  onChangeGraphicsQuality: (next: GraphicsQuality) => void;
 }
 
 export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
@@ -33,8 +23,6 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
   onChangeJoystickConfig,
   onResetJoystickConfig,
   onStartFreeDrag,
-  graphicsQuality,
-  onChangeGraphicsQuality,
 }) => {
   const {lang} = useLanguage();
   const isAr = lang === 'ar';
@@ -55,24 +43,6 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
     {id: 'lg', ar: 'كبير', en: 'Large'},
   ];
 
-  const qualityModes: {
-    id: GraphicsQuality;
-    ar: string;
-    en: string;
-    descAr: string;
-    descEn: string;
-    icon: React.ReactNode;
-  }[] = [
-    {
-      id: 'low',
-      ar: 'خفيف (Fast)',
-      en: 'Fast Performance',
-      descAr: 'الوضع الوحيد المعتمد لضمان أعلى سلاسة وثبات على جميع الأجهزة',
-      descEn: 'Optimized for smooth performance across all devices',
-      icon: <Zap className="w-4 h-4 text-emerald-300 shrink-0" />,
-    },
-  ];
-
   return (
     <div
       className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-2.5 sm:p-4"
@@ -90,14 +60,12 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-display font-bold text-white">
-                {isAr
-                  ? 'إعدادات التحكم وجودة اللعبة'
-                  : 'Control & Graphics Settings'}
+                {isAr ? 'إعدادات التحكم' : 'Control Settings'}
               </h2>
               <p className="text-[11px] text-slate-400">
                 {isAr
-                  ? 'خصّص موقع وحجم زر تحريك التقني وجودة العرض'
-                  : 'Customize joystick placement, size, and rendering quality'}
+                  ? 'خصّص موقع وحجم زر تحريك التقني'
+                  : 'Customize technician movement button placement and size'}
               </p>
             </div>
           </div>
@@ -112,7 +80,7 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Section 1: Joystick Placement */}
+        {/* Joystick Placement */}
         <div className="rounded-xl border border-slate-800 bg-[#0E1929] p-3.5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -254,49 +222,6 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
                 );
               })}
             </div>
-          </div>
-        </div>
-
-        {/* Section 2: Graphics Quality (Fast Only) */}
-        <div className="rounded-xl border border-slate-800 bg-[#0E1929] p-3.5 space-y-2.5">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="text-xs sm:text-sm font-bold text-white">
-              {isAr ? 'جودة رسوميات اللعبة' : 'Game Graphics Quality'}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 gap-2">
-            {qualityModes.map((q) => {
-              const active = graphicsQuality === q.id;
-              return (
-                <button
-                  key={q.id}
-                  type="button"
-                  onClick={() => onChangeGraphicsQuality(q.id)}
-                  className={`p-2.5 rounded-xl border text-start flex items-center gap-3 cursor-pointer transition-colors ${
-                    active
-                      ? 'bg-emerald-500/15 border-emerald-400 text-white'
-                      : 'bg-[#08111D] border-slate-700/80 hover:border-slate-500 text-slate-300'
-                  }`}
-                >
-                  {q.icon}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold">
-                      {isAr ? q.ar : q.en}
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      {isAr ? q.descAr : q.descEn}
-                    </div>
-                  </div>
-                  {active && (
-                    <span className="px-2 py-0.5 rounded bg-emerald-500 text-slate-950 text-[10px] font-bold shrink-0">
-                      {isAr ? 'مفعّل' : 'Active'}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
           </div>
         </div>
 
