@@ -50,6 +50,74 @@
           "updatedAt": {
             ".validate": "newData.isNumber() && newData.val() > 0"
           },
+          "currentDay": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000000"
+          },
+          "dailyTargetPatients": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 500"
+          },
+          "dailyPatientsHandled": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
+          },
+          "dailyEarned": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000"
+          },
+          "dailySpentPurchases": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000"
+          },
+          "dailySpentExpenses": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000"
+          },
+          "dailyRetakes": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000"
+          },
+          "dailyFilmsUsed": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000"
+          },
+          "dayCompletedAwaitingNext": {
+            ".validate": "newData.isBoolean()"
+          },
+          "dayHistory": {
+            "$idx": {
+              ".validate": "newData.hasChildren(['dayNumber', 'patientsTarget', 'patientsCompleted', 'earned', 'spentPurchases', 'spentExpenses', 'doctorDeduction', 'netProfit', 'endedAt'])",
+              "dayNumber": {
+                ".validate": "newData.isNumber() && newData.val() >= 1"
+              },
+              "patientsTarget": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "patientsCompleted": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "earned": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "spentPurchases": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "spentExpenses": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "doctorDeduction": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "netProfit": {
+                ".validate": "newData.isNumber()"
+              },
+              "retakes": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "filmsUsed": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "endedAt": {
+                ".validate": "newData.isNumber() && newData.val() > 0"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
           "ownedUpgrades": {
             "$idx": {
               ".validate": "newData.isString() && newData.val().length <= 40"
@@ -65,13 +133,13 @@
                 ".validate": "newData.isString() && newData.val().length <= 120"
               },
               "patientAvatarPath": {
-                ".validate": "newData.isString() && newData.val().length <= 20000"
+                ".validate": "newData.isString() && newData.val().length <= 50000"
               },
               "examTitleAr": {
                 ".validate": "newData.isString() && newData.val().length <= 200"
               },
               "examImagePath": {
-                ".validate": "newData.isString() && newData.val().length <= 20000"
+                ".validate": "newData.isString() && newData.val().length <= 50000"
               },
               "modality": {
                 ".validate": "newData.val() === 'XRAY' || newData.val() === 'CT' || newData.val() === 'MRI'"

@@ -45,9 +45,90 @@ if (typeof window !== 'undefined') {
     });
 }
 
+let activeAuthActionCount = 0;
+
+export function isAuthFlowBusy(): boolean {
+  return activeAuthActionCount > 0;
+}
+
 export interface AuthResult {
   user: User;
   saveState: ClinicSaveState | null;
+  cloudReachable: boolean;
+  permissionDenied: boolean;
+}
+
+export interface CloudSaveResult {
+  synced: boolean;
+  permissionDenied: boolean;
+}
+
+export interface CloudLoadResult {
+  saveState: ClinicSaveState | null;
+  synced: boolean;
+  cloudReachable: boolean;
+  permissionDenied: boolean;
+}
+
+function stripUndefined<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function isPermissionDeniedError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const code = 'code' in err ? String((err as {code: unknown}).code) : '';
+  const msg = 'message' in err ? String((err as {message: unknown}).message) : '';
+  return (
+    code.toLowerCase().includes('permission-denied') ||
+    code.toLowerCase().includes('permission_denied') ||
+    msg.toLowerCase().includes('permission_denied') ||
+    msg.toLowerCase().includes('permission denied')
+  );
+}
+
+/**
+ * Legacy-compatible subset matching older database.rules.json schemas
+ * (before daily shift fields were added), used as automatic fallback if
+ * live RTDB rules still reject extra keys with PERMISSION_DENIED.
+ */
+function toLegacyRtdbSavePayload(save: ClinicSaveState): ClinicSaveState {
+  const safeCases = (Array.isArray(save.completedCases) ? save.completedCases : [])
+    .slice(0, 60)
+    .map((c) =>
+      stripUndefined({
+        id: String(c.id || `case-${Date.now()}`),
+        patientNameAr: String(c.patientNameAr || ''),
+        ...(c.patientAvatarPath
+          ? {patientAvatarPath: String(c.patientAvatarPath).slice(0, 19000)}
+          : {}),
+        examTitleAr: String(c.examTitleAr || ''),
+        ...(c.examImagePath
+          ? {examImagePath: String(c.examImagePath).slice(0, 19000)}
+          : {}),
+        modality: c.modality || 'XRAY',
+        findingAr: String(c.findingAr || '').slice(0, 580),
+        earned: Math.max(0, Number(c.earned) || 0),
+        kvpUsed: Math.max(0, Number(c.kvpUsed) || 0),
+        masUsed: Math.max(0, Number(c.masUsed) || 0),
+        shieldUsed: Boolean(c.shieldUsed),
+        ...(c.postureUsed ? {postureUsed: String(c.postureUsed)} : {}),
+        timestamp: Number(c.timestamp) || Date.now(),
+      })
+    );
+
+  return stripUndefined({
+    cash: Math.max(0, Number(save.cash) || 0),
+    totalRevenue: Math.max(0, Number(save.totalRevenue) || 0),
+    films: Math.max(0, Number(save.films) || 0),
+    cartonsBought: Math.max(0, Number(save.cartonsBought) || 0),
+    patientsServed: Math.max(0, Number(save.patientsServed) || 0),
+    retakesCount: Math.max(0, Number(save.retakesCount) || 0),
+    filmDebt: Math.max(0, Number(save.filmDebt) || 0),
+    ownedUpgrades: Array.isArray(save.ownedUpgrades) ? save.ownedUpgrades : [],
+    completedCases: safeCases as ClinicSaveState['completedCases'],
+    soundEnabled: Boolean(save.soundEnabled),
+    updatedAt: Number(save.updatedAt) || Date.now(),
+  });
 }
 
 export function mapFirebaseAuthError(
@@ -102,13 +183,18 @@ export function getLocalBackupKey(uid: string): string {
   return `radiology_clinic_save_uid_${uid}`;
 }
 
-function getProgressScore(s: Partial<ClinicSaveState> | null | undefined): number {
+export function getProgressScore(
+  s: Partial<ClinicSaveState> | null | undefined
+): number {
   if (!s) return -1;
   return (
     (s.patientsServed || 0) * 10000 +
     (s.totalRevenue || 0) * 10 +
     (s.ownedUpgrades?.length || 0) * 500 +
-    (s.cartonsBought || 0) * 50
+    ((s.currentDay || 1) - 1) * 1000 +
+    (s.dailyPatientsHandled || 0) * 100 +
+    (s.cartonsBought || 0) * 50 +
+    (s.cash || 0)
   );
 }
 
@@ -116,10 +202,10 @@ export function saveClinicProgressLocal(
   uid: string,
   saveState: ClinicSaveState
 ): ClinicSaveState {
-  const stamped: ClinicSaveState = {
+  const stamped: ClinicSaveState = stripUndefined({
     ...saveState,
     updatedAt: saveState.updatedAt || Date.now(),
-  };
+  });
   try {
     localStorage.setItem(getLocalBackupKey(uid), JSON.stringify(stamped));
   } catch {
@@ -128,28 +214,54 @@ export function saveClinicProgressLocal(
   return stamped;
 }
 
-export async function saveClinicProgressToCloud(
+async function writeRtdbSave(
   uid: string,
-  saveState: ClinicSaveState
-): Promise<{synced: boolean}> {
-  const stamped: ClinicSaveState = {
-    ...saveState,
-    updatedAt: Date.now(),
-  };
-  saveClinicProgressLocal(uid, stamped);
-
+  stamped: ClinicSaveState
+): Promise<{ok: boolean; permissionDenied: boolean}> {
   try {
     await set(ref(rtdb, `clinics/${uid}/save`), stamped);
-    return {synced: true};
-  } catch {
-    return {synced: false};
+    return {ok: true, permissionDenied: false};
+  } catch (err) {
+    // If live RTDB rules still reject newly added fields, retry with core legacy fields
+    // so cash, films, patientsServed, upgrades, and cases NEVER get lost.
+    if (isPermissionDeniedError(err)) {
+      try {
+        await set(
+          ref(rtdb, `clinics/${uid}/save`),
+          toLegacyRtdbSavePayload(stamped)
+        );
+        return {ok: true, permissionDenied: false};
+      } catch (fallbackErr) {
+        return {
+          ok: false,
+          permissionDenied: isPermissionDeniedError(fallbackErr),
+        };
+      }
+    }
+    return {ok: false, permissionDenied: false};
   }
 }
 
-export async function loadClinicProgressFromCloud(uid: string): Promise<{
-  saveState: ClinicSaveState | null;
-  synced: boolean;
-}> {
+export async function saveClinicProgressToCloud(
+  uid: string,
+  saveState: ClinicSaveState
+): Promise<CloudSaveResult> {
+  const stamped: ClinicSaveState = stripUndefined({
+    ...saveState,
+    updatedAt: saveState.updatedAt || Date.now(),
+  });
+  saveClinicProgressLocal(uid, stamped);
+
+  const rtdbRes = await writeRtdbSave(uid, stamped);
+  return {
+    synced: rtdbRes.ok,
+    permissionDenied: !rtdbRes.ok && rtdbRes.permissionDenied,
+  };
+}
+
+export async function loadClinicProgressFromCloud(
+  uid: string
+): Promise<CloudLoadResult> {
   let localData: ClinicSaveState | null = null;
   try {
     const cached = localStorage.getItem(getLocalBackupKey(uid));
@@ -160,39 +272,68 @@ export async function loadClinicProgressFromCloud(uid: string): Promise<{
     localData = null;
   }
 
+  let cloudReachable = false;
+  let permissionDenied = false;
+
   try {
     const snap = await get(ref(rtdb, `clinics/${uid}/save`));
+    cloudReachable = true;
     if (snap.exists()) {
       const cloudData = snap.val() as ClinicSaveState;
       const cloudTime = cloudData.updatedAt || 0;
       const localTime = localData?.updatedAt || 0;
+      const cloudScore = getProgressScore(cloudData);
+      const localScore = getProgressScore(localData);
 
-      // Keep whichever snapshot is newer or clearly holds further progress
+      // Keep whichever snapshot is newer or holds actual progress (never overwrite real progress with blank state)
       if (
         localData &&
-        (localTime > cloudTime ||
-          (localTime === cloudTime &&
-            getProgressScore(localData) > getProgressScore(cloudData)))
+        localScore > 0 &&
+        (cloudScore <= 0 ||
+          localTime > cloudTime ||
+          (localTime === cloudTime && localScore > cloudScore))
       ) {
-        void set(ref(rtdb, `clinics/${uid}/save`), localData).catch(() => {});
-        return {saveState: localData, synced: true};
+        void writeRtdbSave(uid, stripUndefined(localData));
+        return {
+          saveState: localData,
+          synced: true,
+          cloudReachable: true,
+          permissionDenied: false,
+        };
       }
 
       saveClinicProgressLocal(uid, cloudData);
-      return {saveState: cloudData, synced: true};
+      return {
+        saveState: cloudData,
+        synced: true,
+        cloudReachable: true,
+        permissionDenied: false,
+      };
     }
-  } catch {
-    // Fallback cleanly to local cache
+  } catch (err) {
+    if (isPermissionDeniedError(err)) {
+      permissionDenied = true;
+    }
   }
 
   if (localData) {
+    if (cloudReachable && getProgressScore(localData) > 0) {
+      void writeRtdbSave(uid, stripUndefined(localData));
+    }
     return {
       saveState: localData,
-      synced: false,
+      synced: cloudReachable,
+      cloudReachable,
+      permissionDenied,
     };
   }
 
-  return {saveState: null, synced: false};
+  return {
+    saveState: null,
+    synced: cloudReachable,
+    cloudReachable,
+    permissionDenied,
+  };
 }
 
 export async function registerTechAccount(params: {
@@ -203,58 +344,90 @@ export async function registerTechAccount(params: {
 }): Promise<AuthResult> {
   const cleanName = params.name.trim();
   const cleanEmail = params.email.trim();
-
-  const cred = await createUserWithEmailAndPassword(
-    auth,
-    cleanEmail,
-    params.password
-  );
-
-  if (cleanName) {
-    await updateProfile(cred.user, {displayName: cleanName});
-  }
-
-  const stampedInit: ClinicSaveState = {
-    ...params.initialSave,
-    updatedAt: Date.now(),
-  };
-
-  saveClinicProgressLocal(cred.user.uid, stampedInit);
+  activeAuthActionCount += 1;
 
   try {
-    await set(ref(rtdb, `clinics/${cred.user.uid}`), {
-      profile: {
-        name: cleanName,
-        email: cleanEmail,
-        createdAt: Date.now(),
-      },
-      save: stampedInit,
-    });
-  } catch {
-    // Local cache handles persistence silently if RTDB rules aren't open yet
-  }
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      cleanEmail,
+      params.password
+    );
 
-  return {
-    user: cred.user,
-    saveState: stampedInit,
-  };
+    if (cleanName) {
+      await updateProfile(cred.user, {displayName: cleanName});
+    }
+
+    const now = Date.now();
+    const stampedInit: ClinicSaveState = stripUndefined({
+      ...params.initialSave,
+      updatedAt: now,
+    });
+
+    saveClinicProgressLocal(cred.user.uid, stampedInit);
+
+    const profilePayload = {
+      name: cleanName || cleanEmail.split('@')[0] || 'Radiographer',
+      email: cleanEmail,
+      createdAt: now,
+    };
+
+    let cloudReachable = false;
+    let permissionDenied = false;
+
+    try {
+      await set(ref(rtdb, `clinics/${cred.user.uid}`), {
+        profile: profilePayload,
+        save: stampedInit,
+      });
+      cloudReachable = true;
+    } catch (err) {
+      if (isPermissionDeniedError(err)) {
+        try {
+          await set(ref(rtdb, `clinics/${cred.user.uid}`), {
+            profile: profilePayload,
+            save: toLegacyRtdbSavePayload(stampedInit),
+          });
+          cloudReachable = true;
+        } catch (fallbackErr) {
+          permissionDenied = isPermissionDeniedError(fallbackErr);
+        }
+      }
+    }
+
+    return {
+      user: cred.user,
+      saveState: stampedInit,
+      cloudReachable,
+      permissionDenied,
+    };
+  } finally {
+    activeAuthActionCount = Math.max(0, activeAuthActionCount - 1);
+  }
 }
 
 export async function loginTechAccount(params: {
   email: string;
   password: string;
 }): Promise<AuthResult> {
-  const cred = await signInWithEmailAndPassword(
-    auth,
-    params.email.trim(),
-    params.password
-  );
+  activeAuthActionCount += 1;
 
-  const loaded = await loadClinicProgressFromCloud(cred.user.uid);
-  return {
-    user: cred.user,
-    saveState: loaded.saveState,
-  };
+  try {
+    const cred = await signInWithEmailAndPassword(
+      auth,
+      params.email.trim(),
+      params.password
+    );
+
+    const loaded = await loadClinicProgressFromCloud(cred.user.uid);
+    return {
+      user: cred.user,
+      saveState: loaded.saveState,
+      cloudReachable: loaded.cloudReachable,
+      permissionDenied: loaded.permissionDenied,
+    };
+  } finally {
+    activeAuthActionCount = Math.max(0, activeAuthActionCount - 1);
+  }
 }
 
 export async function sendTechPasswordReset(

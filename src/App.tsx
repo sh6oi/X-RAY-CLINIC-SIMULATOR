@@ -68,6 +68,8 @@ import {
 } from './i18n/translations';
 import {
   auth,
+  getProgressScore,
+  isAuthFlowBusy,
   loadClinicProgressFromCloud,
   logoutTechAccount,
   saveClinicProgressLocal,
@@ -355,6 +357,8 @@ export default function App() {
   const speechTimerRef = useRef<number | null>(null);
   const cloudSyncTimerRef = useRef<number | null>(null);
   const hydratedUidRef = useRef<string | null>(null);
+  const cloudWriteGuardRef = useRef<boolean>(false);
+  const cloudPermWarnedRef = useRef<boolean>(false);
   const latestSaveRef = useRef<ClinicSaveState>(save);
   const latestUidRef = useRef<string | null>(null);
   const pendingCrEvalRef = useRef<ScanEvaluation | null>(null);
@@ -495,6 +499,11 @@ export default function App() {
     []
   );
 
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
+  const isArRef = useRef(isAr);
+  isArRef.current = isAr;
+
   // Listen for persistent Firebase Auth session across refreshes/days
   useEffect(() => {
     let settled = false;
@@ -508,9 +517,15 @@ export default function App() {
 
       if (!user) {
         hydratedUidRef.current = null;
+        cloudWriteGuardRef.current = false;
         setTechProfile(null);
         setScreenMode('AUTH');
         setAuthChecking(false);
+        return;
+      }
+
+      // If interactive Login/Register is currently running, let handleAuthenticated finish cleanly without racing
+      if (isAuthFlowBusy() || hydratedUidRef.current === user.uid) {
         return;
       }
 
@@ -522,6 +537,20 @@ export default function App() {
       setTechProfile(profile);
 
       const loaded = await loadClinicProgressFromCloud(user.uid);
+      if (isAuthFlowBusy() || hydratedUidRef.current === user.uid) {
+        return;
+      }
+
+      cloudWriteGuardRef.current = !loaded.cloudReachable && loaded.saveState === null;
+      if (loaded.permissionDenied && !cloudPermWarnedRef.current) {
+        cloudPermWarnedRef.current = true;
+        showToastRef.current(
+          isArRef.current
+            ? 'تعذر الوصول للحفظ السحابي بسبب صلاحيات قاعدة البيانات في Firebase!'
+            : 'Cloud sync blocked by Firebase database rules!'
+        );
+      }
+
       const restored = sanitizeSaveState(loaded.saveState);
       hydratedUidRef.current = user.uid;
       setSave(restored);
@@ -550,24 +579,47 @@ export default function App() {
     };
   }, []);
 
-  // Continuous synchronous local backup + fast debounced RTDB cloud sync
+  // Continuous synchronous local backup + fast debounced cloud sync
   useEffect(() => {
     soundFx.setEnabled(save.soundEnabled);
     if (!techProfile || hydratedUidRef.current !== techProfile.uid) return;
 
     saveClinicProgressLocal(techProfile.uid, save);
 
+    // If initial cloud load failed while offline on a fresh install, don't overwrite cloud with blank INITIAL_SAVE
+    if (cloudWriteGuardRef.current && getProgressScore(save) <= 0) {
+      return;
+    }
+    if (getProgressScore(save) > 0) {
+      cloudWriteGuardRef.current = false;
+    }
+
     if (cloudSyncTimerRef.current) window.clearTimeout(cloudSyncTimerRef.current);
     cloudSyncTimerRef.current = window.setTimeout(() => {
-      void saveClinicProgressToCloud(techProfile.uid, save);
+      void saveClinicProgressToCloud(techProfile.uid, save).then((res) => {
+        if (res.permissionDenied && !cloudPermWarnedRef.current) {
+          cloudPermWarnedRef.current = true;
+          showToast(
+            isAr
+              ? 'تنبيه: قواعد Firebase تمنع حفظ التقدم السحابي حاليًا — تأكد من تحديث قواعد قاعدة البيانات.'
+              : 'Warning: Firebase rules are blocking cloud save — update database rules.'
+          );
+        }
+      });
     }, 280);
-  }, [save, techProfile]);
+  }, [save, techProfile, isAr, showToast]);
 
-  // Flush save immediately before tab closes / page refreshes
+  // Flush save immediately before tab closes / app minimizes / page navigates away
   useEffect(() => {
     const flushSave = () => {
       const uid = latestUidRef.current;
       if (!uid || hydratedUidRef.current !== uid) return;
+      if (
+        cloudWriteGuardRef.current &&
+        getProgressScore(latestSaveRef.current) <= 0
+      ) {
+        return;
+      }
       const stamped: ClinicSaveState = {
         ...latestSaveRef.current,
         updatedAt: Date.now(),
@@ -581,9 +633,11 @@ export default function App() {
     };
 
     window.addEventListener('beforeunload', flushSave);
+    window.addEventListener('pagehide', flushSave);
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       window.removeEventListener('beforeunload', flushSave);
+      window.removeEventListener('pagehide', flushSave);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       if (exposeTimerRef.current) window.clearTimeout(exposeTimerRef.current);
       if (developTimerRef.current) window.clearTimeout(developTimerRef.current);
@@ -715,6 +769,17 @@ export default function App() {
         'Radiographer',
       email: result.user.email || '',
     };
+    cloudWriteGuardRef.current =
+      !result.cloudReachable && result.saveState === null;
+    if (result.permissionDenied && !cloudPermWarnedRef.current) {
+      cloudPermWarnedRef.current = true;
+      showToast(
+        isAr
+          ? 'تنبيه: قواعد Firebase تمنع الوصول للحفظ السحابي — راجع قواعد قاعدة البيانات.'
+          : 'Warning: Firebase rules blocked cloud sync — check database rules.'
+      );
+    }
+
     const restored = sanitizeSaveState(result.saveState);
     hydratedUidRef.current = profile.uid;
     setTechProfile(profile);
@@ -736,6 +801,7 @@ export default function App() {
       );
       setDaySummaryOpen(false);
     }
+    setAuthChecking(false);
     setScreenMode('PLAYING');
   };
 
@@ -743,9 +809,12 @@ export default function App() {
     if (techProfile) {
       const stamped: ClinicSaveState = {...save, updatedAt: Date.now()};
       saveClinicProgressLocal(techProfile.uid, stamped);
-      await saveClinicProgressToCloud(techProfile.uid, stamped);
+      if (!cloudWriteGuardRef.current || getProgressScore(stamped) > 0) {
+        await saveClinicProgressToCloud(techProfile.uid, stamped);
+      }
     }
     hydratedUidRef.current = null;
+    cloudWriteGuardRef.current = false;
     await logoutTechAccount();
     setTechProfile(null);
     setDesignerPopupOpen(false);
