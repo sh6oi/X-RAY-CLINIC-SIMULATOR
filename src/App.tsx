@@ -2130,17 +2130,17 @@ export default function App() {
 
         {/* Active Patient Request Card OR End-of-Day Ready Banner */}
         {activePatient ? (
-          <div className="hud-patient-card pointer-events-auto rounded-xl border border-slate-800 bg-[#08101C]/95 p-1.5 sm:p-3 shadow-xl sm:max-w-sm w-full sm:w-auto flex items-center gap-2 sm:gap-3">
+          <div className="hud-patient-card pointer-events-auto rounded-xl border border-slate-800 bg-[#08101C]/95 p-1.5 sm:p-2.5 shadow-xl sm:max-w-md w-full sm:w-auto flex items-center gap-2 sm:gap-2.5">
             <img
               src={activePatient.avatarPath}
               alt={activePatient.nameAr}
               decoding="async"
               referrerPolicy="no-referrer"
-              className="hud-patient-avatar w-9 h-9 sm:w-12 sm:h-12 rounded-lg object-cover border border-slate-700 shrink-0"
+              className="hud-patient-avatar w-9 h-9 sm:w-11 sm:h-11 rounded-lg object-cover border border-slate-700 shrink-0"
             />
-            <div className="hud-patient-meta min-w-0 flex-1 space-y-0.5 text-[10.5px] sm:text-xs">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-white truncate">
+            <div className="hud-patient-meta min-w-0 flex-1 space-y-0.5 text-[10px] sm:text-xs leading-snug">
+              <div className="flex items-start justify-between gap-2">
+                <span className="font-bold text-white break-words">
                   {activePatient.nameAr} ({activePatient.age}{' '}
                   {isAr ? 'سنة' : 'y'})
                 </span>
@@ -2151,11 +2151,11 @@ export default function App() {
                     : requestedExam.baseFee}
                 </span>
               </div>
-              <div className="text-cyan-300 font-semibold truncate">
+              <div className="text-cyan-300 font-semibold break-words">
                 {isAr ? 'المطلوب: ' : 'Order: '}
                 {isAr ? requestedExam.titleAr : requestedExam.titleEn}
               </div>
-              <div className="text-slate-400 truncate">
+              <div className="text-slate-400 break-words">
                 {POSTURE_SHORT_I18N[lang][requestedExam.recommendedPosture]} ·{' '}
                 <span className="font-mono-num text-slate-300">
                   {requestedExam.kvpRange[0]}–{requestedExam.kvpRange[1]} kVp /{' '}
@@ -2322,9 +2322,9 @@ export default function App() {
             joystickConfig.preset === 'custom'
               ? ''
               : joystickConfig.preset === 'top-left'
-                ? 'left-[max(0.75rem,env(safe-area-inset-left))] top-[62px] sm:top-[82px]'
+                ? 'left-[max(0.75rem,env(safe-area-inset-left))] top-[74px] sm:top-[90px]'
                 : joystickConfig.preset === 'top-right'
-                  ? 'right-[max(0.75rem,env(safe-area-inset-right))] top-[62px] sm:top-[82px]'
+                  ? 'right-[max(0.75rem,env(safe-area-inset-right))] top-[74px] sm:top-[90px]'
                   : joystickConfig.preset === 'bottom-right'
                     ? `right-[max(0.75rem,env(safe-area-inset-right))] sm:bottom-6 ${
                         techLocation === 'ROOM' && !caseApproved
@@ -2457,15 +2457,17 @@ export default function App() {
           !caseApproved &&
           !crExposedPending && (
           <div
-            className={`hud-position-panel pointer-events-auto w-full max-w-[min(590px,calc(100vw-160px))] lg:max-w-[740px] rounded-xl border border-slate-800 bg-[#08101C]/95 px-2 sm:px-2.5 py-1 sm:py-1.5 shadow-2xl flex flex-col gap-1 ${
-              joystickConfig.preset === 'bottom-right'
-                ? 'mr-auto ml-1'
-                : 'ml-auto mr-1 sm:mr-2 xl:mx-auto'
+            className={`hud-position-panel pointer-events-auto w-full rounded-xl border border-slate-800 bg-[#08101C]/95 px-2 sm:px-2.5 py-1 sm:py-1.5 shadow-2xl flex flex-col gap-1 ${
+              joystickConfig.preset === 'bottom-left'
+                ? 'max-w-[min(700px,calc(100vw-154px))] lg:max-w-[780px] ml-auto mr-1 sm:mr-2 xl:mx-auto'
+                : joystickConfig.preset === 'bottom-right'
+                  ? 'max-w-[min(700px,calc(100vw-154px))] lg:max-w-[780px] mr-auto ml-1 sm:ml-2 xl:mx-auto'
+                  : 'max-w-[min(760px,calc(100vw-20px))] mx-auto'
             }`}
           >
             {/* Postures */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
-              <span className="text-[10px] sm:text-[10.5px] text-slate-400 shrink-0 mx-0.5">
+            <div className="flex flex-wrap items-center gap-1 max-w-full">
+              <span className="text-[9.5px] sm:text-[10.5px] text-slate-400 shrink-0 mx-0.5">
                 {isAr ? 'الوضعية:' : 'Posture:'}
               </span>
               {POSTURE_KEYS.map((pKey) => (
@@ -2473,7 +2475,7 @@ export default function App() {
                   key={pKey}
                   type="button"
                   onClick={() => handleSelectPosture(pKey)}
-                  className={`px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md text-[10px] sm:text-[10.5px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                  className={`px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-md text-[9.5px] sm:text-[10.5px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
                     selectedPosture === pKey
                       ? 'bg-cyan-500 text-slate-950'
                       : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300'
@@ -2485,8 +2487,8 @@ export default function App() {
             </div>
 
             {/* Regions + Lead Shield */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
-              <span className="text-[10px] sm:text-[10.5px] text-slate-400 shrink-0 mx-0.5">
+            <div className="flex flex-wrap items-center gap-1 max-w-full">
+              <span className="text-[9.5px] sm:text-[10.5px] text-slate-400 shrink-0 mx-0.5">
                 {isAr ? 'المنطقة:' : 'Region:'}
               </span>
               {REGION_OPTIONS.map((reg) => (
@@ -2494,7 +2496,7 @@ export default function App() {
                   key={reg}
                   type="button"
                   onClick={() => handleSelectRegion(reg)}
-                  className={`px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-md text-[10px] sm:text-[10.5px] font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                  className={`px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-md text-[9.5px] sm:text-[10.5px] font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
                     selectedRegion === reg
                       ? 'bg-sky-500/25 border border-sky-400 text-sky-200'
                       : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'

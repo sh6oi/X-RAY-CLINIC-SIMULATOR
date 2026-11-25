@@ -99,18 +99,18 @@ input[type="range"].radiology-slider::-moz-range-thumb {
   }
   .hud-patient-card {
     padding: 4px 8px !important;
-    gap: 7px !important;
+    gap: 6px !important;
     width: auto !important;
-    max-width: min(290px, 44vw) !important;
+    max-width: min(350px, 47vw) !important;
     border-radius: 10px !important;
   }
   .hud-patient-avatar {
-    width: 30px !important;
-    height: 30px !important;
+    width: 28px !important;
+    height: 28px !important;
   }
   .hud-patient-meta {
-    font-size: 10px !important;
-    line-height: 1.25 !important;
+    font-size: 9.5px !important;
+    line-height: 1.28 !important;
   }
   .hud-credit-badge {
     top: 46px !important;
@@ -207,11 +207,11 @@ input[type="range"].radiology-slider::-moz-range-thumb {
     padding: 3px 7px !important;
     gap: 3px !important;
     border-radius: 11px !important;
-    max-width: min(560px, calc(100vw - 156px)) !important;
   }
   .hud-position-panel button {
     padding: 2px 6px !important;
     font-size: 9.5px !important;
+    line-height: 1.25 !important;
   }
   .hud-action-bar {
     padding: 4px 8px !important;
@@ -236,7 +236,7 @@ input[type="range"].radiology-slider::-moz-range-thumb {
 /* Even tighter sizing for ultra-short phones (<= 390px tall in landscape) */
 @media (orientation: landscape) and (max-height: 400px) {
   .hud-patient-card {
-    max-width: 245px !important;
+    max-width: min(320px, 46vw) !important;
   }
 }
 
