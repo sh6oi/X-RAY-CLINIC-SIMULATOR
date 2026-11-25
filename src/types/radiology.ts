@@ -9,17 +9,29 @@ export type BodyRegion =
 
 export type Modality = 'XRAY' | 'CT' | 'MRI';
 
-export type ProjectionType = 'PA' | 'AP' | 'LATERAL' | 'AXIAL' | 'SAGITTAL';
+export type ProjectionType =
+  | 'PA'
+  | 'AP'
+  | 'LATERAL'
+  | 'OBLIQUE'
+  | 'AXIAL'
+  | 'SAGITTAL';
 
 export type PatientPosture =
   | 'SUPINE'
   | 'PRONE'
   | 'TABLE_LEFT_LAT'
   | 'TABLE_RIGHT_LAT'
+  | 'TABLE_RPO'
+  | 'TABLE_LPO'
   | 'ERECT_PA'
   | 'ERECT_AP'
   | 'ERECT_LEFT_LAT'
-  | 'ERECT_RIGHT_LAT';
+  | 'ERECT_RIGHT_LAT'
+  | 'ERECT_RAO'
+  | 'ERECT_LAO';
+
+export type PlayMode = 'app' | 'browser';
 
 export interface TechProfile {
   uid: string;

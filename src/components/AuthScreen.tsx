@@ -26,6 +26,7 @@ import {
 } from '../firebase';
 import type {ClinicSaveState} from '../types/radiology';
 import {useLanguage} from '../i18n/translations';
+import {PWAInstallButton} from './PWAInstallButton';
 
 interface AuthScreenProps {
   initialSave: ClinicSaveState;
@@ -129,11 +130,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       {/* Top Bar */}
       <header className="border-b border-slate-800/90 bg-[#0D1520]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-8">
-          <span className="text-sm sm:text-lg font-display font-bold text-white whitespace-nowrap shrink-0">
-            {isAr
-              ? 'عيادة الأشعة التخصصية'
-              : 'Specialized Radiology Clinic'}
-          </span>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <img
+              src="./pwa-192x192.png"
+              alt="X-Ray Clinic Simulator"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg object-cover border border-amber-400/50 shadow-sm shrink-0"
+            />
+            <span className="text-sm sm:text-lg font-display font-bold text-white whitespace-nowrap shrink-0">
+              {isAr
+                ? 'عيادة الأشعة التخصصية'
+                : 'Specialized Radiology Clinic'}
+            </span>
+          </div>
           <div className="hidden lg:flex items-center gap-6 text-sm text-slate-400">
             <span>
               {isAr ? 'حفظ سحابي تلقائي للتقدم' : 'Auto cloud progress saving'}
@@ -150,6 +158,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <PWAInstallButton />
             <button
               type="button"
               onClick={toggleLang}

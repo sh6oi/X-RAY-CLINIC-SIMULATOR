@@ -1,8 +1,15 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
+import {registerSW} from 'virtual:pwa-register';
 import App from './App.tsx';
 import {LanguageProvider} from './i18n/translations.tsx';
 import './index.css';
+
+try {
+  registerSW({immediate: true});
+} catch {
+  // Ignore service worker registration errors in restricted contexts
+}
 
 interface ErrorBoundaryState {
   hasError: boolean;

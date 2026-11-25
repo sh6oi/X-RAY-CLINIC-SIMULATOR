@@ -9,6 +9,7 @@ import {
   DoorOpen,
   Film,
   Gamepad2,
+  Globe,
   Hand,
   Languages,
   LogOut,
@@ -38,6 +39,7 @@ import type {
   JoystickConfig,
   PatientCase,
   PatientPosture,
+  PlayMode,
   ProjectionType,
   ScanEvaluation,
   ScreenMode,
@@ -86,6 +88,7 @@ import {ControlSettingsModal} from './components/ControlSettingsModal';
 import {DaySummaryModal} from './components/DaySummaryModal';
 import {ExposureConsolePanel} from './components/ExposureConsolePanel';
 import {UpdateNotificationBanner} from './components/UpdateNotificationBanner';
+import {PWAInstallButton} from './components/PWAInstallButton';
 import {VirtualJoystick} from './components/VirtualJoystick';
 import {DesignerCredit} from './components/DesignerCredit';
 import {useAppUpdate} from './hooks/useAppUpdate';
@@ -199,10 +202,14 @@ const POSTURE_KEYS: PatientPosture[] = [
   'ERECT_AP',
   'ERECT_LEFT_LAT',
   'ERECT_RIGHT_LAT',
+  'ERECT_RAO',
+  'ERECT_LAO',
   'SUPINE',
   'PRONE',
   'TABLE_LEFT_LAT',
   'TABLE_RIGHT_LAT',
+  'TABLE_RPO',
+  'TABLE_LPO',
 ];
 
 const REGION_OPTIONS: BodyRegion[] = [
@@ -257,6 +264,10 @@ export default function App() {
   const [isDeveloping, setIsDeveloping] = useState<boolean>(false);
   const [currentEvaluation, setCurrentEvaluation] =
     useState<ScanEvaluation | null>(null);
+  const [capturedPosture, setCapturedPosture] =
+    useState<PatientPosture | null>(null);
+  const [capturedProjection, setCapturedProjection] =
+    useState<ProjectionType | null>(null);
   const [caseApproved, setCaseApproved] = useState<boolean>(false);
   const [patientSpeech, setPatientSpeech] = useState<string | null>(null);
 
@@ -349,6 +360,25 @@ export default function App() {
     }
     return DEFAULT_BRIGHTNESS;
   });
+
+  const [playMode, setPlayMode] = useState<PlayMode>(() => {
+    try {
+      const raw = localStorage.getItem('clinic_play_mode_v1');
+      if (raw === 'browser' || raw === 'app') return raw;
+    } catch {
+      // Ignore storage errors
+    }
+    return 'app';
+  });
+
+  const updatePlayMode = (nextMode: PlayMode) => {
+    setPlayMode(nextMode);
+    try {
+      localStorage.setItem('clinic_play_mode_v1', nextMode);
+    } catch {
+      // Ignore storage errors
+    }
+  };
 
   const joystickRef = useRef<{x: number; y: number}>({x: 0, y: 0});
   const exposeTimerRef = useRef<number | null>(null);
@@ -739,7 +769,7 @@ export default function App() {
     hasDR || isBoreScan || cassetteState === requiredCassetteSlot;
 
   const availableProjections: ProjectionType[] = useMemo(() => {
-    const base: ProjectionType[] = ['PA', 'AP', 'LATERAL'];
+    const base: ProjectionType[] = ['PA', 'AP', 'LATERAL', 'OBLIQUE'];
     if (save.ownedUpgrades.includes('ct_scanner')) base.push('AXIAL');
     if (save.ownedUpgrades.includes('mri_suite')) base.push('SAGITTAL');
     return base;
@@ -895,7 +925,17 @@ export default function App() {
       posture === 'TABLE_RIGHT_LAT'
     ) {
       setSelectedProjection('LATERAL');
-    } else if (posture === 'SUPINE' && selectedProjection === 'LATERAL') {
+    } else if (
+      posture === 'ERECT_RAO' ||
+      posture === 'ERECT_LAO' ||
+      posture === 'TABLE_RPO' ||
+      posture === 'TABLE_LPO'
+    ) {
+      setSelectedProjection('OBLIQUE');
+    } else if (
+      posture === 'SUPINE' &&
+      (selectedProjection === 'LATERAL' || selectedProjection === 'OBLIQUE')
+    ) {
       setSelectedProjection('AP');
     }
   };
@@ -920,11 +960,27 @@ export default function App() {
       ) {
         setSelectedPosture('TABLE_LEFT_LAT');
       }
+    } else if (proj === 'OBLIQUE') {
+      if (isErect) {
+        if (
+          selectedPosture !== 'ERECT_RAO' &&
+          selectedPosture !== 'ERECT_LAO'
+        ) {
+          setSelectedPosture('ERECT_RAO');
+        }
+      } else if (
+        selectedPosture !== 'TABLE_RPO' &&
+        selectedPosture !== 'TABLE_LPO'
+      ) {
+        setSelectedPosture('TABLE_RPO');
+      }
     } else if (proj === 'PA') {
       if (isErect) setSelectedPosture('ERECT_PA');
       else if (
         selectedPosture === 'TABLE_LEFT_LAT' ||
-        selectedPosture === 'TABLE_RIGHT_LAT'
+        selectedPosture === 'TABLE_RIGHT_LAT' ||
+        selectedPosture === 'TABLE_RPO' ||
+        selectedPosture === 'TABLE_LPO'
       ) {
         setSelectedPosture('PRONE');
       }
@@ -1420,6 +1476,8 @@ export default function App() {
 
     soundFx.playExpose();
     setIsExposing(true);
+    setCapturedPosture(selectedPosture);
+    setCapturedProjection(selectedProjection);
 
     const evaluation = evaluateExposure({
       exam: requestedExam,
@@ -1565,6 +1623,8 @@ export default function App() {
 
     setActivePatientId(null);
     setCurrentEvaluation(null);
+    setCapturedPosture(null);
+    setCapturedProjection(null);
     pendingCrEvalRef.current = null;
     setCrExposedPending(false);
     setCaseApproved(false);
@@ -1649,6 +1709,8 @@ export default function App() {
     setQueue(buildDayInitialQueue(save.ownedUpgrades, nextTarget, 0, maxQueueSize));
     setActivePatientId(null);
     setCurrentEvaluation(null);
+    setCapturedPosture(null);
+    setCapturedProjection(null);
     pendingCrEvalRef.current = null;
     setCrExposedPending(false);
     setCaseApproved(false);
@@ -1876,7 +1938,10 @@ export default function App() {
                     : 'Cassette in Wall Bucky';
 
   return (
-    <div className="relative w-screen h-dvh overflow-hidden bg-[#09111C] text-slate-100 select-none">
+    <div
+      data-play-mode={playMode}
+      className="relative w-screen h-dvh overflow-hidden bg-[#09111C] text-slate-100 select-none"
+    >
       {/* FULL-SCREEN 3D RADIOLOGY CLINIC */}
       <RadiologyRoom3D
         patient={activePatient}
@@ -2035,6 +2100,55 @@ export default function App() {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               )}
             </button>
+
+            <div
+              role="group"
+              aria-label={isAr ? 'وضع اللعب' : 'Play Mode'}
+              className="hud-playmode-toggle flex items-center rounded-lg border border-slate-700 bg-slate-900/95 p-0.5 gap-0.5 shrink-0"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  updatePlayMode('app');
+                  showToast(
+                    isAr
+                      ? 'تم تفعيل وضع التطبيق (الحجم القياسي).'
+                      : 'App Mode active (standard HUD sizing).'
+                  );
+                }}
+                title={isAr ? 'وضع التطبيق (حجم قياسي)' : 'App Mode (Standard HUD)'}
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold cursor-pointer transition-colors ${
+                  playMode === 'app'
+                    ? 'bg-cyan-500 text-slate-950'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Smartphone className="w-3 h-3 shrink-0" />
+                <span>{isAr ? 'تطبيق' : 'App'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updatePlayMode('browser');
+                  showToast(
+                    isAr
+                      ? 'تم تفعيل وضع المتصفح (شريط مصغّر ومناسب لشاشة الهاتف).'
+                      : 'Browser Mode active (compact HUD for mobile browsers).'
+                  );
+                }}
+                title={isAr ? 'وضع المتصفح (مصغّر للهواتف)' : 'Browser Mode (Compact Mobile HUD)'}
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold cursor-pointer transition-colors ${
+                  playMode === 'browser'
+                    ? 'bg-cyan-500 text-slate-950'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Globe className="w-3 h-3 shrink-0" />
+                <span>{isAr ? 'متصفح' : 'Browser'}</span>
+              </button>
+            </div>
+
+            <PWAInstallButton compact />
 
             <button
               type="button"
@@ -2714,6 +2828,8 @@ export default function App() {
         activePatient={activePatient}
         requestedExam={requestedExam}
         evaluation={currentEvaluation}
+        actualPosture={capturedPosture ?? selectedPosture}
+        actualProjection={capturedProjection ?? selectedProjection}
         isDeveloping={isDeveloping}
         hasDR={hasDR}
         hasAutoProc={hasAutoProc}
@@ -2723,6 +2839,8 @@ export default function App() {
         onApproveAndCollect={handleApproveAndCollect}
         onRetake={() => {
           setCurrentEvaluation(null);
+          setCapturedPosture(null);
+          setCapturedProjection(null);
           pendingCrEvalRef.current = null;
           setCrExposedPending(false);
           setConsoleOpen(true);

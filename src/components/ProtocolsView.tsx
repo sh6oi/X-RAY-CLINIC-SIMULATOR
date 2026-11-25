@@ -7,6 +7,7 @@ import {
   REGION_LABELS_I18N,
   useLanguage,
 } from '../i18n/translations';
+import {renderProceduralRadiograph} from '../utils/radiographRenderer';
 
 const MODALITY_FILTERS: {
   id: 'ALL' | Modality;
@@ -130,9 +131,14 @@ export const ProtocolsView: React.FC = () => {
           >
             <div className="w-20 sm:w-24 h-24 sm:h-28 rounded-lg overflow-hidden border border-slate-800 bg-black shrink-0">
               <img
-                src={exam.imagePath}
+                src={renderProceduralRadiograph({
+                  region: exam.region,
+                  modality: exam.modality,
+                  projection: exam.recommendedProjection,
+                  posture: exam.recommendedPosture,
+                  patientSeed: exam.id,
+                })}
                 alt={isAr ? exam.titleAr : exam.titleEn}
-                referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
               />
             </div>

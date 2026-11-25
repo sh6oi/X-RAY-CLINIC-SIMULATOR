@@ -238,3 +238,114 @@ input[type="range"].radiology-slider::-moz-range-thumb {
     max-width: 245px !important;
   }
 }
+
+/* Browser Play Mode: shrinks top credits/film bar, patient info card, and posture strip cleanly for phone browsers */
+[data-play-mode="browser"] .hud-header-bar {
+  padding: 5px max(7px, env(safe-area-inset-right)) 0 max(7px, env(safe-area-inset-left)) !important;
+  gap: 5px !important;
+}
+
+[data-play-mode="browser"] .hud-telemetry-card {
+  padding: 3px 7px !important;
+  gap: 5px !important;
+  border-radius: 9px !important;
+  font-size: 10px !important;
+}
+
+[data-play-mode="browser"] .hud-telemetry-card > div:first-child {
+  gap: 5px !important;
+  font-size: 10px !important;
+}
+
+[data-play-mode="browser"] .hud-telemetry-card svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+[data-play-mode="browser"] .hud-telemetry-card button {
+  padding: 2px 5px !important;
+  font-size: 9.5px !important;
+  border-radius: 6px !important;
+}
+
+[data-play-mode="browser"] .hud-playmode-toggle {
+  padding: 1px !important;
+}
+
+[data-play-mode="browser"] .hud-playmode-toggle button {
+  padding: 2px 5px !important;
+  font-size: 9px !important;
+}
+
+[data-play-mode="browser"] .hud-patient-card {
+  padding: 4px 8px !important;
+  gap: 6px !important;
+  border-radius: 9px !important;
+  max-width: min(260px, 76vw) !important;
+}
+
+[data-play-mode="browser"] .hud-patient-avatar {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+}
+
+[data-play-mode="browser"] .hud-patient-meta {
+  font-size: 9.5px !important;
+  line-height: 1.2 !important;
+}
+
+[data-play-mode="browser"] .hud-patient-meta > * + * {
+  margin-top: 1px !important;
+}
+
+[data-play-mode="browser"] .hud-bottom-dock {
+  gap: 4px !important;
+  padding-bottom: max(4px, env(safe-area-inset-bottom)) !important;
+}
+
+[data-play-mode="browser"] .hud-position-panel {
+  padding: 3px 7px !important;
+  gap: 3px !important;
+  border-radius: 10px !important;
+}
+
+[data-play-mode="browser"] .hud-position-panel span {
+  font-size: 9.5px !important;
+}
+
+[data-play-mode="browser"] .hud-position-panel button {
+  padding: 2px 6px !important;
+  font-size: 9.5px !important;
+  border-radius: 6px !important;
+}
+
+[data-play-mode="browser"] .hud-action-bar {
+  padding: 4px 7px !important;
+  gap: 4px !important;
+  border-radius: 10px !important;
+}
+
+[data-play-mode="browser"] .hud-action-bar button {
+  padding: 4px 8px !important;
+  font-size: 10px !important;
+  border-radius: 8px !important;
+}
+
+[data-play-mode="browser"] .hud-low-films,
+[data-play-mode="browser"] .hud-toast {
+  top: 76px !important;
+  padding: 3px 9px !important;
+  font-size: 10px !important;
+}
+
+@media (min-width: 640px) {
+  [data-play-mode="browser"] .hud-patient-card {
+    max-width: 270px !important;
+  }
+  [data-play-mode="browser"] .hud-low-films,
+  [data-play-mode="browser"] .hud-toast {
+    top: 48px !important;
+  }
+}
+

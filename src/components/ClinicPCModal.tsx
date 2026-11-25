@@ -11,6 +11,8 @@ import type {
   CompletedCase,
   ExamProtocol,
   PatientCase,
+  PatientPosture,
+  ProjectionType,
   ScanEvaluation,
   UpgradeId,
   WorkspaceTab,
@@ -29,6 +31,8 @@ interface ClinicPCModalProps {
   activePatient: PatientCase | null;
   requestedExam: ExamProtocol;
   evaluation: ScanEvaluation | null;
+  actualPosture?: PatientPosture;
+  actualProjection?: ProjectionType;
   isDeveloping: boolean;
   hasDR: boolean;
   hasAutoProc: boolean;
@@ -57,6 +61,8 @@ export const ClinicPCModal: React.FC<ClinicPCModalProps> = ({
   activePatient,
   requestedExam,
   evaluation,
+  actualPosture,
+  actualProjection,
   isDeveloping,
   hasDR,
   hasAutoProc,
@@ -193,6 +199,8 @@ export const ClinicPCModal: React.FC<ClinicPCModalProps> = ({
                   patient={activePatient}
                   requestedExam={requestedExam}
                   evaluation={evaluation}
+                  actualPosture={actualPosture}
+                  actualProjection={actualProjection}
                   kvp={kvp}
                   mas={mas}
                   filmsRemaining={filmsRemaining}

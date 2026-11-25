@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -17,24 +17,26 @@ import {
 import type {
   ExamProtocol,
   PatientCase,
+  PatientPosture,
+  ProjectionType,
   ScanEvaluation,
 } from '../types/radiology';
-import {
-  CT_SCAN_IMAGE,
-  FILM_CARTON_COST,
-  MRI_SCAN_IMAGE,
-  REGION_SCAN_IMAGES,
-} from '../data/radiologyData';
+import {FILM_CARTON_COST} from '../data/radiologyData';
 import {
   MODALITY_LABELS_I18N,
+  POSTURE_SHORT_I18N,
+  PROJECTION_LABELS_I18N,
   REGION_LABELS_I18N,
   useLanguage,
 } from '../i18n/translations';
+import {renderProceduralRadiograph} from '../utils/radiographRenderer';
 
 interface RadiographDisplayProps {
   patient: PatientCase;
   requestedExam: ExamProtocol;
   evaluation: ScanEvaluation;
+  actualPosture?: PatientPosture;
+  actualProjection?: ProjectionType;
   kvp: number;
   mas: number;
   filmsRemaining: number;
@@ -133,6 +135,8 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
   patient,
   requestedExam,
   evaluation,
+  actualPosture,
+  actualProjection,
   kvp,
   mas,
   filmsRemaining,
@@ -158,16 +162,34 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
   const [maskAperturePct, setMaskAperturePct] = useState(88);
   const [overlayMaskEnabled, setOverlayMaskEnabled] = useState(true);
 
-  const imageSrc =
-    requestedExam.modality === 'CT'
-      ? CT_SCAN_IMAGE
-      : requestedExam.modality === 'MRI'
-        ? MRI_SCAN_IMAGE
-        : REGION_SCAN_IMAGES[evaluation.targetRegionScanned];
+  const effectivePosture: PatientPosture =
+    actualPosture ?? requestedExam.recommendedPosture;
+  const effectiveProjection: ProjectionType =
+    actualProjection ?? requestedExam.recommendedProjection;
+
+  const imageSrc = useMemo(
+    () =>
+      renderProceduralRadiograph({
+        region: evaluation.targetRegionScanned,
+        modality: requestedExam.modality,
+        projection: effectiveProjection,
+        posture: effectivePosture,
+        patientSeed: patient.id,
+      }),
+    [
+      evaluation.targetRegionScanned,
+      requestedExam.modality,
+      effectiveProjection,
+      effectivePosture,
+      patient.id,
+    ]
+  );
 
   const regionLabel =
     REGION_LABELS_I18N[lang][evaluation.targetRegionScanned];
   const modalityLabel = MODALITY_LABELS_I18N[lang][requestedExam.modality];
+  const postureLabel = POSTURE_SHORT_I18N[lang][effectivePosture];
+  const projectionLabel = PROJECTION_LABELS_I18N[lang][effectiveProjection];
   const evalText = getEvaluationText(evaluation, lang, regionLabel);
 
   const handleSelectViewPreset = (preset: (typeof VIEW_PRESETS)[number]) => {
@@ -221,8 +243,9 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
             <div className="text-sm font-bold text-white truncate">
               {patient.nameAr} · {regionLabel}
             </div>
-            <div className="text-[11px] text-slate-400">
-              {modalityLabel} · {kvp} kVp · {mas} mAs
+            <div className="text-[11px] text-slate-400 truncate">
+              {modalityLabel} · <span className="text-cyan-300 font-semibold">{postureLabel}</span> ·{' '}
+              {kvp} kVp · {mas} mAs
             </div>
           </div>
         </div>
@@ -291,14 +314,14 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
               <>
                 <div className="pointer-events-none absolute top-2.5 right-3 z-10 text-[11px] font-mono-num text-cyan-200 text-right leading-relaxed bg-[#040912]/70 px-2 py-1 rounded">
                   <div>{patient.nameAr}</div>
-                  <div>{regionLabel}</div>
+                  <div>{regionLabel} · {postureLabel}</div>
                 </div>
                 <div className="pointer-events-none absolute top-2.5 left-3 z-10 text-[11px] font-mono-num text-cyan-200 text-left leading-relaxed bg-[#040912]/70 px-2 py-1 rounded">
-                  <div>{kvp} kVp</div>
-                  <div>{mas} mAs</div>
+                  <div>{kvp} kVp · {mas} mAs</div>
+                  <div className="text-[10px] text-cyan-300">{projectionLabel}</div>
                 </div>
                 <div className="pointer-events-none absolute bottom-2.5 left-3 z-10 text-xs font-mono-num font-bold text-cyan-100 bg-[#040912]/70 px-2 py-0.5 rounded">
-                  R · {zoomPct}%
+                  {effectiveProjection} · {zoomPct}%
                 </div>
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-25">
                   <div className="w-6 h-px bg-cyan-300" />
