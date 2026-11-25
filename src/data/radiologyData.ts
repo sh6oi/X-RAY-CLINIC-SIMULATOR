@@ -133,10 +133,14 @@ export function getRadiographImage({
   }
 }
 
+export const MINI_PACK_SIZE = 10;
+export const MINI_PACK_COST = 80;
 export const FILM_CARTON_SIZE = 20;
 export const FILM_CARTON_COST = 150;
 export const BULK_CARTON_SIZE = 100;
 export const BULK_CARTON_COST = 650;
+export const MEGA_CRATE_SIZE = 200;
+export const MEGA_CRATE_COST = 1200;
 export const EMERGENCY_LOAN_DEBT = 75;
 
 export const REGION_LABELS_AR: Record<BodyRegion, string> = {
@@ -976,21 +980,32 @@ export const UPGRADES: UpgradeItem[] = [
     titleAr: 'درع رصاصي للحماية الإشعاعية',
     subtitleAr: 'Lead Apron & Gonadal Shield',
     descriptionAr:
-      'توفير دروع الرصاص الواقية للمرضى أثناء التصوير يرفع التقييم الطبي ويضيف $3 مكافأة جودة لكل فحص.',
-    cost: 180,
+      'توفير دروع الرصاص الواقية للمرضى أثناء التصوير يرفع التقييم الطبي ويضيف $0.5 مكافأة أمان لكل فحص.',
+    cost: 360,
     category: 'safety',
-    benefitSummaryAr: '+$3 مكافأة أمان وجودة لكل مريض',
+    benefitSummaryAr: '+$0.5 مكافأة أمان لكل مريض',
     imagePath: ASSETS.shopLeadApronImg,
+  },
+  {
+    id: 'area_radiation_monitor',
+    titleAr: 'جهاز رصد وإنذار الإشعاع الجداري',
+    subtitleAr: 'Wall Radiation Area Monitor',
+    descriptionAr:
+      'كاشف رقمي يراقب مستوى الإشعاع في الغرفة باستمرار ويرفع التزام السلامة المهنية بمكافأة $0.5 لكل فحص.',
+    cost: 520,
+    category: 'safety',
+    benefitSummaryAr: 'مراقبة مستمرة للإشعاع + $0.5 أمان',
+    imagePath: ASSETS.shopAreaMonitorImg,
   },
   {
     id: 'dosimeter_badge',
     titleAr: 'مقياس الجرعة الشخصي الذكي',
     subtitleAr: 'Digital Personal Dosimeter',
     descriptionAr:
-      'يعرض لك مؤشر توافق الجرعة الفوري في لوحة التحكم قبل إطلاق الأشعة لتجنب تلف الأفلام ويضيف $2 أمان.',
-    cost: 320,
+      'يعرض لك مؤشر توافق الجرعة الفوري في لوحة التحكم قبل إطلاق الأشعة لتجنب تلف الأفلام ويضيف $0.5 أمان.',
+    cost: 640,
     category: 'safety',
-    benefitSummaryAr: 'مؤشر توافق kVp/mAs + $2 أمان',
+    benefitSummaryAr: 'مؤشر توافق kVp/mAs + $0.5 أمان',
     imagePath: ASSETS.shopDosimeterBadgeImg,
   },
   {
@@ -998,21 +1013,32 @@ export const UPGRADES: UpgradeItem[] = [
     titleAr: 'طوق الغدة الدرقية ونظارة الرصاص',
     subtitleAr: 'Thyroid Collar & Lead Eyewear',
     descriptionAr:
-      'حماية تخصصية إضافية للرقبة والعينين من الإشعاع المشتت ترفع معايير السلامة وتضيف $3 لكل فحص.',
-    cost: 420,
+      'حماية تخصصية إضافية للرقبة والعينين من الإشعاع المشتت ترفع معايير السلامة وتضيف $1 لكل فحص.',
+    cost: 840,
     category: 'safety',
-    benefitSummaryAr: '+$3 مكافأة سلامة إشعاعية',
+    benefitSummaryAr: '+$1 مكافأة سلامة إشعاعية',
     imagePath: ASSETS.shopDosimeterBadgeImg,
+  },
+  {
+    id: 'lead_glass_barrier',
+    titleAr: 'زجاج رصاصي مُعزّز لغرفة التحكم',
+    subtitleAr: 'Heavy Lead-Glass Control Shield',
+    descriptionAr:
+      'نافذة مراقبة سميكة مُطعّمة بالرصاص تعزل غرفة التحكم تماماً عن التشتت الإشعاعي وتضيف $1 أمان.',
+    cost: 1040,
+    category: 'safety',
+    benefitSummaryAr: '+$1 مكافأة عزل وسلامة التحكم',
+    imagePath: ASSETS.shopLeadGlassImg,
   },
   {
     id: 'auto_processor',
     titleAr: 'ماكينة تحميض أفلام آلية',
     subtitleAr: 'Automatic Film Processor',
     descriptionAr:
-      'يسرّع قراءة الكاسيت في جهاز CR ويحسن التباين التشخيصي مع إضافة $2 مكافأة دقة.',
-    cost: 550,
+      'يسرّع قراءة الكاسيت في جهاز CR ويحسن التباين التشخيصي مع إضافة $1 مكافأة دقة لكل مريض.',
+    cost: 1100,
     category: 'efficiency',
-    benefitSummaryAr: 'قراءة أسرع للكاسيت + $2 مكافأة دقة',
+    benefitSummaryAr: 'قراءة أسرع للكاسيت + $1 مكافأة دقة',
     imagePath: ASSETS.shopAutoProcessorImg,
   },
   {
@@ -1020,21 +1046,32 @@ export const UPGRADES: UpgradeItem[] = [
     titleAr: 'طقم وسائد وأحزمة تثبيت المريض',
     subtitleAr: 'Positioning Wedges & Pads',
     descriptionAr:
-      'يمنع اهتزاز المريض ويوسّع هامش التسامح في قيم kVp و mAs لتقليل إعادة التصوير مع $3 جودة.',
-    cost: 680,
+      'يمنع اهتزاز المريض ويوسّع هامش التسامح في قيم kVp و mAs لتقليل إعادة التصوير مع $1 جودة.',
+    cost: 1360,
     category: 'efficiency',
-    benefitSummaryAr: 'توسيع هامش kVp/mAs + $3 جودة',
+    benefitSummaryAr: 'توسيع هامش kVp/mAs + $1 جودة',
     imagePath: ASSETS.shopImmobilizationKitImg,
+  },
+  {
+    id: 'bucky_grid',
+    titleAr: 'شبكة تقليل التشتت الإشعاعي (Bucky Grid)',
+    subtitleAr: 'Anti-Scatter Carbon Bucky Grid',
+    descriptionAr:
+      'شبكة دقيقة من ألياف الكربون تمتص الأشعة المشتتة لإبراز تفاصيل العظام بوضوح وتوسيع هامش التعريض مع $1 جودة.',
+    cost: 1480,
+    category: 'efficiency',
+    benefitSummaryAr: 'تباين أدق + توسيع هامش التعريض + $1 جودة',
+    imagePath: ASSETS.shopBuckyGridImg,
   },
   {
     id: 'collimator_laser',
     titleAr: 'موجّه الليزر والمُحدِّد الدقيق',
     subtitleAr: 'Precision Laser Collimator',
     descriptionAr:
-      'تحديد ليزري متقاطع لحقل الأشعة يقلل التشتت الإشعاعي ويرفع التقييم التشخيصي بمقدار $3.',
-    cost: 820,
+      'تحديد ليزري متقاطع لحقل الأشعة يقلل التشتت الإشعاعي ويرفع التقييم التشخيصي بمقدار $1 لكل مريض.',
+    cost: 1640,
     category: 'efficiency',
-    benefitSummaryAr: 'تحديد ليزري دقيق + $3 جودة',
+    benefitSummaryAr: 'تحديد ليزري دقيق + $1 جودة',
     imagePath: ASSETS.shopLaserCollimatorImg,
   },
   {
@@ -1043,10 +1080,21 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Protocol Auto-Calibration',
     descriptionAr:
       'يُضيف زر ضبط تلقائي لقيم kVp و mAs والوضعية الصحيحة بنقرة واحدة لتقليل هدر الأفلام.',
-    cost: 950,
+    cost: 1900,
     category: 'efficiency',
     benefitSummaryAr: 'زر ضبط تلقائي يمنع تلف الأفلام',
     imagePath: ASSETS.shopDrSystemImg,
+  },
+  {
+    id: 'aec_sensor',
+    titleAr: 'مستشعر التعريض التلقائي (AEC)',
+    subtitleAr: 'Automatic Exposure Control (AEC)',
+    descriptionAr:
+      'غرفة تأين ثلاثية الحقول تضبط التعريض تلقائياً لمنع احتراق أو بهتان الأفلام وتضيف $1.5 مكافأة دقة.',
+    cost: 2200,
+    category: 'efficiency',
+    benefitSummaryAr: 'حماية ذكية ضد حرق/بهتان الفيلم + $1.5 جودة',
+    imagePath: ASSETS.shopAecSensorImg,
   },
   {
     id: 'waiting_room',
@@ -1054,31 +1102,53 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Waiting Room Expansion',
     descriptionAr:
       'زيادة سعة صالة الانتظار إلى 6 مرضى مع رفع عدد المراجعين اليومي للعيادة من 10–15 إلى 20–25 مريضاً في اليوم.',
-    cost: 1200,
+    cost: 2400,
     category: 'efficiency',
     benefitSummaryAr: '20–25 مريضاً يومياً · سعة 6 مقاعد',
     imagePath: ASSETS.clinicReceptionImg,
+  },
+  {
+    id: 'ergonomic_table_pad',
+    titleAr: 'مرتبة طبية مريحة لطاولة الأشعة',
+    subtitleAr: 'Radiolucent Memory-Foam Table Pad',
+    descriptionAr:
+      'حشوة طبية شفافة للأشعة تثبّت العمود الفقري والحوض براحة للمريض وتضيف $1.5 مكافأة راحة وجودة.',
+    cost: 2700,
+    category: 'efficiency',
+    benefitSummaryAr: 'ثبات وراحة المريض + $1.5 جودة',
+    imagePath: ASSETS.shopTablePadImg,
   },
   {
     id: 'tube_cooler',
     titleAr: 'نظام تبريد أنبوب الأشعة الفائق',
     subtitleAr: 'High-Capacity Tube Cooling',
     descriptionAr:
-      'يخفض حرارة أنبوب الأشعة ويسرّع دورة التعريض وقراءة CR بنسبة 40% مع $2 كفاءة لكل حالة.',
-    cost: 1450,
+      'يخفض حرارة أنبوب الأشعة ويسرّع دورة التعريض وقراءة CR بنسبة 40% مع $1.5 كفاءة لكل مريض.',
+    cost: 2900,
     category: 'efficiency',
-    benefitSummaryAr: 'سرعة تصوير مضاعفة + $2 كفاءة',
+    benefitSummaryAr: 'سرعة تصوير مضاعفة + $1.5 كفاءة',
     imagePath: ASSETS.shopLaserCollimatorImg,
+  },
+  {
+    id: 'hepa_sterilizer',
+    titleAr: 'منظومة تعقيم وتنقية الهواء الطبي (HEPA)',
+    subtitleAr: 'Medical HEPA & UV-C Air Sterilizer',
+    descriptionAr:
+      'جهاز تنقية وتعقيم متطور بالهواء النقي والأشعة فوق البنفسجية يرفع تصنيف النظافة الطبية للعيادة بمقدار $1.5 لكل مريض.',
+    cost: 3300,
+    category: 'staff',
+    benefitSummaryAr: '+$1.5 تقييم تعقيم وجودة بيئة العيادة',
+    imagePath: ASSETS.shopHepaSterilizerImg,
   },
   {
     id: 'dry_laser_printer',
     titleAr: 'طابعة أفلام ليزرية جافة (DryView)',
     subtitleAr: 'Dry Laser Medical Imager',
     descriptionAr:
-      'طباعة طبية فائقة التباين للنتائج والأقراص للمرضى ترفع عائد كل فحص بمقدار $4.',
-    cost: 1850,
+      'طباعة طبية فائقة التباين للنتائج والأقراص للمرضى ترفع عائد كل فحص بمقدار $1.5 لكل مريض.',
+    cost: 3700,
     category: 'efficiency',
-    benefitSummaryAr: '+$4 رسوم طباعة وتقرير لكل فحص',
+    benefitSummaryAr: '+$1.5 رسوم طباعة وتقرير لكل مريض',
     imagePath: ASSETS.shopDryPrinterImg,
   },
   {
@@ -1086,11 +1156,22 @@ export const UPGRADES: UpgradeItem[] = [
     titleAr: 'منظومة PACS الذكية لتحليل الصور',
     subtitleAr: 'Dual-Monitor AI PACS Suite',
     descriptionAr:
-      'محطة قراءة طبية مزدوجة تساعدك على ضبط التباين والتشخيص بدقة عالية وتضيف $5 لكل فحص.',
-    cost: 2400,
+      'محطة قراءة طبية مزدوجة تساعدك على ضبط التباين والتشخيص بدقة عالية وتضيف $2 لكل مريض.',
+    cost: 4800,
     category: 'efficiency',
-    benefitSummaryAr: '+$5 مكافأة دقة تشخيصية متقدمة',
+    benefitSummaryAr: '+$2 مكافأة دقة تشخيصية متقدمة',
     imagePath: ASSETS.shopAiPacsImg,
+  },
+  {
+    id: 'teleradiology_link',
+    titleAr: 'نظام استشارات الأشعة عن بُعد (Teleradiology)',
+    subtitleAr: 'Encrypted Teleradiology Hub',
+    descriptionAr:
+      'ربط مباشر ومشفّر مع استشاريي الأشعة لإصدار تقارير فورية متخصصة، يضيف $2 عائد استشارة لكل مريض.',
+    cost: 5700,
+    category: 'modality',
+    benefitSummaryAr: '+$2 مكافأة تقرير استشاري عن بُعد',
+    imagePath: ASSETS.shopTeleradiologyImg,
   },
   {
     id: 'digital_dr',
@@ -1098,7 +1179,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Digital Radiography Flat-Panel',
     descriptionAr:
       'التحول من نظام CR إلى التصوير الرقمي المباشر DR! لا حاجة لقارئ الكاسيت بعد الآن ولا استهلاك للأفلام — تنتقل الصورة مباشرة للحاسوب ويرتفع سعر الفحص إلى $25.',
-    cost: 3200,
+    cost: 6400,
     category: 'modality',
     benefitSummaryAr: 'إرسال فوري للحاسوب بدون قارئ CR + $25',
     imagePath: ASSETS.shopDrSystemImg,
@@ -1108,10 +1189,10 @@ export const UPGRADES: UpgradeItem[] = [
     titleAr: 'جناح وصالة انتظار VIP الفاخرة',
     subtitleAr: 'VIP Patient Comfort Lounge',
     descriptionAr:
-      'تجهيز صالة راحة فاخرة للمراجعين بإضاءة هادئة وضيافة طبية ترفع دخل العيادة بمقدار $8 لكل فحص.',
-    cost: 3800,
+      'تجهيز صالة راحة فاخرة للمراجعين بإضاءة هادئة وضيافة طبية ترفع دخل العيادة بمقدار $2 لكل مريض.',
+    cost: 7600,
     category: 'modality',
-    benefitSummaryAr: '+$8 عائد ضيافة وجودة VIP لكل فحص',
+    benefitSummaryAr: '+$2 عائد ضيافة وجودة VIP لكل مريض',
     imagePath: ASSETS.shopVipLoungeImg,
   },
   {
@@ -1120,7 +1201,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: '64-Slice CT Scanner Suite',
     descriptionAr:
       'جهاز التصوير المقطعي الحلزوني (64 شريحة) لغرفة السيتي — هذا الجهاز غير متوفر للشراء حالياً وسيتوفر قريباً.',
-    cost: 8500,
+    cost: 17000,
     category: 'modality',
     benefitSummaryAr: 'غير متوفر حالياً — سيتوفر قريباً',
     imagePath: ASSETS.shopCtScannerImg,
@@ -1132,7 +1213,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: '1.5T MRI Imaging Suite',
     descriptionAr:
       'منظومة الرنين المغناطيسي لغرفة الـ MRI — هذا الجهاز غير متوفر للشراء حالياً وسيتوفر قريباً.',
-    cost: 16000,
+    cost: 32000,
     category: 'modality',
     benefitSummaryAr: 'غير متوفر حالياً — سيتوفر قريباً',
     imagePath: ASSETS.shopMriSuiteImg,
@@ -1144,7 +1225,7 @@ export const UPGRADES: UpgradeItem[] = [
     subtitleAr: 'Assistant Radiographer (Master Unlock)',
     descriptionAr:
       'خيار متقدم يفتح فقط بعد خدمة 500 مريض! تقني مساعد يدير حالات إضافية ويدر دخلاً تلقائياً مستمراً.',
-    cost: 4500,
+    cost: 9000,
     category: 'staff',
     benefitSummaryAr: 'يُفتح بعد فحص 500 مريض · دخل تلقائي',
     imagePath: ASSETS.shopAssistantTechImg,
@@ -1740,13 +1821,20 @@ export function evaluateExposure(params: {
   const hasDR = ownedUpgrades.includes('digital_dr');
   const hasAutoProc = ownedUpgrades.includes('auto_processor');
   const hasShieldUpgrade = ownedUpgrades.includes('lead_shield');
+  const hasAreaMonitor = ownedUpgrades.includes('area_radiation_monitor');
   const hasDosimeter = ownedUpgrades.includes('dosimeter_badge');
   const hasThyroidCollar = ownedUpgrades.includes('thyroid_collar');
+  const hasLeadGlass = ownedUpgrades.includes('lead_glass_barrier');
   const hasImmobilization = ownedUpgrades.includes('immobilization_kit');
+  const hasBuckyGrid = ownedUpgrades.includes('bucky_grid');
   const hasLaserCollimator = ownedUpgrades.includes('collimator_laser');
+  const hasAecSensor = ownedUpgrades.includes('aec_sensor');
+  const hasTablePad = ownedUpgrades.includes('ergonomic_table_pad');
   const hasTubeCooler = ownedUpgrades.includes('tube_cooler');
+  const hasHepaSterilizer = ownedUpgrades.includes('hepa_sterilizer');
   const hasDryPrinter = ownedUpgrades.includes('dry_laser_printer');
   const hasAiPacs = ownedUpgrades.includes('ai_pacs');
+  const hasTeleradiology = ownedUpgrades.includes('teleradiology_link');
   const hasVipLounge = ownedUpgrades.includes('vip_lounge');
 
   const filmConsumed = exam.modality === 'XRAY' && !hasDR ? 1 : 0;
@@ -1801,9 +1889,18 @@ export function evaluateExposure(params: {
 
   const [minKvp, maxKvp] = exam.kvpRange;
   const [minMas, maxMas] = exam.masRange;
-  const kvpMargin = hasImmobilization ? 9 : 6;
-  const masLowMargin = hasImmobilization ? 5 : 3;
-  const masHighMargin = hasImmobilization ? 8 : 5;
+  const kvpMargin =
+    6 +
+    (hasImmobilization ? 3 : 0) +
+    (hasBuckyGrid ? 1 : 0) +
+    (hasAecSensor ? 2 : 0);
+  const masLowMargin =
+    3 + (hasImmobilization ? 2 : 0) + (hasAecSensor ? 1 : 0);
+  const masHighMargin =
+    5 +
+    (hasImmobilization ? 3 : 0) +
+    (hasBuckyGrid ? 1 : 0) +
+    (hasAecSensor ? 2 : 0);
 
   const kvpTooLow = kvp < minKvp - kvpMargin;
   const kvpTooHigh = kvp > maxKvp + kvpMargin;
@@ -1844,18 +1941,25 @@ export function evaluateExposure(params: {
 
   const baseEarned = exam.modality === 'XRAY' && hasDR ? 25 : exam.baseFee;
   const safetyBonus =
-    (hasShieldUpgrade && shieldUsed ? 3 : 0) +
-    (hasDosimeter ? 2 : 0) +
-    (hasThyroidCollar ? 3 : 0);
+    (hasShieldUpgrade && shieldUsed ? 0.5 : 0) +
+    (hasAreaMonitor ? 0.5 : 0) +
+    (hasDosimeter ? 0.5 : 0) +
+    (hasThyroidCollar ? 1 : 0) +
+    (hasLeadGlass ? 1 : 0);
   const qualityBonus =
-    (hasAutoProc ? 2 : 0) +
+    (hasAutoProc ? 1 : 0) +
     (patientPrepped ? 2 : 0) +
-    (hasImmobilization ? 3 : 0) +
-    (hasLaserCollimator ? 3 : 0) +
-    (hasTubeCooler ? 2 : 0) +
-    (hasDryPrinter ? 4 : 0) +
-    (hasAiPacs ? 5 : 0) +
-    (hasVipLounge ? 8 : 0);
+    (hasImmobilization ? 1 : 0) +
+    (hasBuckyGrid ? 1 : 0) +
+    (hasLaserCollimator ? 1 : 0) +
+    (hasAecSensor ? 1.5 : 0) +
+    (hasTablePad ? 1.5 : 0) +
+    (hasTubeCooler ? 1.5 : 0) +
+    (hasHepaSterilizer ? 1.5 : 0) +
+    (hasDryPrinter ? 1.5 : 0) +
+    (hasAiPacs ? 2 : 0) +
+    (hasTeleradiology ? 2 : 0) +
+    (hasVipLounge ? 2 : 0);
   const totalEarned = baseEarned + safetyBonus + qualityBonus;
 
   return {

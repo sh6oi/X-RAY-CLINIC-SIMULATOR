@@ -53,6 +53,10 @@ import {
   EMERGENCY_LOAN_DEBT,
   FILM_CARTON_COST,
   FILM_CARTON_SIZE,
+  MEGA_CRATE_COST,
+  MEGA_CRATE_SIZE,
+  MINI_PACK_COST,
+  MINI_PACK_SIZE,
   UPGRADES,
   evaluateExposure,
   generatePatient,
@@ -1740,9 +1744,23 @@ export default function App() {
     );
   };
 
-  const handleBuyCarton = (count: 1 | 5) => {
-    const cost = count === 1 ? FILM_CARTON_COST : BULK_CARTON_COST;
-    const filmsToAdd = count === 1 ? FILM_CARTON_SIZE : BULK_CARTON_SIZE;
+  const handleBuyCarton = (count: 0.5 | 1 | 5 | 10) => {
+    const cost =
+      count === 0.5
+        ? MINI_PACK_COST
+        : count === 1
+          ? FILM_CARTON_COST
+          : count === 5
+            ? BULK_CARTON_COST
+            : MEGA_CRATE_COST;
+    const filmsToAdd =
+      count === 0.5
+        ? MINI_PACK_SIZE
+        : count === 1
+          ? FILM_CARTON_SIZE
+          : count === 5
+            ? BULK_CARTON_SIZE
+            : MEGA_CRATE_SIZE;
 
     if (save.cash < cost) {
       soundFx.playError();
@@ -1757,7 +1775,7 @@ export default function App() {
       ...prev,
       cash: prev.cash - cost,
       films: prev.films + filmsToAdd,
-      cartonsBought: prev.cartonsBought + count,
+      cartonsBought: prev.cartonsBought + (count === 0.5 ? 1 : count),
       dailySpentExpenses: (prev.dailySpentExpenses ?? 0) + cost,
     }));
     showToast(

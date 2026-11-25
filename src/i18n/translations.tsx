@@ -234,38 +234,56 @@ export const UPGRADE_EN: Record<
   lead_shield: {
     title: 'Lead Apron & Gonadal Shield',
     description:
-      'Provides protective lead shielding for patients during exposure, adding +$3 safety & quality bonus per scan.',
-    benefit: '+$3 safety bonus per patient',
+      'Provides protective lead shielding for patients during exposure, adding +$0.5 safety bonus per patient.',
+    benefit: '+$0.5 safety bonus per patient',
+  },
+  area_radiation_monitor: {
+    title: 'Wall Radiation Area Monitor',
+    description:
+      'Digital radiation detector continuously tracks room dose levels, elevating clinical safety compliance and adding +$0.5 per patient.',
+    benefit: 'Continuous monitoring + $0.5 safety',
   },
   dosimeter_badge: {
     title: 'Digital Personal Dosimeter',
     description:
-      'Displays live kVp & mAs protocol alignment inside the console before firing and adds +$2 safety bonus.',
-    benefit: 'Live kVp/mAs guide + $2 safety',
+      'Displays live kVp & mAs protocol alignment inside the console before firing and adds +$0.5 safety bonus.',
+    benefit: 'Live kVp/mAs guide + $0.5 safety',
   },
   thyroid_collar: {
     title: 'Thyroid Collar & Lead Eyewear',
     description:
-      'Extra radiation protection for neck and eyes against scatter radiation, adding +$3 safety per exam.',
-    benefit: '+$3 radiation safety bonus',
+      'Extra radiation protection for neck and eyes against scatter radiation, adding +$1 safety per patient.',
+    benefit: '+$1 radiation safety bonus',
+  },
+  lead_glass_barrier: {
+    title: 'Heavy Lead-Glass Control Shield',
+    description:
+      'Reinforced high-density leaded glass window shields the booth completely from scatter, adding +$1 safety per patient.',
+    benefit: '+$1 booth shielding safety',
   },
   auto_processor: {
     title: 'Automatic Film Processor',
     description:
-      'Faster film processing inside the CR reader with sharper diagnostic contrast and +$2 accuracy bonus.',
-    benefit: 'Faster CR readout + $2 bonus',
+      'Faster film processing inside the CR reader with sharper diagnostic contrast and +$1 accuracy bonus per patient.',
+    benefit: 'Faster CR readout + $1 bonus',
   },
   immobilization_kit: {
     title: 'Immobilization Wedges & Pads',
     description:
-      'Reduces patient motion and widens kVp/mAs tolerance margins to prevent retakes, adding +$3 quality.',
-    benefit: 'Wider dose tolerance + $3 quality',
+      'Reduces patient motion and widens kVp/mAs tolerance margins to prevent retakes, adding +$1 quality per patient.',
+    benefit: 'Wider dose tolerance + $1 quality',
+  },
+  bucky_grid: {
+    title: 'Anti-Scatter Carbon Bucky Grid',
+    description:
+      'Absorbs secondary scatter radiation for crisp bone contrast, slightly widens exposure margins, and adds +$1 quality.',
+    benefit: 'Anti-scatter contrast + $1 quality',
   },
   collimator_laser: {
     title: 'Precision Laser Collimator',
     description:
-      'Crisp laser crosshair field alignment lowers scatter and boosts diagnostic score by +$3 per scan.',
-    benefit: 'Laser alignment + $3 quality',
+      'Crisp laser crosshair field alignment lowers scatter and boosts diagnostic score by +$1 per patient.',
+    benefit: 'Laser alignment + $1 quality',
   },
   protocol_assist: {
     title: 'Smart Protocol Auto-Calibrator',
@@ -273,29 +291,53 @@ export const UPGRADE_EN: Record<
       'Adds a one-tap Auto-Calibrate button on the console to set kVp, mAs, and posture accurately.',
     benefit: 'One-tap console auto-calibration',
   },
+  aec_sensor: {
+    title: 'Automatic Exposure Control (AEC)',
+    description:
+      'Three-field ionization sensor automatically compensates exposure levels, preventing under/overexposed films and adding +$1.5 quality.',
+    benefit: 'Smart AEC margin + $1.5 quality',
+  },
   waiting_room: {
     title: 'Waiting Room Expansion',
     description:
       'Increases clinic waiting room capacity from 3 to 6 seats and boosts daily clinic visitors from 10–15 to 20–25 patients per day.',
     benefit: '20–25 patients/day · 6 seats',
   },
+  ergonomic_table_pad: {
+    title: 'Radiolucent Memory-Foam Table Pad',
+    description:
+      'Ergonomic X-ray table mattress stabilizes spine/pelvis positioning cleanly and adds +$1.5 comfort & quality bonus.',
+    benefit: 'Patient comfort + $1.5 quality',
+  },
   tube_cooler: {
     title: 'High-Capacity Tube Cooling',
     description:
-      'Cuts X-ray tube heat load and speeds up exposure & CR processing time by 40% (+$2 efficiency).',
-    benefit: 'Faster exposure & CR speed + $2',
+      'Cuts X-ray tube heat load and speeds up exposure & CR processing time by 40% (+$1.5 efficiency per patient).',
+    benefit: 'Faster exposure & CR speed + $1.5',
+  },
+  hepa_sterilizer: {
+    title: 'Medical HEPA & UV-C Air Sterilizer',
+    description:
+      'Hospital-grade air purification keeps the imaging suite sterile and boosts clinic care rating by +$1.5 per patient.',
+    benefit: '+$1.5 clinical hygiene & rating',
   },
   dry_laser_printer: {
     title: 'Dry Laser Medical Imager',
     description:
-      'High-contrast medical dry film printing for patients, increasing each exam fee by +$4.',
-    benefit: '+$4 print fee per patient',
+      'High-contrast medical dry film printing for patients, increasing each exam fee by +$1.5 per patient.',
+    benefit: '+$1.5 print fee per patient',
   },
   ai_pacs: {
     title: 'Dual-Monitor AI PACS Suite',
     description:
-      'Advanced diagnostic workstation boosts image review precision and adds +$5 per completed scan.',
-    benefit: '+$5 diagnostic precision bonus',
+      'Advanced diagnostic workstation boosts image review precision and adds +$2 per completed patient scan.',
+    benefit: '+$2 diagnostic precision bonus',
+  },
+  teleradiology_link: {
+    title: 'Encrypted Teleradiology Hub',
+    description:
+      'Real-time remote consultant radiologist reporting link adds +$2 specialist consultation bonus per patient.',
+    benefit: '+$2 remote specialist bonus',
   },
   digital_dr: {
     title: 'Digital Radiography Flat-Panel (DR)',
@@ -306,8 +348,8 @@ export const UPGRADE_EN: Record<
   vip_lounge: {
     title: 'VIP Patient Comfort Lounge',
     description:
-      'Luxury patient waiting suite with calm ambiance and hospitality, adding +$8 revenue per exam.',
-    benefit: '+$8 VIP hospitality bonus',
+      'Luxury patient waiting suite with calm ambiance and hospitality, adding +$2 revenue per patient.',
+    benefit: '+$2 VIP hospitality bonus',
   },
   ct_scanner: {
     title: '64-Slice CT Scanner Suite',

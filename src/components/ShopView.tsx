@@ -19,6 +19,10 @@ import {
   FILM_CARTON_COST,
   FILM_CARTON_IMAGE,
   FILM_CARTON_SIZE,
+  MEGA_CRATE_COST,
+  MEGA_CRATE_SIZE,
+  MINI_PACK_COST,
+  MINI_PACK_SIZE,
   UPGRADES,
 } from '../data/radiologyData';
 import {UPGRADE_EN, useLanguage} from '../i18n/translations';
@@ -29,7 +33,7 @@ interface ShopViewProps {
   filmDebt: number;
   patientsServed: number;
   ownedUpgrades: UpgradeId[];
-  onBuyCarton: (count: 1 | 5) => void;
+  onBuyCarton: (count: 0.5 | 1 | 5 | 10) => void;
   onTakeEmergencyLoan: () => void;
   onBuyUpgrade: (id: UpgradeId) => void;
 }
@@ -105,7 +109,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
 
   const hasDR = ownedUpgrades.includes('digital_dr');
   const needsEmergencyLoan =
-    !hasDR && films === 0 && cash < FILM_CARTON_COST;
+    !hasDR && films === 0 && cash < MINI_PACK_COST;
 
   const visibleUpgrades = useMemo(
     () =>
@@ -115,9 +119,12 @@ export const ShopView: React.FC<ShopViewProps> = ({
     [categoryFilter]
   );
 
+  const perMiniFilmCost = (MINI_PACK_COST / MINI_PACK_SIZE).toFixed(2);
   const perFilmCost = (FILM_CARTON_COST / FILM_CARTON_SIZE).toFixed(2);
   const perBulkFilmCost = (BULK_CARTON_COST / BULK_CARTON_SIZE).toFixed(2);
+  const perMegaFilmCost = (MEGA_CRATE_COST / MEGA_CRATE_SIZE).toFixed(2);
   const bulkSavings = FILM_CARTON_COST * 5 - BULK_CARTON_COST;
+  const megaSavings = FILM_CARTON_COST * 10 - MEGA_CRATE_COST;
 
   return (
     <div className="space-y-8">
@@ -131,8 +138,8 @@ export const ShopView: React.FC<ShopViewProps> = ({
           </h2>
           <p className="mt-1 text-sm text-slate-400">
             {isAr
-              ? 'اشترِ كراتين الأفلام والأدوات المساعدة لتقني الأشعة وتجهيزات العيادة، أو طوّر جهازك إلى DR للاستغناء عن قارئ الكاسيت CR.'
-              : 'Purchase X-ray film cartons, technologist tools, and clinic upgrades — or upgrade to Digital DR to bypass the CR cassette reader.'}
+              ? 'أفلام الأشعة متاحة للشراء بعدد لا نهائي من المرات، بينما جميع الأجهزة والترقيات الأخرى تُشترى مرة واحدة فقط.'
+              : 'X-ray films can be purchased unlimited times; all clinic equipment and upgrades are one-time purchases.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-5 text-sm">
@@ -190,8 +197,8 @@ export const ShopView: React.FC<ShopViewProps> = ({
               </h3>
               <p className="mt-1 text-xs text-amber-100/80 leading-relaxed">
                 {isAr
-                  ? `نفدت جميع أفلامك ولا تملك $${FILM_CARTON_COST} حالياً لشراء كرتون كامل. يمكنك طلب حزمة طوارئ (10 أفلام أشعة) وتُسدد قيمتها ($${EMERGENCY_LOAN_DEBT}) تلقائياً من عوائد المرضى القادمين.`
-                  : `You ran out of films and don't have $${FILM_CARTON_COST} for a full carton. Request an emergency 10-film pack ($${EMERGENCY_LOAN_DEBT} deferred credit deducted automatically from upcoming patients).`}
+                  ? `نفدت جميع أفلامك ولا تملك $${MINI_PACK_COST} حالياً لشراء عبوة أفلام. يمكنك طلب حزمة طوارئ (10 أفلام أشعة) وتُسدد قيمتها ($${EMERGENCY_LOAN_DEBT}) تلقائياً من عوائد المرضى القادمين.`
+                  : `You ran out of films and don't have $${MINI_PACK_COST} for a film pack. Request an emergency 10-film pack ($${EMERGENCY_LOAN_DEBT} deferred credit deducted automatically from upcoming patients).`}
               </p>
             </div>
           </div>
@@ -220,10 +227,17 @@ export const ShopView: React.FC<ShopViewProps> = ({
 
       {/* Section 1: X-Ray Films */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-100">
-            {isAr ? 'أفلام التصوير الإشعاعي (CR)' : 'CR X-Ray Film Packs'}
-          </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-bold text-slate-100">
+              {isAr ? 'أفلام التصوير الإشعاعي (CR)' : 'CR X-Ray Film Packs'}
+            </h3>
+            <p className="text-xs text-cyan-300/90 mt-0.5">
+              {isAr
+                ? 'شراء غير محدود — يمكنك شراء أفلام الأشعة بعدد لا نهائي من المرات'
+                : 'Unlimited purchases — buy film packs as many times as needed'}
+            </p>
+          </div>
           {hasDR && (
             <span className="text-xs text-cyan-300">
               {isAr
@@ -233,41 +247,97 @@ export const ShopView: React.FC<ShopViewProps> = ({
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {/* Quick 10-Film Pack */}
+          <div className="rounded-xl border border-slate-800 bg-[#131C29] p-4 flex flex-col justify-between gap-3.5">
+            <ShopImageFrame
+              src={FILM_CARTON_IMAGE}
+              alt={isAr ? 'عبوة سريعة 10 أفلام أشعة' : '10 X-Ray Film Pack'}
+              fallbackIcon={<Package className="w-7 h-7 text-cyan-400" />}
+            />
+
+            <div className="space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-bold text-white">
+                    {isAr
+                      ? `عبوة سريعة (${MINI_PACK_SIZE} أفلام)`
+                      : `Quick Pack (${MINI_PACK_SIZE} Films)`}
+                  </h4>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <span>
+                      {isAr ? `${MINI_PACK_SIZE} أفلام` : `${MINI_PACK_SIZE} films`}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      {isAr ? `$${perMiniFilmCost} للفيلم` : `$${perMiniFilmCost}/film`}
+                    </span>
+                  </div>
+                </div>
+                <span className="font-mono-num text-base font-bold text-emerald-400 shrink-0">
+                  ${MINI_PACK_COST}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {isAr
+                  ? 'خيار مرن للتزود السريع بالأفلام عند الحاجة بأقل تكلفة.'
+                  : 'Flexible small restock pack whenever film stock runs low.'}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={cash < MINI_PACK_COST || hasDR}
+              onClick={() => onBuyCarton(0.5)}
+              className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-cyan-500/40 disabled:bg-slate-800/60 disabled:border-slate-800 disabled:text-slate-500 text-cyan-200 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
+            >
+              <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {hasDR
+                  ? isAr
+                    ? 'غير مطلوب مع DR'
+                    : 'Not needed'
+                  : isAr
+                    ? `شراء (${MINI_PACK_SIZE} أفلام) — $${MINI_PACK_COST}`
+                    : `Buy ${MINI_PACK_SIZE} — $${MINI_PACK_COST}`}
+              </span>
+            </button>
+          </div>
+
           {/* Standard 20-Film Carton */}
-          <div className="rounded-xl border border-slate-800 bg-[#131C29] p-5 flex flex-col justify-between gap-4">
+          <div className="rounded-xl border border-slate-800 bg-[#131C29] p-4 flex flex-col justify-between gap-3.5">
             <ShopImageFrame
               src={FILM_CARTON_IMAGE}
               alt={isAr ? 'كرتون أفلام أشعة سينية 20 فيلم' : '20 X-Ray Film Carton'}
               fallbackIcon={<Package className="w-7 h-7 text-cyan-400" />}
             />
 
-            <div className="space-y-2">
-              <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h4 className="text-base font-bold text-white">
+                  <h4 className="text-sm font-bold text-white">
                     {isAr
-                      ? `كرتون أفلام أشعة (${FILM_CARTON_SIZE} فيلم)`
-                      : `Standard Film Carton (${FILM_CARTON_SIZE} Films)`}
+                      ? `كرتون قياسي (${FILM_CARTON_SIZE} فيلم)`
+                      : `Standard Carton (${FILM_CARTON_SIZE} Films)`}
                   </h4>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-400">
                     <span>
-                      {isAr ? `${FILM_CARTON_SIZE} فيلم أشعة سينية` : `${FILM_CARTON_SIZE} X-ray sheets`}
+                      {isAr ? `${FILM_CARTON_SIZE} فيلماً` : `${FILM_CARTON_SIZE} sheets`}
                     </span>
                     <span aria-hidden="true">·</span>
                     <span>
-                      {isAr ? `$${perFilmCost} لكل فيلم` : `$${perFilmCost} per film`}
+                      {isAr ? `$${perFilmCost} للفيلم` : `$${perFilmCost}/film`}
                     </span>
                   </div>
                 </div>
-                <span className="font-mono-num text-lg font-bold text-emerald-400 shrink-0">
+                <span className="font-mono-num text-base font-bold text-emerald-400 shrink-0">
                   ${FILM_CARTON_COST}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-[11px] text-slate-400 leading-relaxed">
                 {isAr
-                  ? `الكرتون القياسي لكاسيت الـ CR في العيادات؛ يحقق أرباحاً مضاعفة عند إتمام 20 فحصاً بدقة.`
-                  : 'Standard CR cassette film carton for daily imaging; generates strong clinic profit when exams succeed on the first shot.'}
+                  ? 'الكرتون القياسي لكاسيت الـ CR في العيادات اليومية.'
+                  : 'Standard CR cassette carton for regular daily exams.'}
               </p>
             </div>
 
@@ -275,55 +345,55 @@ export const ShopView: React.FC<ShopViewProps> = ({
               type="button"
               disabled={cash < FILM_CARTON_COST || hasDR}
               onClick={() => onBuyCarton(1)}
-              className="w-full py-2.5 px-4 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed transition-colors"
+              className="w-full py-2 px-3 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
             >
-              <ShoppingCart className="w-4 h-4 shrink-0" />
+              <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
               <span>
                 {hasDR
                   ? isAr
-                    ? 'غير مطلوب مع جهاز DR'
-                    : 'Not needed with DR'
+                    ? 'غير مطلوب مع DR'
+                    : 'Not needed'
                   : isAr
-                    ? `شراء كرتون (${FILM_CARTON_SIZE} فيلم) — $${FILM_CARTON_COST}`
-                    : `Buy Carton (${FILM_CARTON_SIZE} Films) — $${FILM_CARTON_COST}`}
+                    ? `شراء (${FILM_CARTON_SIZE} فيلم) — $${FILM_CARTON_COST}`
+                    : `Buy ${FILM_CARTON_SIZE} — $${FILM_CARTON_COST}`}
               </span>
             </button>
           </div>
 
           {/* Bulk 5-Carton Pack */}
-          <div className="rounded-xl border border-slate-800 bg-[#131C29] p-5 flex flex-col justify-between gap-4">
+          <div className="rounded-xl border border-slate-800 bg-[#131C29] p-4 flex flex-col justify-between gap-3.5">
             <ShopImageFrame
               src={FILM_CARTON_IMAGE}
               alt={isAr ? 'حزمة جملة 5 كراتين أفلام أشعة' : '5-Carton Bulk Pack'}
               fallbackIcon={<Package className="w-7 h-7 text-slate-300" />}
             />
 
-            <div className="space-y-2">
-              <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h4 className="text-base font-bold text-white">
+                  <h4 className="text-sm font-bold text-white">
                     {isAr
-                      ? `حزمة جملة (5 كراتين · ${BULK_CARTON_SIZE} فيلم)`
-                      : `Bulk Pack (5 Cartons · ${BULK_CARTON_SIZE} Films)`}
+                      ? `حزمة جملة (${BULK_CARTON_SIZE} فيلم)`
+                      : `Bulk Pack (${BULK_CARTON_SIZE} Films)`}
                   </h4>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-400">
                     <span>
-                      {isAr ? `${BULK_CARTON_SIZE} فيلم` : `${BULK_CARTON_SIZE} films`}
+                      {isAr ? `$${perBulkFilmCost} للفيلم` : `$${perBulkFilmCost}/film`}
                     </span>
                     <span aria-hidden="true">·</span>
-                    <span>
+                    <span className="text-emerald-300">
                       {isAr ? `توفير $${bulkSavings}` : `Save $${bulkSavings}`}
                     </span>
                   </div>
                 </div>
-                <span className="font-mono-num text-lg font-bold text-emerald-400 shrink-0">
+                <span className="font-mono-num text-base font-bold text-emerald-400 shrink-0">
                   ${BULK_CARTON_COST}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-[11px] text-slate-400 leading-relaxed">
                 {isAr
-                  ? `توريد اقتصادي مخصص للعيادات المزدحمة؛ يخفض تكلفة الفيلم إلى $${perBulkFilmCost} ويقلل حاجتك لإعادة الطلب.`
-                  : `Cost-effective bulk pack for busy clinics, lowering unit cost to $${perBulkFilmCost} per film.`}
+                  ? 'توريد اقتصادي مخصص للعيادات المزدحمة يخفض تكلفة الفيلم.'
+                  : 'Cost-effective 5-carton bundle for high-volume clinics.'}
               </p>
             </div>
 
@@ -331,17 +401,73 @@ export const ShopView: React.FC<ShopViewProps> = ({
               type="button"
               disabled={cash < BULK_CARTON_COST || hasDR}
               onClick={() => onBuyCarton(5)}
-              className="w-full py-2.5 px-4 rounded-lg bg-slate-100 hover:bg-white disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed transition-colors"
+              className="w-full py-2 px-3 rounded-lg bg-slate-100 hover:bg-white disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
             >
-              <ShoppingCart className="w-4 h-4 shrink-0" />
+              <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
               <span>
                 {hasDR
                   ? isAr
-                    ? 'غير مطلوب مع جهاز DR'
-                    : 'Not needed with DR'
+                    ? 'غير مطلوب مع DR'
+                    : 'Not needed'
                   : isAr
-                    ? `شراء 5 كراتين (${BULK_CARTON_SIZE} فيلم) — $${BULK_CARTON_COST}`
-                    : `Buy 5 Cartons (${BULK_CARTON_SIZE} Films) — $${BULK_CARTON_COST}`}
+                    ? `شراء (${BULK_CARTON_SIZE} فيلم) — $${BULK_CARTON_COST}`
+                    : `Buy ${BULK_CARTON_SIZE} — $${BULK_CARTON_COST}`}
+              </span>
+            </button>
+          </div>
+
+          {/* Mega 10-Carton Hospital Crate */}
+          <div className="rounded-xl border border-slate-800 bg-[#131C29] p-4 flex flex-col justify-between gap-3.5">
+            <ShopImageFrame
+              src={FILM_CARTON_IMAGE}
+              alt={isAr ? 'صندوق مستشفى ضخم 200 فيلم' : '200-Film Hospital Crate'}
+              fallbackIcon={<Package className="w-7 h-7 text-amber-300" />}
+            />
+
+            <div className="space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-bold text-white">
+                    {isAr
+                      ? `صندوق مستشفى (${MEGA_CRATE_SIZE} فيلم)`
+                      : `Hospital Crate (${MEGA_CRATE_SIZE} Films)`}
+                  </h4>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <span>
+                      {isAr ? `$${perMegaFilmCost} للفيلم` : `$${perMegaFilmCost}/film`}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="text-emerald-300">
+                      {isAr ? `توفير $${megaSavings}` : `Save $${megaSavings}`}
+                    </span>
+                  </div>
+                </div>
+                <span className="font-mono-num text-base font-bold text-emerald-400 shrink-0">
+                  ${MEGA_CRATE_COST}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {isAr
+                  ? 'أكبر كمية توريد متكررة بأقل سعر ممكن للفيلم الواحد.'
+                  : 'Maximum hospital supply crate with the lowest cost per film.'}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={cash < MEGA_CRATE_COST || hasDR}
+              onClick={() => onBuyCarton(10)}
+              className="w-full py-2 px-3 rounded-lg bg-emerald-400 hover:bg-emerald-300 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
+            >
+              <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {hasDR
+                  ? isAr
+                    ? 'غير مطلوب مع DR'
+                    : 'Not needed'
+                  : isAr
+                    ? `شراء (${MEGA_CRATE_SIZE} فيلم) — $${MEGA_CRATE_COST}`
+                    : `Buy ${MEGA_CRATE_SIZE} — $${MEGA_CRATE_COST}`}
               </span>
             </button>
           </div>
@@ -351,11 +477,18 @@ export const ShopView: React.FC<ShopViewProps> = ({
       {/* Section 2: Equipment & Clinic Upgrades */}
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-lg font-bold text-slate-100">
-            {isAr
-              ? 'الأدوات المساعدة والأجهزة الطبية وترقيات العيادة'
-              : 'Technologist Tools, Systems & Clinic Upgrades'}
-          </h3>
+          <div>
+            <h3 className="text-lg font-bold text-slate-100">
+              {isAr
+                ? 'الأدوات المساعدة والأجهزة الطبية وترقيات العيادة'
+                : 'Technologist Tools, Systems & Clinic Upgrades'}
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {isAr
+                ? 'جميع الأجهزة والأدوات التالية تُشترى مرة واحدة فقط للعيادة'
+                : 'Every equipment item & upgrade below is a permanent one-time purchase'}
+            </p>
+          </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
             {CATEGORY_FILTERS.map((c) => {
@@ -494,7 +627,9 @@ export const ShopView: React.FC<ShopViewProps> = ({
                   {isOwned ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
                       <Check className="w-4 h-4 shrink-0" />
-                      <span>{isAr ? 'تم التركيب في العيادة' : 'Installed'}</span>
+                      <span>
+                        {isAr ? 'تم الشراء والتركيب (مرة واحدة)' : 'Installed (1/1)'}
+                      </span>
                     </span>
                   ) : (
                     <button

@@ -53,6 +53,13 @@ import shopLaserCollimatorImg from '../assets/images/shop_laser_collimator_17951
 import shopDryPrinterImg from '../assets/images/shop_dry_printer_1795107508345.jpg';
 import shopAiPacsImg from '../assets/images/shop_ai_pacs_1795107508211.jpg';
 import shopVipLoungeImg from '../assets/images/shop_vip_lounge_1795107508465.jpg';
+import shopAreaMonitorImg from '../assets/images/shop_area_monitor_1795572900105.jpg';
+import shopLeadGlassImg from '../assets/images/shop_lead_glass_1795572901659.jpg';
+import shopBuckyGridImg from '../assets/images/shop_bucky_grid_1795572901913.jpg';
+import shopAecSensorImg from '../assets/images/shop_aec_sensor_1795572902165.jpg';
+import shopTablePadImg from '../assets/images/shop_table_pad_1795572903141.jpg';
+import shopHepaSterilizerImg from '../assets/images/shop_hepa_sterilizer_1795572903582.jpg';
+import shopTeleradiologyImg from '../assets/images/shop_teleradiology_1795572904239.jpg';
 
 export const ASSETS = {
   clinicRoomImg,
@@ -99,4 +106,11 @@ export const ASSETS = {
   shopDryPrinterImg,
   shopAiPacsImg,
   shopVipLoungeImg,
+  shopAreaMonitorImg,
+  shopLeadGlassImg,
+  shopBuckyGridImg,
+  shopAecSensorImg,
+  shopTablePadImg,
+  shopHepaSterilizerImg,
+  shopTeleradiologyImg,
 };

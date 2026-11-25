@@ -45,7 +45,7 @@ interface ClinicPCModalProps {
   filmDebt: number;
   patientsServed: number;
   ownedUpgrades: UpgradeId[];
-  onBuyCarton: (count: 1 | 5) => void;
+  onBuyCarton: (count: 0.5 | 1 | 5 | 10) => void;
   onTakeEmergencyLoan: () => void;
   onBuyUpgrade: (id: UpgradeId) => void;
   completedCases: CompletedCase[];
