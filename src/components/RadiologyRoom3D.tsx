@@ -16,6 +16,8 @@ import {REGION_LABELS_I18N} from '../i18n/translations';
 
 export type SceneTargetAction =
   | {type: 'REGION'; region: BodyRegion}
+  | {type: 'PATIENT_BODY'}
+  | {type: 'PATIENT_POSTURES'}
   | {type: 'CASSETTE_RACK'}
   | {type: 'TABLE_BUCKY'}
   | {type: 'WALL_BUCKY'}
@@ -81,7 +83,7 @@ const ANATOMY_SPOTS: HotspotLocalMeta[] = [
     label: 'الرقبة',
     spineY: 0.56,
     lateralX: 0,
-    radius: 0.17,
+    radius: 0.19,
     erectWorldY: 1.52,
     tableWorldX: -0.56,
     tableWorldZ: 0,
@@ -101,7 +103,7 @@ const ANATOMY_SPOTS: HotspotLocalMeta[] = [
     label: 'القطنية',
     spineY: 0.04,
     lateralX: 0,
-    radius: 0.23,
+    radius: 0.25,
     erectWorldY: 1.02,
     tableWorldX: -0.04,
     tableWorldZ: 0,
@@ -5661,31 +5663,109 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     applyPatientAppearanceRef.current = applyPatientAppearance;
     applyPatientAppearance();
 
+    // Fallback clickable body meshes so tapping anywhere else on the patient opens Posture Menu
+    [pHead, pChest, pAbdomen, pPelvis, pTunicSkirt].forEach((mesh) => {
+      mesh.layers.enable(1);
+      mesh.userData.action = {type: 'PATIENT_BODY'} satisfies SceneTargetAction;
+      interactiveMeshes.push(mesh);
+    });
+    thighPivots.forEach((hipPivot) => {
+      hipPivot.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.layers.enable(1);
+          obj.userData.action = {
+            type: 'PATIENT_BODY',
+          } satisfies SceneTargetAction;
+          interactiveMeshes.push(obj);
+        }
+      });
+    });
+    shoulderPivots.forEach((sPivot) => {
+      sPivot.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.layers.enable(1);
+          obj.userData.action = {
+            type: 'PATIENT_BODY',
+          } satisfies SceneTargetAction;
+          interactiveMeshes.push(obj);
+        }
+      });
+    });
+
     // Clickable Patient Anatomical Regions
     const hotspotRings: {region: BodyRegion; mesh: THREE.Mesh}[] = [];
-    ANATOMY_SPOTS.forEach((spot) => {
+    const registerRegionHitMesh = (
+      parent: THREE.Object3D,
+      region: BodyRegion,
+      radius: number,
+      pos: [number, number, number],
+      ringPositions: [number, number, number][]
+    ) => {
       const hitMesh = new THREE.Mesh(
-        track(new THREE.SphereGeometry(spot.radius, 14, 12)),
+        track(new THREE.SphereGeometry(radius, 14, 12)),
         track(new THREE.MeshBasicMaterial({visible: false}))
       );
-      hitMesh.position.set(spot.lateralX, spot.spineY, 0.02);
+      hitMesh.position.set(pos[0], pos[1], pos[2]);
       hitMesh.layers.set(1);
       hitMesh.userData.action = {
         type: 'REGION',
-        region: spot.id,
+        region,
       } satisfies SceneTargetAction;
-      patientLocalBody.add(hitMesh);
+      parent.add(hitMesh);
       interactiveMeshes.push(hitMesh);
 
-      const ring = new THREE.Mesh(
-        track(
-          new THREE.RingGeometry(spot.radius * 0.68, spot.radius * 0.9, 28)
-        ),
-        track(matHighlightGlow.clone())
+      ringPositions.forEach(([rx, ry, rz]) => {
+        const ring = new THREE.Mesh(
+          track(new THREE.RingGeometry(radius * 0.64, radius * 0.86, 28)),
+          track(matHighlightGlow.clone())
+        );
+        ring.position.set(rx, ry, rz);
+        parent.add(ring);
+        hotspotRings.push({region, mesh: ring});
+      });
+    };
+
+    ANATOMY_SPOTS.forEach((spot) => {
+      if (spot.id === 'hand') {
+        wristPivots.forEach((wrist) => {
+          registerRegionHitMesh(
+            wrist,
+            'hand',
+            spot.radius,
+            [0, -0.05, 0],
+            [
+              [0, -0.05, 0.075],
+              [0, -0.05, -0.075],
+            ]
+          );
+        });
+        return;
+      }
+      if (spot.id === 'knee') {
+        kneePivots.forEach((knee) => {
+          registerRegionHitMesh(
+            knee,
+            'knee',
+            spot.radius,
+            [0, 0, 0],
+            [
+              [0, 0, 0.095],
+              [0, 0, -0.095],
+            ]
+          );
+        });
+        return;
+      }
+      registerRegionHitMesh(
+        patientLocalBody,
+        spot.id,
+        spot.radius,
+        [spot.lateralX, spot.spineY, 0],
+        [
+          [spot.lateralX, spot.spineY, 0.175],
+          [spot.lateralX, spot.spineY, -0.175],
+        ]
       );
-      ring.position.set(spot.lateralX, spot.spineY, 0.17);
-      patientLocalBody.add(ring);
-      hotspotRings.push({region: spot.id, mesh: ring});
     });
 
     // =========================================================================
@@ -6447,7 +6527,16 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     let lastDragPos = {x: 0, y: 0};
     let dragMaxDist = 0;
     let lastHoverTime = 0;
+    let longPressTimer: number | null = null;
+    let longPressFired = false;
     const pressedKeys = new Set<string>();
+
+    const clearLongPressTimer = () => {
+      if (longPressTimer !== null) {
+        window.clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
 
     const getIntersects = (clientX: number, clientY: number) => {
       const rect = renderer.domElement.getBoundingClientRect();
@@ -6457,6 +6546,20 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       return raycaster.intersectObjects(interactiveMeshes, false);
     };
 
+    const pickPriorityActionHit = (
+      hits: THREE.Intersection<THREE.Object3D>[]
+    ): THREE.Intersection<THREE.Object3D> | null => {
+      if (hits.length === 0) return null;
+      const maxDist = hits[0].distance + 0.42;
+      const regionHit = hits.find(
+        (h) =>
+          h.distance <= maxDist &&
+          (h.object.userData.action as SceneTargetAction | undefined)?.type ===
+            'REGION'
+      );
+      return regionHit ?? hits[0];
+    };
+
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (activeDragPointerId !== null) return;
@@ -6464,17 +6567,44 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       pointerDownPos = {x: e.clientX, y: e.clientY};
       lastDragPos = {x: e.clientX, y: e.clientY};
       dragMaxDist = 0;
+      longPressFired = false;
+      clearLongPressTimer();
       renderer.domElement.style.cursor = 'grabbing';
       try {
         renderer.domElement.setPointerCapture(e.pointerId);
       } catch {
         // Ignore if capture is unsupported
       }
+
+      const downHits = getIntersects(e.clientX, e.clientY);
+      const downPick = pickPriorityActionHit(downHits);
+      const downAction = downPick?.object.userData.action as
+        | SceneTargetAction
+        | undefined;
+      if (
+        downAction?.type === 'REGION' ||
+        downAction?.type === 'PATIENT_BODY'
+      ) {
+        const downPointerId = e.pointerId;
+        longPressTimer = window.setTimeout(() => {
+          longPressTimer = null;
+          if (activeDragPointerId !== downPointerId || dragMaxDist > 8) return;
+          longPressFired = true;
+          handReachImpulseRef.current = 1.0;
+          try {
+            navigator.vibrate?.(18);
+          } catch {
+            // Ignore vibration failures
+          }
+          onSceneInteractRef.current({type: 'PATIENT_POSTURES'});
+        }, 420);
+      }
     };
 
     const onPointerUp = (e: PointerEvent) => {
       if (activeDragPointerId !== e.pointerId) return;
       activeDragPointerId = null;
+      clearLongPressTimer();
       renderer.domElement.style.cursor = 'grab';
       try {
         renderer.domElement.releasePointerCapture(e.pointerId);
@@ -6482,11 +6612,17 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         // Ignore
       }
 
+      if (longPressFired) {
+        longPressFired = false;
+        return;
+      }
+
       if (dragMaxDist > 7) return;
 
       const hits = getIntersects(e.clientX, e.clientY);
-      if (hits.length > 0) {
-        const action = hits[0].object.userData.action as
+      const picked = pickPriorityActionHit(hits);
+      if (picked) {
+        const action = picked.object.userData.action as
           | SceneTargetAction
           | undefined;
         if (action) {
@@ -6502,8 +6638,14 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     const onPointerCancel = (e: PointerEvent) => {
       if (activeDragPointerId === e.pointerId) {
         activeDragPointerId = null;
+        clearLongPressTimer();
+        longPressFired = false;
         renderer.domElement.style.cursor = 'grab';
       }
+    };
+
+    const onContextMenu = (e: Event) => {
+      e.preventDefault();
     };
 
     const getLocalizedActionLabel = (
@@ -6514,8 +6656,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       switch (action.type) {
         case 'REGION':
           return isAr
-            ? `انقر لتوجيه أنبوب الأشعة نحو: ${REGION_LABELS_I18N.ar[action.region]}`
-            : `Aim X-Ray tube at: ${REGION_LABELS_I18N.en[action.region]}`;
+            ? `ضغطة لتحديد «${REGION_LABELS_I18N.ar[action.region]}» · ضغط مطول للوضعيات`
+            : `Tap to select ${REGION_LABELS_I18N.en[action.region]} · Hold for postures`;
+        case 'PATIENT_BODY':
+        case 'PATIENT_POSTURES':
+          return isAr
+            ? 'اضغط ضغطاً مطولاً على المريض لفتح قائمة الوضعيات'
+            : 'Long-press patient to open Posture Menu';
         case 'CASSETTE_RACK':
           return isAr
             ? 'انقر لأخذ كاسيت الأشعة بيدك'
@@ -6592,6 +6739,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
           dragMaxDist,
           Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y)
         );
+        if (dragMaxDist > 8) {
+          clearLongPressTimer();
+        }
         if (dragMaxDist > 4) {
           cameraMoveActiveRef.current = false;
           const lookSens = e.pointerType === 'touch' ? 0.0056 : 0.0038;
@@ -6611,8 +6761,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       lastHoverTime = now;
 
       const hits = getIntersects(e.clientX, e.clientY);
-      if (hits.length > 0) {
-        const action = hits[0].object.userData.action as
+      const picked = pickPriorityActionHit(hits);
+      if (picked) {
+        const action = picked.object.userData.action as
           | SceneTargetAction
           | undefined;
         const label = getLocalizedActionLabel(action);
@@ -6640,6 +6791,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     renderer.domElement.addEventListener('pointerup', onPointerUp);
     renderer.domElement.addEventListener('pointercancel', onPointerCancel);
     renderer.domElement.addEventListener('pointermove', onPointerMove);
+    renderer.domElement.addEventListener('contextmenu', onContextMenu);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
@@ -7606,6 +7758,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     return () => {
       disposed = true;
       loopRunning = false;
+      clearLongPressTimer();
       cancelAnimationFrame(frameId);
       clearTimeout(frameId);
       resizeObserver.disconnect();
@@ -7618,6 +7771,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('pointercancel', onPointerCancel);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
+      renderer.domElement.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       applyBrightnessRef.current = null;
