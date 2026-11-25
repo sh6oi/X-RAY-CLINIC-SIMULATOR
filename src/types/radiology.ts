@@ -31,8 +31,6 @@ export type PatientPosture =
   | 'ERECT_RAO'
   | 'ERECT_LAO';
 
-export type PlayMode = 'app' | 'browser';
-
 export interface TechProfile {
   uid: string;
   name: string;

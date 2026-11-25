@@ -1,13 +1,12 @@
 import React, {useMemo, useState} from 'react';
 import type {BodyRegion, Modality} from '../types/radiology';
-import {EXAMS} from '../data/radiologyData';
+import {EXAMS, getRadiographImage} from '../data/radiologyData';
 import {
   MODALITY_LABELS_I18N,
   POSTURE_SHORT_I18N,
   REGION_LABELS_I18N,
   useLanguage,
 } from '../i18n/translations';
-import {renderProceduralRadiograph} from '../utils/radiographRenderer';
 
 const MODALITY_FILTERS: {
   id: 'ALL' | Modality;
@@ -130,17 +129,23 @@ export const ProtocolsView: React.FC = () => {
             className="rounded-xl border border-slate-800 bg-[#131C29] p-4 sm:p-5 flex gap-4 items-start"
           >
             <div className="w-20 sm:w-24 h-24 sm:h-28 rounded-lg overflow-hidden border border-slate-800 bg-black shrink-0">
-              <img
-                src={renderProceduralRadiograph({
+              {(() => {
+                const {src, mirrorX} = getRadiographImage({
                   region: exam.region,
                   modality: exam.modality,
                   projection: exam.recommendedProjection,
                   posture: exam.recommendedPosture,
-                  patientSeed: exam.id,
-                })}
-                alt={isAr ? exam.titleAr : exam.titleEn}
-                className="w-full h-full object-cover"
-              />
+                });
+                return (
+                  <img
+                    src={src}
+                    alt={isAr ? exam.titleAr : exam.titleEn}
+                    referrerPolicy="no-referrer"
+                    style={mirrorX ? {transform: 'scaleX(-1)'} : undefined}
+                    className="w-full h-full object-cover"
+                  />
+                );
+              })()}
             </div>
 
             <div className="flex-1 min-w-0 space-y-2.5">

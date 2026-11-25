@@ -2,6 +2,7 @@ import type {
   BodyRegion,
   ClinicRank,
   ExamProtocol,
+  Modality,
   PatientCase,
   PatientPosture,
   ProjectionType,
@@ -34,6 +35,103 @@ export const REGION_SCAN_IMAGES: Record<BodyRegion, string> = {
 
 export const CT_SCAN_IMAGE = ASSETS.ctChestImg;
 export const MRI_SCAN_IMAGE = ASSETS.mriLumbarImg;
+
+export function getRadiographImage({
+  region,
+  modality,
+  projection,
+  posture,
+}: {
+  region: BodyRegion;
+  modality: Modality;
+  projection: ProjectionType;
+  posture?: PatientPosture;
+}): {src: string; mirrorX: boolean} {
+  if (modality === 'CT') {
+    return {
+      src: region === 'head' ? ASSETS.ctHeadAxialImg : ASSETS.ctChestImg,
+      mirrorX: false,
+    };
+  }
+
+  if (modality === 'MRI') {
+    if (region === 'head') {
+      return {src: ASSETS.mriBrainSagittalImg, mirrorX: false};
+    }
+    if (region === 'knee') {
+      return {src: ASSETS.mriKneeSagittalImg, mirrorX: false};
+    }
+    return {src: ASSETS.mriLumbarImg, mirrorX: false};
+  }
+
+  const isRightSide =
+    posture === 'ERECT_RIGHT_LAT' ||
+    posture === 'TABLE_RIGHT_LAT' ||
+    posture === 'ERECT_LAO' ||
+    posture === 'TABLE_LPO';
+
+  switch (region) {
+    case 'chest':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayChestLatImg, mirrorX: isRightSide};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayChestObliqueImg, mirrorX: isRightSide};
+      }
+      return {src: ASSETS.xrayChestImg, mirrorX: false};
+
+    case 'cervical':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayCervicalImg, mirrorX: isRightSide};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayCervicalObliqueImg, mirrorX: isRightSide};
+      }
+      return {src: ASSETS.xrayCervicalApImg, mirrorX: false};
+
+    case 'lumbar':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayLumbarLatImg, mirrorX: isRightSide};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayLumbarObliqueImg, mirrorX: isRightSide};
+      }
+      return {src: ASSETS.xrayLumbarImg, mirrorX: false};
+
+    case 'head':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xraySkullLatImg, mirrorX: isRightSide};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xraySkullObliqueImg, mirrorX: isRightSide};
+      }
+      return {src: ASSETS.xraySkullImg, mirrorX: false};
+
+    case 'knee':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayKneeLatImg, mirrorX: isRightSide};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayKneeObliqueImg, mirrorX: isRightSide};
+      }
+      return {src: ASSETS.xrayKneeImg, mirrorX: false};
+
+    case 'hand':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayHandLatImg, mirrorX: isRightSide};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayHandObliqueImg, mirrorX: isRightSide};
+      }
+      return {src: ASSETS.xrayHandImg, mirrorX: false};
+
+    case 'pelvis':
+      if (projection === 'OBLIQUE' || projection === 'LATERAL') {
+        return {src: ASSETS.xrayPelvisObliqueImg, mirrorX: isRightSide};
+      }
+      return {src: ASSETS.xrayPelvisImg, mirrorX: false};
+  }
+}
 
 export const FILM_CARTON_SIZE = 20;
 export const FILM_CARTON_COST = 150;

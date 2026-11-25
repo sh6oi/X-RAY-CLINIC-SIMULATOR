@@ -9,7 +9,6 @@ import {
   DoorOpen,
   Film,
   Gamepad2,
-  Globe,
   Hand,
   Languages,
   LogOut,
@@ -39,7 +38,6 @@ import type {
   JoystickConfig,
   PatientCase,
   PatientPosture,
-  PlayMode,
   ProjectionType,
   ScanEvaluation,
   ScreenMode,
@@ -360,25 +358,6 @@ export default function App() {
     }
     return DEFAULT_BRIGHTNESS;
   });
-
-  const [playMode, setPlayMode] = useState<PlayMode>(() => {
-    try {
-      const raw = localStorage.getItem('clinic_play_mode_v1');
-      if (raw === 'browser' || raw === 'app') return raw;
-    } catch {
-      // Ignore storage errors
-    }
-    return 'app';
-  });
-
-  const updatePlayMode = (nextMode: PlayMode) => {
-    setPlayMode(nextMode);
-    try {
-      localStorage.setItem('clinic_play_mode_v1', nextMode);
-    } catch {
-      // Ignore storage errors
-    }
-  };
 
   const joystickRef = useRef<{x: number; y: number}>({x: 0, y: 0});
   const exposeTimerRef = useRef<number | null>(null);
@@ -1939,7 +1918,6 @@ export default function App() {
 
   return (
     <div
-      data-play-mode={playMode}
       className="relative w-screen h-dvh overflow-hidden bg-[#09111C] text-slate-100 select-none"
     >
       {/* FULL-SCREEN 3D RADIOLOGY CLINIC */}
@@ -2100,53 +2078,6 @@ export default function App() {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               )}
             </button>
-
-            <div
-              role="group"
-              aria-label={isAr ? 'وضع اللعب' : 'Play Mode'}
-              className="hud-playmode-toggle flex items-center rounded-lg border border-slate-700 bg-slate-900/95 p-0.5 gap-0.5 shrink-0"
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  updatePlayMode('app');
-                  showToast(
-                    isAr
-                      ? 'تم تفعيل وضع التطبيق (الحجم القياسي).'
-                      : 'App Mode active (standard HUD sizing).'
-                  );
-                }}
-                title={isAr ? 'وضع التطبيق (حجم قياسي)' : 'App Mode (Standard HUD)'}
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold cursor-pointer transition-colors ${
-                  playMode === 'app'
-                    ? 'bg-cyan-500 text-slate-950'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Smartphone className="w-3 h-3 shrink-0" />
-                <span>{isAr ? 'تطبيق' : 'App'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  updatePlayMode('browser');
-                  showToast(
-                    isAr
-                      ? 'تم تفعيل وضع المتصفح (شريط مصغّر ومناسب لشاشة الهاتف).'
-                      : 'Browser Mode active (compact HUD for mobile browsers).'
-                  );
-                }}
-                title={isAr ? 'وضع المتصفح (مصغّر للهواتف)' : 'Browser Mode (Compact Mobile HUD)'}
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold cursor-pointer transition-colors ${
-                  playMode === 'browser'
-                    ? 'bg-cyan-500 text-slate-950'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Globe className="w-3 h-3 shrink-0" />
-                <span>{isAr ? 'متصفح' : 'Browser'}</span>
-              </button>
-            </div>
 
             <PWAInstallButton compact />
 
@@ -2514,9 +2445,9 @@ export default function App() {
       <footer
         className={`hud-bottom-dock pointer-events-none fixed bottom-0 inset-x-0 z-20 px-2 pt-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] sm:p-4 flex flex-col items-center gap-1 sm:gap-2 ${
           joystickConfig.preset === 'bottom-left'
-            ? 'max-[1200px]:pl-[106px]'
+            ? 'hud-dock-avoid-left'
             : joystickConfig.preset === 'bottom-right'
-              ? 'max-[1200px]:pr-[106px]'
+              ? 'hud-dock-avoid-right'
               : ''
         }`}
       >
@@ -2525,10 +2456,16 @@ export default function App() {
           techLocation === 'ROOM' &&
           !caseApproved &&
           !crExposedPending && (
-          <div className="hud-position-panel pointer-events-auto max-w-5xl w-full rounded-2xl border border-slate-800 bg-[#08101C]/95 px-2 sm:px-3 py-1 sm:py-2 shadow-2xl flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-1 sm:gap-2.5">
+          <div
+            className={`hud-position-panel pointer-events-auto w-full max-w-[min(590px,calc(100vw-160px))] lg:max-w-[740px] rounded-xl border border-slate-800 bg-[#08101C]/95 px-2 sm:px-2.5 py-1 sm:py-1.5 shadow-2xl flex flex-col gap-1 ${
+              joystickConfig.preset === 'bottom-right'
+                ? 'mr-auto ml-1'
+                : 'ml-auto mr-1 sm:mr-2 xl:mx-auto'
+            }`}
+          >
             {/* Postures */}
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
-              <span className="text-[10.5px] sm:text-[11px] text-slate-400 shrink-0 mx-1">
+              <span className="text-[10px] sm:text-[10.5px] text-slate-400 shrink-0 mx-0.5">
                 {isAr ? 'الوضعية:' : 'Posture:'}
               </span>
               {POSTURE_KEYS.map((pKey) => (
@@ -2536,7 +2473,7 @@ export default function App() {
                   key={pKey}
                   type="button"
                   onClick={() => handleSelectPosture(pKey)}
-                  className={`px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-[10.5px] sm:text-[11px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                  className={`px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md text-[10px] sm:text-[10.5px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
                     selectedPosture === pKey
                       ? 'bg-cyan-500 text-slate-950'
                       : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300'
@@ -2549,7 +2486,7 @@ export default function App() {
 
             {/* Regions + Lead Shield */}
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
-              <span className="text-[10.5px] sm:text-[11px] text-slate-400 shrink-0 mx-1">
+              <span className="text-[10px] sm:text-[10.5px] text-slate-400 shrink-0 mx-0.5">
                 {isAr ? 'المنطقة:' : 'Region:'}
               </span>
               {REGION_OPTIONS.map((reg) => (
@@ -2557,7 +2494,7 @@ export default function App() {
                   key={reg}
                   type="button"
                   onClick={() => handleSelectRegion(reg)}
-                  className={`px-2 py-1 sm:px-2.5 rounded-md text-[10.5px] sm:text-[11px] font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                  className={`px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-md text-[10px] sm:text-[10.5px] font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
                     selectedRegion === reg
                       ? 'bg-sky-500/25 border border-sky-400 text-sky-200'
                       : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'

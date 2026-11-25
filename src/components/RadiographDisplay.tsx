@@ -21,7 +21,7 @@ import type {
   ProjectionType,
   ScanEvaluation,
 } from '../types/radiology';
-import {FILM_CARTON_COST} from '../data/radiologyData';
+import {FILM_CARTON_COST, getRadiographImage} from '../data/radiologyData';
 import {
   MODALITY_LABELS_I18N,
   POSTURE_SHORT_I18N,
@@ -29,7 +29,6 @@ import {
   REGION_LABELS_I18N,
   useLanguage,
 } from '../i18n/translations';
-import {renderProceduralRadiograph} from '../utils/radiographRenderer';
 
 interface RadiographDisplayProps {
   patient: PatientCase;
@@ -167,21 +166,19 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
   const effectiveProjection: ProjectionType =
     actualProjection ?? requestedExam.recommendedProjection;
 
-  const imageSrc = useMemo(
+  const {src: imageSrc, mirrorX: autoMirrorX} = useMemo(
     () =>
-      renderProceduralRadiograph({
+      getRadiographImage({
         region: evaluation.targetRegionScanned,
         modality: requestedExam.modality,
         projection: effectiveProjection,
         posture: effectivePosture,
-        patientSeed: patient.id,
       }),
     [
       evaluation.targetRegionScanned,
       requestedExam.modality,
       effectiveProjection,
       effectivePosture,
-      patient.id,
     ]
   );
 
@@ -278,7 +275,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
               className="w-full h-full flex items-center justify-center transition-transform duration-200"
               style={{
                 filter: exposureFilter,
-                transform: `scale(${zoomPct / 100}) rotate(${rotationDeg}deg) scaleX(${flippedX ? -1 : 1})`,
+                transform: `scale(${zoomPct / 100}) rotate(${rotationDeg}deg) scaleX(${(flippedX !== autoMirrorX) ? -1 : 1})`,
               }}
             >
               <img
@@ -312,13 +309,13 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
 
             {overlayMaskEnabled && (
               <>
-                <div className="pointer-events-none absolute top-2.5 right-3 z-10 text-[11px] font-mono-num text-cyan-200 text-right leading-relaxed bg-[#040912]/70 px-2 py-1 rounded">
-                  <div>{patient.nameAr}</div>
-                  <div>{regionLabel} · {postureLabel}</div>
+                <div className="pointer-events-none absolute top-2 right-2 z-10 max-w-[46%] text-[9.5px] sm:text-[10.5px] font-mono-num text-cyan-200 text-right leading-snug bg-[#040912]/75 px-1.5 py-0.5 rounded">
+                  <div className="truncate">{patient.nameAr}</div>
+                  <div className="truncate">{regionLabel} · {postureLabel}</div>
                 </div>
-                <div className="pointer-events-none absolute top-2.5 left-3 z-10 text-[11px] font-mono-num text-cyan-200 text-left leading-relaxed bg-[#040912]/70 px-2 py-1 rounded">
-                  <div>{kvp} kVp · {mas} mAs</div>
-                  <div className="text-[10px] text-cyan-300">{projectionLabel}</div>
+                <div className="pointer-events-none absolute top-2 left-2 z-10 max-w-[46%] text-[9.5px] sm:text-[10.5px] font-mono-num text-cyan-200 text-left leading-snug bg-[#040912]/75 px-1.5 py-0.5 rounded">
+                  <div className="truncate">{kvp} kVp · {mas} mAs</div>
+                  <div className="text-[9px] sm:text-[10px] text-cyan-300 truncate">{projectionLabel}</div>
                 </div>
                 <div className="pointer-events-none absolute bottom-2.5 left-3 z-10 text-xs font-mono-num font-bold text-cyan-100 bg-[#040912]/70 px-2 py-0.5 rounded">
                   {effectiveProjection} · {zoomPct}%
