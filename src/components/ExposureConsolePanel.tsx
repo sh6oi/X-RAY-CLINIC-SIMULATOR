@@ -12,8 +12,12 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
-import type {BodyRegion} from '../types/radiology';
-import {REGION_LABELS_I18N, useLanguage} from '../i18n/translations';
+import type {BodyRegion, BodySide} from '../types/radiology';
+import {
+  formatRegionWithSide,
+  useLanguage,
+} from '../i18n/translations';
+import {isPediatricPatientAge} from '../data/radiologyData';
 import {useStageScroll} from '../hooks/useStageScroll';
 
 interface ExposureConsolePanelProps {
@@ -22,6 +26,8 @@ interface ExposureConsolePanelProps {
   onChangeKvp: (val: number) => void;
   onChangeMas: (val: number) => void;
   selectedRegion: BodyRegion;
+  selectedSide?: BodySide;
+  patientAge?: number;
   doorClosed: boolean;
   cassetteReady: boolean;
   cassetteStepLabel: string;
@@ -42,12 +48,16 @@ interface ExposureConsolePanelProps {
   onClose: () => void;
 }
 
+const roundHalf = (val: number): number => Math.round(val * 2) / 2;
+
 export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
   kvp,
   mas,
   onChangeKvp,
   onChangeMas,
   selectedRegion,
+  selectedSide = 'NONE',
+  patientAge,
   doorClosed,
   cassetteReady,
   cassetteStepLabel,
@@ -70,6 +80,7 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
   const {lang} = useLanguage();
   const isAr = lang === 'ar';
   const {scrollRef, scrollHandlers} = useStageScroll<HTMLElement>(true);
+  const isChild = isPediatricPatientAge(patientAge);
 
   const locked = isExposing || isDeveloping || caseApproved || crPendingScan;
   const readyToFire = doorClosed && cassetteReady && !locked;
@@ -93,14 +104,21 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
             <Sliders className="w-3.5 h-3.5 text-cyan-400" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs sm:text-sm font-bold text-white truncate">
-              {isAr
-                ? 'وحدة التحكم بالمولّد (Console)'
-                : 'X-Ray Generator Console'}
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white truncate">
+              <span className="truncate">
+                {isAr
+                  ? 'وحدة التحكم بالمولّد (Console)'
+                  : 'X-Ray Generator Console'}
+              </span>
+              {isChild && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-amber-200 text-[9px] font-bold shrink-0">
+                  {isAr ? 'أطفال' : 'Peds'}
+                </span>
+              )}
             </div>
             <div className="text-[10px] font-mono-num text-slate-400 truncate">
               {hasDR ? 'DR DIGITAL' : 'CR CASSETTE'} ·{' '}
-              {REGION_LABELS_I18N[lang][selectedRegion]}
+              {formatRegionWithSide(selectedRegion, selectedSide, lang, true)}
             </div>
           </div>
         </div>
@@ -237,11 +255,11 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
           </div>
         </div>
 
-        {/* mAs Hardware Module */}
+        {/* mAs Hardware Module (0.5–100 with 0.5 increments) */}
         <div className="hud-console-lcd rounded-xl border border-emerald-900/60 bg-[#050B14] shadow-[inset_0_2px_10px_rgba(0,0,0,0.85)] p-2.5 space-y-1.5">
           <div className="flex items-center justify-between text-[10px] text-slate-400">
             <span>{isAr ? 'الكمية (mAs)' : 'Exposure mAs'}</span>
-            <span className="font-mono-num text-emerald-500/80">1–50</span>
+            <span className="font-mono-num text-emerald-500/80">0.5–100</span>
           </div>
 
           <div className="flex items-baseline justify-between gap-1">
@@ -255,11 +273,12 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
 
           <input
             type="range"
-            min={1}
-            max={50}
+            min={0.5}
+            max={100}
+            step={0.5}
             value={mas}
             disabled={locked}
-            onChange={(e) => onChangeMas(Number(e.target.value))}
+            onChange={(e) => onChangeMas(Math.max(0.5, roundHalf(Number(e.target.value))))}
             aria-label={isAr ? 'كمية الإشعاع mAs' : 'Exposure mAs'}
             className="w-full radiology-slider"
           />
@@ -267,34 +286,34 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
           <div className="grid grid-cols-4 gap-1">
             <button
               type="button"
-              disabled={locked || mas <= 1}
-              onClick={() => onChangeMas(Math.max(1, mas - 5))}
+              disabled={locked || mas <= 0.5}
+              onClick={() => onChangeMas(Math.max(0.5, roundHalf(mas - 5)))}
               className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[10px] font-mono-num font-bold text-slate-200 cursor-pointer"
             >
               -5
             </button>
             <button
               type="button"
-              disabled={locked || mas <= 1}
-              onClick={() => onChangeMas(Math.max(1, mas - 1))}
-              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center cursor-pointer"
-              aria-label="-1 mAs"
+              disabled={locked || mas <= 0.5}
+              onClick={() => onChangeMas(Math.max(0.5, roundHalf(mas - 0.5)))}
+              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[9.5px] font-mono-num font-bold text-slate-200 cursor-pointer"
+              aria-label="-0.5 mAs"
             >
-              <Minus className="w-3 h-3" />
+              -½
             </button>
             <button
               type="button"
-              disabled={locked || mas >= 50}
-              onClick={() => onChangeMas(Math.min(50, mas + 1))}
-              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center cursor-pointer"
-              aria-label="+1 mAs"
+              disabled={locked || mas >= 100}
+              onClick={() => onChangeMas(Math.min(100, roundHalf(mas + 0.5)))}
+              className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[9.5px] font-mono-num font-bold text-slate-200 cursor-pointer"
+              aria-label="+0.5 mAs"
             >
-              <Plus className="w-3 h-3" />
+              +½
             </button>
             <button
               type="button"
-              disabled={locked || mas >= 50}
-              onClick={() => onChangeMas(Math.min(50, mas + 5))}
+              disabled={locked || mas >= 100}
+              onClick={() => onChangeMas(Math.min(100, roundHalf(mas + 5)))}
               className="hud-console-step py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-[10px] font-mono-num font-bold text-slate-200 cursor-pointer"
             >
               +5

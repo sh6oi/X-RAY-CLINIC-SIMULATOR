@@ -1,6 +1,7 @@
 import React, {createContext, useContext, useEffect, useState} from 'react';
 import type {
   BodyRegion,
+  BodySide,
   Language,
   Modality,
   PatientPosture,
@@ -65,77 +66,249 @@ export function useLanguage(): LanguageContextValue {
 export const DESIGNER_INSTAGRAM_URL =
   'https://www.instagram.com/mojtabakr1.sc?gwpx=bXR0YjM1MzJ0NmE0';
 
-export const REGION_LABELS_I18N: Record<Language, Record<BodyRegion, string>> = {
+export const BILATERAL_REGIONS: ReadonlySet<BodyRegion> = new Set<BodyRegion>([
+  'ribs',
+  'shoulder',
+  'clavicle',
+  'humerus',
+  'elbow',
+  'forearm',
+  'wrist',
+  'hand',
+  'hip',
+  'femur',
+  'knee',
+  'tibia_fibula',
+  'ankle',
+  'foot',
+  'toes',
+]);
+
+export function isBilateralRegion(region: BodyRegion): boolean {
+  return BILATERAL_REGIONS.has(region);
+}
+
+export const SIDE_LABELS_I18N: Record<Language, Record<BodySide, string>> = {
   ar: {
-    head: 'الرأس والجمجمة',
-    cervical: 'الفقرات العنقية (الرقبة)',
-    chest: 'الصدر والرئتين',
-    lumbar: 'العمود الفقري القطني',
-    pelvis: 'الحوض والورك',
-    hand: 'اليد والرسغ',
-    knee: 'الركبة',
+    RIGHT: 'الجانب الأيمن (Right R)',
+    LEFT: 'الجانب الأيسر (Left L)',
+    NONE: 'محوري / ثنائي',
   },
   en: {
-    head: 'Head & Skull',
-    cervical: 'Cervical Spine (Neck)',
-    chest: 'Chest & Lungs',
-    lumbar: 'Lumbar Spine',
-    pelvis: 'Pelvis & Hip',
-    hand: 'Hand & Wrist',
+    RIGHT: 'Right (R)',
+    LEFT: 'Left (L)',
+    NONE: 'Midline / Bilateral',
+  },
+};
+
+export const SIDE_SHORT_I18N: Record<Language, Record<BodySide, string>> = {
+  ar: {
+    RIGHT: 'أيمن (R)',
+    LEFT: 'أيسر (L)',
+    NONE: '',
+  },
+  en: {
+    RIGHT: 'Right (R)',
+    LEFT: 'Left (L)',
+    NONE: '',
+  },
+};
+
+export const REGION_LABELS_I18N: Record<Language, Record<BodyRegion, string>> = {
+  ar: {
+    head: 'الجمجمة (Skull)',
+    facial_bones: 'عظام الوجه (Facial bones)',
+    nasal_bones: 'الأنف (Nasal bones)',
+    soft_tissue_neck: 'العنق (Soft tissue neck)',
+    cervical: 'الفقرات العنقية (C-spine)',
+    thoracic: 'الفقرات الصدرية (T-spine)',
+    lumbar: 'الفقرات القطنية (L-spine)',
+    chest: 'الصدر (Chest)',
+    ribs: 'الأضلاع (Ribs)',
+    abdomen: 'البطن (Abdomen)',
+    shoulder: 'الكتف (Shoulder)',
+    clavicle: 'الترقوة (Clavicle)',
+    humerus: 'عظمة العضد (Humerus)',
+    elbow: 'مفصل الكوع (Elbow)',
+    forearm: 'عظمة الساعد (Forearm)',
+    wrist: 'مفصل الرسغ (Wrist)',
+    hand: 'اليد (Hand)',
+    pelvis: 'الحوض (Pelvis)',
+    hip: 'مفصل الورك (Hip)',
+    femur: 'عظمة الفخذ (Femur)',
+    knee: 'مفصل الركبة (Knee)',
+    tibia_fibula: 'عظمة الساق (Tibia/Fibula)',
+    ankle: 'مفصل الكاحل (Ankle)',
+    foot: 'القدم (Foot)',
+    toes: 'أصابع القدم (Toes)',
+    sacrum_coccyx: 'العجز والعصعص (Sacrum/Coccyx)',
+  },
+  en: {
+    head: 'Skull (AP/PA & Lateral)',
+    facial_bones: 'Facial Bones',
+    nasal_bones: 'Nasal Bones',
+    soft_tissue_neck: 'Soft Tissue Neck',
+    cervical: 'Cervical Spine (C-spine)',
+    thoracic: 'Thoracic Spine (T-spine)',
+    lumbar: 'Lumbar Spine (L-spine)',
+    chest: 'Chest',
+    ribs: 'Ribs',
+    abdomen: 'Abdomen',
+    shoulder: 'Shoulder',
+    clavicle: 'Clavicle',
+    humerus: 'Humerus',
+    elbow: 'Elbow Joint',
+    forearm: 'Forearm',
+    wrist: 'Wrist Joint',
+    hand: 'Hand',
+    pelvis: 'Pelvis',
+    hip: 'Hip Joint',
+    femur: 'Femur',
     knee: 'Knee Joint',
+    tibia_fibula: 'Tibia / Fibula',
+    ankle: 'Ankle Joint',
+    foot: 'Foot',
+    toes: 'Toes',
+    sacrum_coccyx: 'Sacrum / Coccyx',
   },
 };
 
 export const REGION_SHORT_I18N: Record<Language, Record<BodyRegion, string>> = {
   ar: {
-    head: 'الرأس',
-    cervical: 'الرقبة',
-    chest: 'الصدر',
+    head: 'الجمجمة',
+    facial_bones: 'عظام الوجه',
+    nasal_bones: 'الأنف',
+    soft_tissue_neck: 'العنق الرخوة',
+    cervical: 'العنقية',
+    thoracic: 'الصدرية',
     lumbar: 'القطنية',
-    pelvis: 'الحوض',
+    chest: 'الصدر',
+    ribs: 'الأضلاع',
+    abdomen: 'البطن',
+    shoulder: 'الكتف',
+    clavicle: 'الترقوة',
+    humerus: 'العضد',
+    elbow: 'الكوع',
+    forearm: 'الساعد',
+    wrist: 'الرسغ',
     hand: 'اليد',
+    pelvis: 'الحوض',
+    hip: 'الورك',
+    femur: 'الفخذ',
     knee: 'الركبة',
+    tibia_fibula: 'الساق',
+    ankle: 'الكاحل',
+    foot: 'القدم',
+    toes: 'أصابع القدم',
+    sacrum_coccyx: 'العجز والعصعص',
   },
   en: {
-    head: 'Head',
-    cervical: 'Neck',
+    head: 'Skull',
+    facial_bones: 'Facial',
+    nasal_bones: 'Nasal',
+    soft_tissue_neck: 'Soft Neck',
+    cervical: 'C-spine',
+    thoracic: 'T-spine',
+    lumbar: 'L-spine',
     chest: 'Chest',
-    lumbar: 'Lumbar',
-    pelvis: 'Pelvis',
+    ribs: 'Ribs',
+    abdomen: 'Abdomen',
+    shoulder: 'Shoulder',
+    clavicle: 'Clavicle',
+    humerus: 'Humerus',
+    elbow: 'Elbow',
+    forearm: 'Forearm',
+    wrist: 'Wrist',
     hand: 'Hand',
+    pelvis: 'Pelvis',
+    hip: 'Hip',
+    femur: 'Femur',
     knee: 'Knee',
+    tibia_fibula: 'Tibia/Fibula',
+    ankle: 'Ankle',
+    foot: 'Foot',
+    toes: 'Toes',
+    sacrum_coccyx: 'Sacrum/Coccyx',
   },
 };
+
+export function formatRegionWithSide(
+  region: BodyRegion,
+  side: BodySide | undefined,
+  lang: Language,
+  short = false
+): string {
+  const base = short ? REGION_SHORT_I18N[lang][region] : REGION_LABELS_I18N[lang][region];
+  if (!isBilateralRegion(region) || !side || side === 'NONE') {
+    return base;
+  }
+  const sideLabel = SIDE_SHORT_I18N[lang][side];
+  return `${base} — ${sideLabel}`;
+}
+
+export interface RegionGroupDef {
+  id: 'head_neck' | 'spine_torso' | 'upper_limb' | 'lower_limb';
+  titleAr: string;
+  titleEn: string;
+  regions: BodyRegion[];
+}
+
+export const REGION_GROUPS: RegionGroupDef[] = [
+  {
+    id: 'head_neck',
+    titleAr: 'الرأس والوجه والعنق',
+    titleEn: 'Head, Face & Neck',
+    regions: ['head', 'facial_bones', 'nasal_bones', 'soft_tissue_neck', 'cervical'],
+  },
+  {
+    id: 'spine_torso',
+    titleAr: 'الصدر والعمود والبطن والحوض',
+    titleEn: 'Thorax, Spine, Abdomen & Pelvis',
+    regions: ['chest', 'ribs', 'thoracic', 'lumbar', 'abdomen', 'pelvis', 'sacrum_coccyx'],
+  },
+  {
+    id: 'upper_limb',
+    titleAr: 'الطرف العلوي (يمين / يسار)',
+    titleEn: 'Upper Extremity (Right / Left)',
+    regions: ['clavicle', 'shoulder', 'humerus', 'elbow', 'forearm', 'wrist', 'hand'],
+  },
+  {
+    id: 'lower_limb',
+    titleAr: 'الطرف السفلي (يمين / يسار)',
+    titleEn: 'Lower Extremity (Right / Left)',
+    regions: ['hip', 'femur', 'knee', 'tibia_fibula', 'ankle', 'foot', 'toes'],
+  },
+];
 
 export const POSTURE_SHORT_I18N: Record<
   Language,
   Record<PatientPosture, string>
 > = {
   ar: {
-    ERECT_PA: 'واقف PA',
-    ERECT_AP: 'واقف AP',
-    ERECT_LEFT_LAT: 'واقف يسار',
-    ERECT_RIGHT_LAT: 'واقف يمين',
-    ERECT_RAO: 'واقف مائل RAO',
-    ERECT_LAO: 'واقف مائل LAO',
-    SUPINE: 'على الظهر',
-    PRONE: 'على البطن',
-    TABLE_LEFT_LAT: 'طاولة يسار',
-    TABLE_RIGHT_LAT: 'طاولة يمين',
-    TABLE_RPO: 'طاولة مائل RPO',
-    TABLE_LPO: 'طاولة مائل LPO',
-  },
-  en: {
     ERECT_PA: 'Erect PA',
     ERECT_AP: 'Erect AP',
-    ERECT_LEFT_LAT: 'Erect L-Lat',
-    ERECT_RIGHT_LAT: 'Erect R-Lat',
+    ERECT_LEFT_LAT: 'Erect Left Lateral',
+    ERECT_RIGHT_LAT: 'Erect Right Lateral',
     ERECT_RAO: 'Erect RAO',
     ERECT_LAO: 'Erect LAO',
     SUPINE: 'Supine',
     PRONE: 'Prone',
-    TABLE_LEFT_LAT: 'Table L-Lat',
-    TABLE_RIGHT_LAT: 'Table R-Lat',
+    TABLE_LEFT_LAT: 'Table Left Lateral',
+    TABLE_RIGHT_LAT: 'Table Right Lateral',
+    TABLE_RPO: 'Table RPO',
+    TABLE_LPO: 'Table LPO',
+  },
+  en: {
+    ERECT_PA: 'Erect PA',
+    ERECT_AP: 'Erect AP',
+    ERECT_LEFT_LAT: 'Erect Left Lateral',
+    ERECT_RIGHT_LAT: 'Erect Right Lateral',
+    ERECT_RAO: 'Erect RAO',
+    ERECT_LAO: 'Erect LAO',
+    SUPINE: 'Supine',
+    PRONE: 'Prone',
+    TABLE_LEFT_LAT: 'Table Left Lateral',
+    TABLE_RIGHT_LAT: 'Table Right Lateral',
     TABLE_RPO: 'Table RPO',
     TABLE_LPO: 'Table LPO',
   },
@@ -146,32 +319,32 @@ export const POSTURE_LABELS_I18N: Record<
   Record<PatientPosture, string>
 > = {
   ar: {
-    SUPINE: 'مستلقٍ على الظهر (Supine)',
-    PRONE: 'مستلقٍ على البطن (Prone)',
-    TABLE_LEFT_LAT: 'نائم جانبياً — يسار (Left Lateral)',
-    TABLE_RIGHT_LAT: 'نائم جانبياً — يمين (Right Lateral)',
-    TABLE_RPO: 'طاولة مائل خلفي يمين (RPO 45°)',
-    TABLE_LPO: 'طاولة مائل خلفي يسار (LPO 45°)',
-    ERECT_PA: 'واقف (Erect) · خلفي-أمامي PA',
-    ERECT_AP: 'واقف (Erect) · أمامي-خلفي AP',
-    ERECT_LEFT_LAT: 'واقف (Erect) · جانبي أيسر (Left Lat)',
-    ERECT_RIGHT_LAT: 'واقف (Erect) · جانبي أيمن (Right Lat)',
-    ERECT_RAO: 'واقف (Erect) · مائل أمامي أيمن (RAO 45°)',
-    ERECT_LAO: 'واقف (Erect) · مائل أمامي أيسر (LAO 45°)',
+    SUPINE: 'Supine (On Back)',
+    PRONE: 'Prone (On Stomach)',
+    TABLE_LEFT_LAT: 'Table Left Lateral',
+    TABLE_RIGHT_LAT: 'Table Right Lateral',
+    TABLE_RPO: 'Table Right Posterior Oblique (RPO 45°)',
+    TABLE_LPO: 'Table Left Posterior Oblique (LPO 45°)',
+    ERECT_PA: 'Erect · PA Standing',
+    ERECT_AP: 'Erect · AP Standing',
+    ERECT_LEFT_LAT: 'Erect · Left Lateral',
+    ERECT_RIGHT_LAT: 'Erect · Right Lateral',
+    ERECT_RAO: 'Erect · Right Anterior Oblique (RAO 45°)',
+    ERECT_LAO: 'Erect · Left Anterior Oblique (LAO 45°)',
   },
   en: {
     SUPINE: 'Supine (On Back)',
     PRONE: 'Prone (On Stomach)',
     TABLE_LEFT_LAT: 'Table Left Lateral',
     TABLE_RIGHT_LAT: 'Table Right Lateral',
-    TABLE_RPO: 'Table Right Posterior Oblique (RPO)',
-    TABLE_LPO: 'Table Left Posterior Oblique (LPO)',
+    TABLE_RPO: 'Table Right Posterior Oblique (RPO 45°)',
+    TABLE_LPO: 'Table Left Posterior Oblique (LPO 45°)',
     ERECT_PA: 'Erect · PA Standing',
     ERECT_AP: 'Erect · AP Standing',
     ERECT_LEFT_LAT: 'Erect · Left Lateral',
     ERECT_RIGHT_LAT: 'Erect · Right Lateral',
-    ERECT_RAO: 'Erect · Right Anterior Oblique (RAO)',
-    ERECT_LAO: 'Erect · Left Anterior Oblique (LAO)',
+    ERECT_RAO: 'Erect · Right Anterior Oblique (RAO 45°)',
+    ERECT_LAO: 'Erect · Left Anterior Oblique (LAO 45°)',
   },
 };
 

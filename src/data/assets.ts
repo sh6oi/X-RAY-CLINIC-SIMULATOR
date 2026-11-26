@@ -32,6 +32,38 @@ import xrayPelvisObliqueImg from '../assets/images/xray_pelvis_oblique_179556884
 import xraySkullImg from '../assets/images/radiology_xray_skull_1795096861483.jpg';
 import xraySkullLatImg from '../assets/images/xray_skull_lat_1795568747362.jpg';
 import xraySkullObliqueImg from '../assets/images/xray_skull_oblique_1795568746860.jpg';
+import xrayFacialBonesImg from '../assets/images/xray_facial_bones_1795717159599.jpg';
+import xrayNasalBonesImg from '../assets/images/xray_nasal_bones_1795717159900.jpg';
+import xrayNeckAirwayImg from '../assets/images/xray_neck_airway_1795717159233.jpg';
+
+import xrayThoracicApImg from '../assets/images/xray_thoracic_ap_1795717160779.jpg';
+import xrayThoracicLatImg from '../assets/images/xray_thoracic_lat_1795718418201.jpg';
+import xrayRibsApImg from '../assets/images/xray_ribs_ap_1795717160950.jpg';
+import xrayAbdomenKubImg from '../assets/images/xray_abdomen_kub_1795717159934.jpg';
+
+import xrayShoulderApImg from '../assets/images/xray_shoulder_ap_1795717160192.jpg';
+import xrayShoulderLatImg from '../assets/images/xray_shoulder_lat_1795718419512.jpg';
+import xrayClavicleApImg from '../assets/images/xray_clavicle_ap_1795717162133.jpg';
+import xrayHumerusApImg from '../assets/images/xray_humerus_ap_1795717162381.jpg';
+import xrayHumerusLatImg from '../assets/images/xray_humerus_lat_true_1795718439565.jpg';
+import xrayElbowApImg from '../assets/images/xray_elbow_ap_1795717164183.jpg';
+import xrayElbowLatImg from '../assets/images/xray_elbow_lat_1795718420523.jpg';
+import xrayForearmApImg from '../assets/images/xray_forearm_ap_1795717164113.jpg';
+import xrayForearmLatImg from '../assets/images/xray_forearm_lat_1795718421269.jpg';
+import xrayWristPaImg from '../assets/images/xray_wrist_pa_1795717164141.jpg';
+
+import xrayHipApImg from '../assets/images/xray_hip_ap_1795717163459.jpg';
+import xrayFemurApImg from '../assets/images/xray_femur_ap_1795717285060.jpg';
+import xrayFemurLatImg from '../assets/images/xray_femur_lat_1795718422105.jpg';
+import xrayTibiaFibulaImg from '../assets/images/xray_tibia_fibula_1795717285972.jpg';
+import xrayTibiaLatImg from '../assets/images/xray_tibia_lat_1795718421611.jpg';
+import xrayAnkleApImg from '../assets/images/xray_ankle_ap_1795717267111.jpg';
+import xrayAnkleLatImg from '../assets/images/xray_ankle_lat_1795718423621.jpg';
+import xrayFootApImg from '../assets/images/xray_foot_ap_1795717286174.jpg';
+import xrayFootLatImg from '../assets/images/xray_foot_lat_1795718422881.jpg';
+import xrayToesApImg from '../assets/images/xray_toes_ap_1795717166113.jpg';
+import xraySacrumCoccyxImg from '../assets/images/xray_sacrum_coccyx_1795717285201.jpg';
+import xraySacrumLatImg from '../assets/images/xray_sacrum_lat_1795718418964.jpg';
 
 import ctChestImg from '../assets/images/radiology_ct_chest_1795096862581.jpg';
 import ctHeadAxialImg from '../assets/images/ct_head_axial_1795568751069.jpg';
@@ -88,6 +120,35 @@ export const ASSETS = {
   xraySkullImg,
   xraySkullLatImg,
   xraySkullObliqueImg,
+  xrayFacialBonesImg,
+  xrayNasalBonesImg,
+  xrayNeckAirwayImg,
+  xrayThoracicApImg,
+  xrayThoracicLatImg,
+  xrayRibsApImg,
+  xrayAbdomenKubImg,
+  xrayShoulderApImg,
+  xrayShoulderLatImg,
+  xrayClavicleApImg,
+  xrayHumerusApImg,
+  xrayHumerusLatImg,
+  xrayElbowApImg,
+  xrayElbowLatImg,
+  xrayForearmApImg,
+  xrayForearmLatImg,
+  xrayWristPaImg,
+  xrayHipApImg,
+  xrayFemurApImg,
+  xrayFemurLatImg,
+  xrayTibiaFibulaImg,
+  xrayTibiaLatImg,
+  xrayAnkleApImg,
+  xrayAnkleLatImg,
+  xrayFootApImg,
+  xrayFootLatImg,
+  xrayToesApImg,
+  xraySacrumCoccyxImg,
+  xraySacrumLatImg,
   ctChestImg,
   ctHeadAxialImg,
   mriLumbarImg,

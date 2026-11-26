@@ -1,11 +1,32 @@
 export type BodyRegion =
   | 'head'
+  | 'facial_bones'
+  | 'nasal_bones'
+  | 'soft_tissue_neck'
   | 'cervical'
-  | 'chest'
+  | 'thoracic'
   | 'lumbar'
-  | 'pelvis'
+  | 'chest'
+  | 'ribs'
+  | 'abdomen'
+  | 'shoulder'
+  | 'clavicle'
+  | 'humerus'
+  | 'elbow'
+  | 'forearm'
+  | 'wrist'
   | 'hand'
-  | 'knee';
+  | 'pelvis'
+  | 'hip'
+  | 'femur'
+  | 'knee'
+  | 'tibia_fibula'
+  | 'ankle'
+  | 'foot'
+  | 'toes'
+  | 'sacrum_coccyx';
+
+export type BodySide = 'LEFT' | 'RIGHT' | 'NONE';
 
 export type Modality = 'XRAY' | 'CT' | 'MRI';
 
@@ -43,6 +64,7 @@ export interface ExamProtocol {
   titleEn: string;
   region: BodyRegion;
   regionLabelAr: string;
+  sideRequired?: boolean;
   modality: Modality;
   modalityLabelAr: string;
   recommendedProjection: ProjectionType;
@@ -60,10 +82,12 @@ export interface PatientCase {
   id: string;
   nameAr: string;
   age: number;
+  isPediatric?: boolean;
   gender: 'M' | 'F';
   avatarPath: string;
   complaintAr: string;
   examId: string;
+  requestedSide: BodySide;
   findingAr: string;
   isUrgent: boolean;
   arrivedAt: number;
@@ -74,6 +98,7 @@ export interface ScanEvaluation {
   reasonCode:
     | 'OPTIMAL'
     | 'WRONG_REGION'
+    | 'WRONG_SIDE'
     | 'WRONG_PROJECTION'
     | 'WRONG_POSTURE'
     | 'UNDEREXPOSED'
@@ -81,6 +106,7 @@ export interface ScanEvaluation {
   titleAr: string;
   feedbackAr: string;
   targetRegionScanned: BodyRegion;
+  targetSideScanned?: BodySide;
   exposureDelta: number; // < 0 underexposed, > 0 overexposed, 0 optimal
   baseEarned: number;
   safetyBonus: number;
@@ -93,9 +119,11 @@ export interface CompletedCase {
   id: string;
   patientNameAr: string;
   patientAvatarPath?: string;
+  patientAge?: number;
   examTitleAr: string;
   examImagePath?: string;
   modality: Modality;
+  sideUsed?: BodySide;
   findingAr: string;
   earned: number;
   kvpUsed: number;

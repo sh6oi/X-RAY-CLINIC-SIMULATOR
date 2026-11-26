@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronUp,
   Coins,
+  Crosshair,
   DoorClosed,
   DoorOpen,
   Film,
@@ -31,6 +32,7 @@ import {
 } from 'lucide-react';
 import type {
   BodyRegion,
+  BodySide,
   CassetteState,
   ClinicSaveState,
   CompletedCase,
@@ -61,14 +63,17 @@ import {
   evaluateExposure,
   generatePatient,
   getClinicRank,
+  getEffectiveExamRanges,
   getExamById,
+  isPediatricPatientAge,
 } from './data/radiologyData';
 import {
   POSTURE_SHORT_I18N,
   RANK_TITLES_I18N,
-  REGION_LABELS_I18N,
-  REGION_SHORT_I18N,
+  SIDE_SHORT_I18N,
   UPGRADE_EN,
+  formatRegionWithSide,
+  isBilateralRegion,
   useLanguage,
 } from './i18n/translations';
 import {
@@ -93,6 +98,8 @@ import {ExposureConsolePanel} from './components/ExposureConsolePanel';
 import {UpdateNotificationBanner} from './components/UpdateNotificationBanner';
 import {PWAInstallButton} from './components/PWAInstallButton';
 import {PatientPostureMenu} from './components/PatientPostureMenu';
+import {PatientRegionMenu} from './components/PatientRegionMenu';
+import {PatientRequisitionModal} from './components/PatientRequisitionModal';
 import {VirtualJoystick} from './components/VirtualJoystick';
 import {DesignerCredit} from './components/DesignerCredit';
 import {useAppUpdate} from './hooks/useAppUpdate';
@@ -193,10 +200,32 @@ function buildDayInitialQueue(
   if (count <= 0) return [];
 
   if (handledToday === 0) {
-    const starterPool = ['chest_pa', 'lumbar_ap', 'cervical_lat'];
+    const starterPool = ['chest_pa', 'knee_ap', 'cervical_lat'];
     return Array.from({length: count}, (_, i) => {
-      const p = generatePatient(upgrades);
-      return i < starterPool.length ? {...p, examId: starterPool[i]} : p;
+      let p = generatePatient(upgrades);
+      if (i === 1) {
+        let guard = 0;
+        while (!p.isPediatric && guard < 20) {
+          p = generatePatient(upgrades);
+          guard += 1;
+        }
+      }
+      if (i < starterPool.length) {
+        const exam = getExamById(starterPool[i]);
+        const needsSide = Boolean(
+          exam.sideRequired || isBilateralRegion(exam.region)
+        );
+        return {
+          ...p,
+          examId: exam.id,
+          requestedSide: needsSide
+            ? p.requestedSide !== 'NONE'
+              ? p.requestedSide
+              : 'LEFT'
+            : 'NONE',
+        };
+      }
+      return p;
     });
   }
   return Array.from({length: count}, () => generatePatient(upgrades));
@@ -230,12 +259,13 @@ export default function App() {
 
   // Patient Positioning & Generator Console State
   const [selectedRegion, setSelectedRegion] = useState<BodyRegion>('chest');
+  const [selectedSide, setSelectedSide] = useState<BodySide>('NONE');
   const [selectedPosture, setSelectedPosture] =
     useState<PatientPosture>('ERECT_PA');
   const [selectedProjection, setSelectedProjection] =
     useState<ProjectionType>('PA');
-  const [kvp, setKvp] = useState<number>(110);
-  const [mas, setMas] = useState<number>(4);
+  const [kvp, setKvp] = useState<number>(115);
+  const [mas, setMas] = useState<number>(2.5);
   const [shieldUsed, setShieldUsed] = useState<boolean>(false);
   const [breathHeld, setBreathHeld] = useState<boolean>(false);
 
@@ -248,6 +278,7 @@ export default function App() {
     useState<PatientPosture | null>(null);
   const [capturedProjection, setCapturedProjection] =
     useState<ProjectionType | null>(null);
+  const [capturedSide, setCapturedSide] = useState<BodySide | null>(null);
   const [caseApproved, setCaseApproved] = useState<boolean>(false);
   const [patientSpeech, setPatientSpeech] = useState<string | null>(null);
 
@@ -261,6 +292,8 @@ export default function App() {
     useState<DaySummaryRecord | null>(null);
   const [brightnessOpen, setBrightnessOpen] = useState<boolean>(false);
   const [patientMenuOpen, setPatientMenuOpen] = useState<boolean>(false);
+  const [regionMenuOpen, setRegionMenuOpen] = useState<boolean>(false);
+  const [requisitionOpen, setRequisitionOpen] = useState<boolean>(false);
   const [isRepositioningJoystick, setIsRepositioningJoystick] =
     useState<boolean>(false);
   const [draftJoystickCoords, setDraftJoystickCoords] = useState<{
@@ -478,6 +511,12 @@ export default function App() {
           triggerPatientSpeech(
             'مهلاً! لماذا صوّرت هذا المكان؟ ألمي ليس هنا!',
             'Hey! Why did you scan there? That is not where it hurts!'
+          );
+          break;
+        case 'WRONG_SIDE':
+          triggerPatientSpeech(
+            'انتبه! طلبت فحص الجهة الأخرى (اليمين أم اليسار)!',
+            'Wait! My pain is on the other side (Left vs Right)!'
           );
           break;
         case 'WRONG_POSTURE':
@@ -724,6 +763,7 @@ export default function App() {
       allDayPatientsDone
     ) {
       setPatientMenuOpen(false);
+      setRegionMenuOpen(false);
     }
   }, [
     techLocation,
@@ -777,6 +817,12 @@ export default function App() {
     [activePatient]
   );
 
+  const effectiveRanges = useMemo(
+    () => getEffectiveExamRanges(requestedExam, activePatient?.age),
+    [requestedExam, activePatient?.age]
+  );
+  const isChildPatient = isPediatricPatientAge(activePatient?.age);
+
   const currentRank = getClinicRank(save.totalRevenue);
   const rankTitle =
     RANK_TITLES_I18N[lang][currentRank.id] || currentRank.titleAr;
@@ -816,7 +862,11 @@ export default function App() {
     ) {
       return 'OBLIQUE';
     }
-    return region === 'hand' ? 'PA' : 'AP';
+    return region === 'hand' ||
+      region === 'wrist' ||
+      region === 'facial_bones'
+      ? 'PA'
+      : 'AP';
   };
 
   const registerPatientMovement = () => {
@@ -896,7 +946,7 @@ export default function App() {
     setScreenMode('AUTH');
   };
 
-  const handleSelectRegion = (region: BodyRegion) => {
+  const handleSelectRegion = (region: BodyRegion, side?: BodySide) => {
     if (isDeveloping || isExposing || caseApproved || crExposedPending) return;
     if (techLocation !== 'ROOM') {
       showToast(
@@ -906,10 +956,19 @@ export default function App() {
       );
       return;
     }
-    if (region !== selectedRegion) {
+    const resolvedSide: BodySide = isBilateralRegion(region)
+      ? side && side !== 'NONE'
+        ? side
+        : selectedSide !== 'NONE'
+          ? selectedSide
+          : 'RIGHT'
+      : 'NONE';
+
+    if (region !== selectedRegion || resolvedSide !== selectedSide) {
       registerPatientMovement();
     }
     setSelectedRegion(region);
+    setSelectedSide(resolvedSide);
     setSelectedProjection(
       deriveProjectionFromState(
         selectedPosture,
@@ -920,8 +979,8 @@ export default function App() {
     soundFx.playPurchase();
     showToast(
       isAr
-        ? `تم توجيه الأشعة نحو: ${REGION_LABELS_I18N.ar[region]}`
-        : `Tube aligned to: ${REGION_LABELS_I18N.en[region]}`
+        ? `تم توجيه الأشعة نحو: ${formatRegionWithSide(region, resolvedSide, 'ar')}`
+        : `Tube aligned to: ${formatRegionWithSide(region, resolvedSide, 'en')}`
     );
   };
 
@@ -1254,7 +1313,7 @@ export default function App() {
   const handleSceneInteract = (action: SceneTargetAction) => {
     switch (action.type) {
       case 'REGION':
-        handleSelectRegion(action.region);
+        handleSelectRegion(action.region, action.side);
         break;
       case 'PATIENT_POSTURES':
         if (techLocation !== 'ROOM') {
@@ -1290,6 +1349,11 @@ export default function App() {
             ? 'اضغط ضغطاً مطولاً على المريض لفتح قائمة الوضعيات، أو اضغط على العضو لتحديد المنطقة.'
             : 'Long-press patient to open postures, or tap an anatomical area to select the region.'
         );
+        break;
+      case 'PATIENT_REQUISITION':
+        if (!activePatient) return;
+        soundFx.playPurchase();
+        setRequisitionOpen(true);
         break;
       case 'CASSETTE_RACK':
         handlePickUpCassette();
@@ -1417,14 +1481,24 @@ export default function App() {
 
   const handleAutoCalibrate = () => {
     if (!hasProtocolAssist || !activePatient) return;
+    const autoSide: BodySide = isBilateralRegion(requestedExam.region)
+      ? activePatient.requestedSide && activePatient.requestedSide !== 'NONE'
+        ? activePatient.requestedSide
+        : 'RIGHT'
+      : 'NONE';
     setSelectedRegion(requestedExam.region);
+    setSelectedSide(autoSide);
     setSelectedPosture(requestedExam.recommendedPosture);
     setSelectedProjection(requestedExam.recommendedProjection);
     setKvp(
-      Math.round((requestedExam.kvpRange[0] + requestedExam.kvpRange[1]) / 2)
+      Math.round(
+        (effectiveRanges.kvpRange[0] + effectiveRanges.kvpRange[1]) / 2
+      )
     );
     setMas(
-      Math.round((requestedExam.masRange[0] + requestedExam.masRange[1]) / 2)
+      Math.round(
+        ((effectiveRanges.masRange[0] + effectiveRanges.masRange[1]) / 2) * 2
+      ) / 2
     );
     if (hasLeadShield) setShieldUsed(true);
     setBreathHeld(requestedExam.region === 'chest');
@@ -1437,8 +1511,8 @@ export default function App() {
     }
     showToast(
       isAr
-        ? `تم ضبط بروتوكول ${requestedExam.titleAr} تلقائياً`
-        : `Auto-calibrated ${requestedExam.titleEn}`
+        ? `تم ضبط بروتوكول ${requestedExam.titleEn} تلقائياً${isChildPatient ? ' (جرعة أطفال)' : ''}`
+        : `Auto-calibrated ${requestedExam.titleEn}${isChildPatient ? ' (Pediatric)' : ''}`
     );
   };
 
@@ -1500,10 +1574,14 @@ export default function App() {
     setSelectedProjection(effectiveProjection);
     setCapturedPosture(selectedPosture);
     setCapturedProjection(effectiveProjection);
+    setCapturedSide(selectedSide);
 
     const evaluation = evaluateExposure({
       exam: requestedExam,
       selectedRegion,
+      selectedSide,
+      requestedSide: activePatient.requestedSide ?? 'NONE',
+      patientAge: activePatient.age,
       selectedProjection: effectiveProjection,
       selectedPosture,
       kvp,
@@ -1587,9 +1665,11 @@ export default function App() {
       id: `case-${Date.now()}`,
       patientNameAr: activePatient.nameAr,
       patientAvatarPath: activePatient.avatarPath,
-      examTitleAr: isAr ? requestedExam.titleAr : requestedExam.titleEn,
+      patientAge: activePatient.age,
+      examTitleAr: requestedExam.titleEn,
       examImagePath: requestedExam.imagePath,
       modality: requestedExam.modality,
+      sideUsed: capturedSide ?? selectedSide,
       findingAr: activePatient.findingAr,
       earned: gross,
       kvpUsed: kvp,
@@ -1647,6 +1727,7 @@ export default function App() {
     setCurrentEvaluation(null);
     setCapturedPosture(null);
     setCapturedProjection(null);
+    setCapturedSide(null);
     pendingCrEvalRef.current = null;
     setCrExposedPending(false);
     setCaseApproved(false);
@@ -1656,6 +1737,7 @@ export default function App() {
     setTechLocation('ROOM');
     moveCountRef.current = 0;
     setPatientSpeech(null);
+    setRequisitionOpen(false);
     soundFx.playPurchase();
     showToast(
       willFinishAllToday
@@ -1733,6 +1815,7 @@ export default function App() {
     setCurrentEvaluation(null);
     setCapturedPosture(null);
     setCapturedProjection(null);
+    setCapturedSide(null);
     pendingCrEvalRef.current = null;
     setCrExposedPending(false);
     setCaseApproved(false);
@@ -1742,6 +1825,7 @@ export default function App() {
     setTechLocation('ROOM');
     moveCountRef.current = 0;
     setPatientSpeech(null);
+    setRequisitionOpen(false);
     setDaySummaryOpen(false);
     setActiveDaySummary(null);
     soundFx.playPurchase();
@@ -1990,6 +2074,7 @@ export default function App() {
             .slice(0, 4)}
           requestedExam={requestedExam}
           selectedRegion={selectedRegion}
+          selectedSide={selectedSide}
           selectedPosture={selectedPosture}
           techLocation={techLocation}
           doorClosed={doorClosed}
@@ -2202,10 +2287,17 @@ export default function App() {
             />
             <div className="hud-patient-meta min-w-0 flex-1 space-y-0.5 text-[10px] sm:text-xs leading-snug">
               <div className="flex items-start justify-between gap-2">
-                <span className="font-bold text-white break-words">
-                  {activePatient.nameAr} ({activePatient.age}{' '}
-                  {isAr ? 'سنة' : 'y'})
-                </span>
+                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                  <span className="font-bold text-white break-words">
+                    {activePatient.nameAr} ({activePatient.age}{' '}
+                    {isAr ? 'سنة' : 'y'})
+                  </span>
+                  {isChildPatient && (
+                    <span className="px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-400/50 text-amber-200 text-[9px] font-bold shrink-0">
+                      {isAr ? 'طفل' : 'Pediatric'}
+                    </span>
+                  )}
+                </div>
                 <span className="font-mono-num font-bold text-emerald-400 shrink-0">
                   $
                   {requestedExam.modality === 'XRAY' && hasDR
@@ -2213,15 +2305,24 @@ export default function App() {
                     : requestedExam.baseFee}
                 </span>
               </div>
-              <div className="text-cyan-300 font-semibold break-words">
-                {isAr ? 'المطلوب: ' : 'Order: '}
-                {isAr ? requestedExam.titleAr : requestedExam.titleEn}
+              <div className="text-cyan-300 font-semibold break-words flex items-center gap-1.5 flex-wrap">
+                <span>
+                  {isAr ? 'المطلوب: ' : 'Order: '}
+                  <span dir="ltr">{requestedExam.titleEn}</span>
+                </span>
+                {isBilateralRegion(requestedExam.region) &&
+                  activePatient.requestedSide &&
+                  activePatient.requestedSide !== 'NONE' && (
+                    <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 border border-cyan-400/60 text-cyan-200 text-[9.5px] font-bold shrink-0">
+                      {SIDE_SHORT_I18N[lang][activePatient.requestedSide]}
+                    </span>
+                  )}
               </div>
               <div className="text-slate-400 break-words">
                 {POSTURE_SHORT_I18N[lang][requestedExam.recommendedPosture]} ·{' '}
                 <span className="font-mono-num text-slate-300">
-                  {requestedExam.kvpRange[0]}–{requestedExam.kvpRange[1]} kVp /{' '}
-                  {requestedExam.masRange[0]}–{requestedExam.masRange[1]} mAs
+                  {effectiveRanges.kvpRange[0]}–{effectiveRanges.kvpRange[1]} kVp /{' '}
+                  {effectiveRanges.masRange[0]}–{effectiveRanges.masRange[1]} mAs
                 </span>
               </div>
             </div>
@@ -2343,6 +2444,8 @@ export default function App() {
           onChangeKvp={setKvp}
           onChangeMas={setMas}
           selectedRegion={selectedRegion}
+          selectedSide={selectedSide}
+          patientAge={activePatient?.age}
           doorClosed={doorClosed}
           cassetteReady={cassetteReady}
           cassetteStepLabel={cassetteStepLabel}
@@ -2353,8 +2456,8 @@ export default function App() {
           onRequestBreathHold={handleRequestBreathHold}
           hasProtocolAssist={hasProtocolAssist}
           hasDosimeter={hasDosimeter}
-          kvpRange={requestedExam.kvpRange}
-          masRange={requestedExam.masRange}
+          kvpRange={effectiveRanges.kvpRange}
+          masRange={effectiveRanges.masRange}
           onAutoCalibrate={handleAutoCalibrate}
           onExpose={handleExpose}
           isExposing={isExposing}
@@ -2554,18 +2657,65 @@ export default function App() {
           ) : techLocation === 'ROOM' ? (
             <>
               {!crExposedPending && (
-                <button
-                  type="button"
-                  onClick={() => setPatientMenuOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/95 hover:bg-slate-700 border border-cyan-500/45 text-cyan-200 font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
-                >
-                  <UserCheck className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>
-                    {POSTURE_SHORT_I18N[lang][selectedPosture]} ·{' '}
-                    {REGION_SHORT_I18N[lang][selectedRegion]}
-                  </span>
-                  <ChevronUp className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setRegionMenuOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-slate-800/95 hover:bg-slate-700 border border-cyan-500/45 text-cyan-200 font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    <Crosshair className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>
+                      {formatRegionWithSide(
+                        selectedRegion,
+                        selectedSide,
+                        lang,
+                        true
+                      )}
+                    </span>
+                    <ChevronUp className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  </button>
+
+                  {isBilateralRegion(selectedRegion) && (
+                    <div className="flex items-center gap-1 rounded-xl bg-slate-900/95 border border-slate-700 p-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSelectRegion(selectedRegion, 'RIGHT')
+                        }
+                        className={`px-2 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
+                          selectedSide === 'RIGHT'
+                            ? 'bg-cyan-500 text-slate-950'
+                            : 'text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        {isAr ? 'يمين R' : 'R'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSelectRegion(selectedRegion, 'LEFT')
+                        }
+                        className={`px-2 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
+                          selectedSide === 'LEFT'
+                            ? 'bg-cyan-500 text-slate-950'
+                            : 'text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        {isAr ? 'يسار L' : 'L'}
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setPatientMenuOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-slate-800/95 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    <UserCheck className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>{POSTURE_SHORT_I18N[lang][selectedPosture]}</span>
+                    <ChevronUp className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  </button>
+                </>
               )}
 
               {!crExposedPending && hasLeadShield && (
@@ -2780,6 +2930,7 @@ export default function App() {
         evaluation={currentEvaluation}
         actualPosture={capturedPosture ?? selectedPosture}
         actualProjection={capturedProjection ?? selectedProjection}
+        actualSide={capturedSide ?? selectedSide}
         isDeveloping={isDeveloping}
         hasDR={hasDR}
         hasAutoProc={hasAutoProc}
@@ -2791,6 +2942,7 @@ export default function App() {
           setCurrentEvaluation(null);
           setCapturedPosture(null);
           setCapturedProjection(null);
+          setCapturedSide(null);
           pendingCrEvalRef.current = null;
           setCrExposedPending(false);
           setConsoleOpen(true);
@@ -2817,6 +2969,25 @@ export default function App() {
         onSelectPosture={handleSelectPosture}
         onToggleShield={() => setShieldUsed((v) => !v)}
         onClose={() => setPatientMenuOpen(false)}
+      />
+
+      {/* PATIENT ANATOMICAL REGION & RIGHT/LEFT SIDE MENU */}
+      <PatientRegionMenu
+        isOpen={regionMenuOpen}
+        selectedRegion={selectedRegion}
+        selectedSide={selectedSide}
+        onSelectRegionAndSide={(region, side) =>
+          handleSelectRegion(region, side)
+        }
+        onClose={() => setRegionMenuOpen(false)}
+      />
+
+      {/* CLICKABLE PATIENT HAND REQUISITION FORM MODAL */}
+      <PatientRequisitionModal
+        isOpen={requisitionOpen}
+        patient={activePatient}
+        requestedExam={requestedExam}
+        onClose={() => setRequisitionOpen(false)}
       />
 
       {/* CONTROL SETTINGS & JOYSTICK POSITION MODAL */}

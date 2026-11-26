@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type {
   BodyRegion,
+  BodySide,
   CassetteState,
   ExamProtocol,
   Language,
@@ -12,13 +13,17 @@ import type {
   UpgradeId,
 } from '../types/radiology';
 import {CLINIC_ROOM_IMAGE} from '../data/radiologyData';
-import {REGION_LABELS_I18N} from '../i18n/translations';
+import {
+  formatRegionWithSide,
+  isBilateralRegion,
+} from '../i18n/translations';
 import {getElementStageRect, toStagePoint} from '../utils/stageViewport';
 
 export type SceneTargetAction =
-  | {type: 'REGION'; region: BodyRegion}
+  | {type: 'REGION'; region: BodyRegion; side?: BodySide}
   | {type: 'PATIENT_BODY'}
   | {type: 'PATIENT_POSTURES'}
+  | {type: 'PATIENT_REQUISITION'}
   | {type: 'CASSETTE_RACK'}
   | {type: 'TABLE_BUCKY'}
   | {type: 'WALL_BUCKY'}
@@ -35,6 +40,7 @@ interface RadiologyRoom3DProps {
   waitingPatients?: PatientCase[];
   requestedExam: ExamProtocol;
   selectedRegion: BodyRegion;
+  selectedSide: BodySide;
   selectedPosture: PatientPosture;
   techLocation: TechLocation;
   doorClosed: boolean;
@@ -59,86 +65,38 @@ interface RadiologyRoom3DProps {
 
 interface HotspotLocalMeta {
   id: BodyRegion;
-  label: string;
-  spineY: number;
-  lateralX: number;
-  radius: number;
   erectWorldY: number;
   tableWorldX: number;
-  tableWorldZ: number;
+  lateralOffset: number;
 }
 
 const ANATOMY_SPOTS: HotspotLocalMeta[] = [
-  {
-    id: 'head',
-    label: 'الرأس',
-    spineY: 0.78,
-    lateralX: 0,
-    radius: 0.22,
-    erectWorldY: 1.72,
-    tableWorldX: -0.78,
-    tableWorldZ: 0,
-  },
-  {
-    id: 'cervical',
-    label: 'الرقبة',
-    spineY: 0.56,
-    lateralX: 0,
-    radius: 0.19,
-    erectWorldY: 1.52,
-    tableWorldX: -0.56,
-    tableWorldZ: 0,
-  },
-  {
-    id: 'chest',
-    label: 'الصدر',
-    spineY: 0.3,
-    lateralX: 0,
-    radius: 0.28,
-    erectWorldY: 1.28,
-    tableWorldX: -0.3,
-    tableWorldZ: 0,
-  },
-  {
-    id: 'lumbar',
-    label: 'القطنية',
-    spineY: 0.04,
-    lateralX: 0,
-    radius: 0.25,
-    erectWorldY: 1.02,
-    tableWorldX: -0.04,
-    tableWorldZ: 0,
-  },
-  {
-    id: 'pelvis',
-    label: 'الحوض',
-    spineY: -0.18,
-    lateralX: 0,
-    radius: 0.26,
-    erectWorldY: 0.84,
-    tableWorldX: 0.18,
-    tableWorldZ: 0,
-  },
-  {
-    id: 'hand',
-    label: 'اليد',
-    spineY: -0.16,
-    lateralX: 0.34,
-    radius: 0.19,
-    erectWorldY: 0.92,
-    tableWorldX: 0.16,
-    tableWorldZ: 0.34,
-  },
-  {
-    id: 'knee',
-    label: 'الركبة',
-    spineY: -0.58,
-    lateralX: 0.12,
-    radius: 0.22,
-    erectWorldY: 0.5,
-    tableWorldX: 0.58,
-    tableWorldZ: 0.12,
-  },
+  {id: 'head', erectWorldY: 1.72, tableWorldX: -0.78, lateralOffset: 0},
+  {id: 'facial_bones', erectWorldY: 1.66, tableWorldX: -0.73, lateralOffset: 0},
+  {id: 'nasal_bones', erectWorldY: 1.68, tableWorldX: -0.75, lateralOffset: 0},
+  {id: 'soft_tissue_neck', erectWorldY: 1.54, tableWorldX: -0.57, lateralOffset: 0},
+  {id: 'cervical', erectWorldY: 1.52, tableWorldX: -0.56, lateralOffset: 0},
+  {id: 'clavicle', erectWorldY: 1.44, tableWorldX: -0.45, lateralOffset: 0.14},
+  {id: 'shoulder', erectWorldY: 1.4, tableWorldX: -0.44, lateralOffset: 0.24},
+  {id: 'chest', erectWorldY: 1.28, tableWorldX: -0.32, lateralOffset: 0},
+  {id: 'ribs', erectWorldY: 1.28, tableWorldX: -0.32, lateralOffset: 0.16},
+  {id: 'thoracic', erectWorldY: 1.28, tableWorldX: -0.32, lateralOffset: 0},
+  {id: 'humerus', erectWorldY: 1.24, tableWorldX: -0.26, lateralOffset: 0.26},
+  {id: 'elbow', erectWorldY: 1.12, tableWorldX: -0.14, lateralOffset: 0.28},
+  {id: 'lumbar', erectWorldY: 1.04, tableWorldX: -0.08, lateralOffset: 0},
+  {id: 'abdomen', erectWorldY: 1.04, tableWorldX: -0.08, lateralOffset: 0},
+  {id: 'forearm', erectWorldY: 1.0, tableWorldX: -0.02, lateralOffset: 0.3},
+  {id: 'wrist', erectWorldY: 0.9, tableWorldX: 0.12, lateralOffset: 0.32},
+  {id: 'hand', erectWorldY: 0.84, tableWorldX: 0.18, lateralOffset: 0.34},
+  {id: 'pelvis', erectWorldY: 0.86, tableWorldX: 0.1, lateralOffset: 0},
+  {id: 'sacrum_coccyx', erectWorldY: 0.86, tableWorldX: 0.1, lateralOffset: 0},
+  {id: 'hip', erectWorldY: 0.84, tableWorldX: 0.14, lateralOffset: 0.14},
+  {id: 'femur', erectWorldY: 0.66, tableWorldX: 0.34, lateralOffset: 0.13},
+  {id: 'knee', erectWorldY: 0.5, tableWorldX: 0.54, lateralOffset: 0.12},
+  {id: 'tibia_fibula', erectWorldY: 0.3, tableWorldX: 0.74, lateralOffset: 0.12},
+  {id: 'ankle', erectWorldY: 0.12, tableWorldX: 0.92, lateralOffset: 0.12},
+  {id: 'foot', erectWorldY: 0.08, tableWorldX: 0.96, lateralOffset: 0.12},
+  {id: 'toes', erectWorldY: 0.06, tableWorldX: 1.0, lateralOffset: 0.12},
 ];
 
 const ERECT_STAND_X = 2.65;
@@ -1246,11 +1204,115 @@ function buildCassetteMesh(
   return group;
 }
 
+function createRequisitionPaperTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 320;
+  const ctx = canvas.getContext('2d');
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const redraw = (
+    examTitleEn: string,
+    age: number,
+    side: BodySide,
+    isUrgent: boolean
+  ) => {
+    if (!ctx) return;
+
+    // Warm ivory paper background
+    ctx.fillStyle = '#FCFBF6';
+    ctx.fillRect(0, 0, 256, 320);
+
+    // Subtle paper border
+    ctx.strokeStyle = '#CBD5E1';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(4, 4, 248, 312);
+
+    // Clinical header band
+    ctx.fillStyle = isUrgent ? '#991B1B' : '#0F4C81';
+    ctx.fillRect(10, 10, 236, 44);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
+    ctx.fillText('RADIOLOGY ORDER', 20, 32);
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = isUrgent ? '#FECACA' : '#BAE6FD';
+    ctx.fillText(
+      isUrgent ? 'STAT PRIORITY' : age < 14 ? 'PEDIATRIC RX' : 'CLINIC REQUISITION',
+      20,
+      48
+    );
+
+    // Ruled patient info strip
+    ctx.fillStyle = '#E2E8F0';
+    ctx.fillRect(16, 66, 224, 2);
+    ctx.fillStyle = '#475569';
+    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText('REQUESTED EXAM:', 18, 90);
+
+    // Exam title box
+    ctx.fillStyle = '#EFF6FF';
+    ctx.fillRect(14, 100, 228, 104);
+    ctx.strokeStyle = '#38BDF8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(14, 100, 228, 104);
+
+    // Word-wrap English exam title
+    ctx.fillStyle = '#0F172A';
+    ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+    const words = examTitleEn.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+    for (const w of words) {
+      const candidate = currentLine ? `${currentLine} ${w}` : w;
+      if (ctx.measureText(candidate).width > 206 && currentLine) {
+        lines.push(currentLine);
+        currentLine = w;
+      } else {
+        currentLine = candidate;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    lines.slice(0, 3).forEach((line, i) => {
+      ctx.fillText(line, 24, 132 + i * 26);
+    });
+
+    // Side badge if bilateral
+    if (side === 'RIGHT' || side === 'LEFT') {
+      ctx.fillStyle = '#0284C7';
+      ctx.fillRect(18, 214, 118, 28);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
+      ctx.fillText(`SIDE: ${side}`, 28, 233);
+    }
+
+    // Printed prescription lines & medical stamp
+    ctx.fillStyle = '#94A3B8';
+    ctx.fillRect(18, 256, 220, 3);
+    ctx.fillRect(18, 270, 165, 3);
+
+    ctx.strokeStyle = '#0284C7';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(208, 282, 20, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#0284C7';
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    ctx.fillText('RX', 200, 286);
+
+    texture.needsUpdate = true;
+  };
+
+  redraw('Chest PA', 32, 'NONE', false);
+  return {texture, redraw};
+}
+
 export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   patient,
   waitingPatients = [],
   requestedExam,
   selectedRegion,
+  selectedSide,
   selectedPosture,
   techLocation,
   doorClosed,
@@ -1279,6 +1341,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
   // Refs synced from React props without rebuilding WebGL
   const selectedRegionRef = useRef<BodyRegion>(selectedRegion);
+  const selectedSideRef = useRef<BodySide>(selectedSide);
+  const patientScaleRef = useRef<number>(1.0);
   const selectedPostureRef = useRef<PatientPosture>(selectedPosture);
   const techLocationRef = useRef<TechLocation>(techLocation);
   const doorClosedRef = useRef<boolean>(doorClosed);
@@ -1311,11 +1375,17 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     gender: 'M' | 'F';
     age: number;
     hasPatient: boolean;
+    examTitleEn: string;
+    requestedSide: BodySide;
+    isUrgent: boolean;
   }>({
     id: patient?.id ?? 'default-m',
     gender: patient?.gender ?? 'M',
     age: patient?.age ?? 32,
     hasPatient: Boolean(patient),
+    examTitleEn: requestedExam.titleEn,
+    requestedSide: patient?.requestedSide ?? 'NONE',
+    isUrgent: Boolean(patient?.isUrgent),
   });
   const waitingPatientsRef = useRef<
     {id: string; gender: 'M' | 'F'; age: number}[]
@@ -1328,6 +1398,10 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
   useEffect(() => {
     selectedRegionRef.current = selectedRegion;
   }, [selectedRegion]);
+
+  useEffect(() => {
+    selectedSideRef.current = selectedSide;
+  }, [selectedSide]);
 
   useEffect(() => {
     selectedPostureRef.current = selectedPosture;
@@ -1428,11 +1502,21 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       gender: patient?.gender ?? 'M',
       age: patient?.age ?? 32,
       hasPatient: Boolean(patient),
+      examTitleEn: requestedExam.titleEn,
+      requestedSide: patient?.requestedSide ?? 'NONE',
+      isUrgent: Boolean(patient?.isUrgent),
     };
     applyPatientAppearanceRef.current?.();
     patientEnterAnimRef.current = patient ? 1.0 : 0;
     cameraMoveActiveRef.current = true;
-  }, [patient?.id, patient?.gender, patient?.age]);
+  }, [
+    patient?.id,
+    patient?.gender,
+    patient?.age,
+    patient?.requestedSide,
+    patient?.isUrgent,
+    requestedExam.titleEn,
+  ]);
 
   const waitingSignature = waitingPatients.map((p) => p.id).join('|');
   useEffect(() => {
@@ -5543,12 +5627,27 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     const SKIN_TONES = [0xe8bea0, 0xdba88a, 0xc8906e, 0xf0d2bc, 0xb87e5b];
     const LIP_TONES = [0xc2726d, 0xb56862, 0x9e5953, 0xcc7b75, 0x93524c];
 
+    const reqPaperAsset = createRequisitionPaperTexture();
+    track(reqPaperAsset.texture);
+
     const applyPatientAppearance = () => {
       const info = patientAppearanceRef.current;
       patientWorldAnchor.visible = info.hasPatient;
       if (!info.hasPatient) return;
+      reqPaperAsset.redraw(
+        info.examTitleEn,
+        info.age,
+        info.requestedSide,
+        info.isUrgent
+      );
       const seed = hashPatientSeed(info.id);
       const isFemale = info.gender === 'F';
+      const isPed = info.age < 14;
+      const childScale = isPed
+        ? THREE.MathUtils.clamp(0.58 + info.age * 0.02, 0.66, 0.84)
+        : 1.0;
+      patientScaleRef.current = childScale;
+      patientLocalBody.scale.setScalar(childScale);
 
       const skinIdx = seed % SKIN_TONES.length;
       matPatientSkin.color.setHex(SKIN_TONES[skinIdx]);
@@ -5565,8 +5664,8 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         pAbdomen.scale.set(0.83, 1, 0.7);
         pPelvis.scale.set(1.16, 1.08, 0.84);
         pNeck.scale.set(0.82, 1, 0.82);
-        pHead.scale.set(0.88, 1.04, 0.94);
-        pTunicSkirt.visible = true;
+        pHead.scale.set(isPed ? 0.96 : 0.88, isPed ? 1.12 : 1.04, isPed ? 1.02 : 0.94);
+        pTunicSkirt.visible = !isPed;
         browMeshes.forEach((b) => {
           b.scale.set(0.85, 0.9, 0.85);
         });
@@ -5590,7 +5689,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         matPatientHijab.color.setHex(FEMALE_HIJAB_COLORS[hijabIdx]);
         matPatientHijabTrim.color.setHex(FEMALE_TOP_COLORS[topIdx]);
 
-        const wearsHijab = (seed >> 2) % 3 !== 0;
+        const wearsHijab = !isPed && (seed >> 2) % 3 !== 0;
         pHijabCap.visible = wearsHijab;
         pHijabUnderscarf.visible = wearsHijab;
         pHijabDrape.visible = wearsHijab;
@@ -5610,18 +5709,18 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         pBeard.visible = false;
         pMustache.visible = false;
       } else {
-        pChest.scale.set(1.24, 1.02, 0.82);
+        pChest.scale.set(isPed ? 1.06 : 1.24, 1.02, 0.82);
         pClavicleBridge.scale.set(0.88, 1.02, 0.74);
-        pAbdomen.scale.set(1.12, 1.0, 0.8);
+        pAbdomen.scale.set(isPed ? 0.98 : 1.12, 1.0, 0.8);
         pPelvis.scale.set(0.96, 1.02, 0.76);
         pNeck.scale.set(1.04, 1, 1.04);
-        pHead.scale.set(0.94, 1.08, 0.99);
+        pHead.scale.set(isPed ? 1.02 : 0.94, isPed ? 1.14 : 1.08, isPed ? 1.06 : 0.99);
         pTunicSkirt.visible = false;
         browMeshes.forEach((b) => {
-          b.scale.set(1.2, 1.05, 1.1);
+          b.scale.set(isPed ? 0.9 : 1.2, 1.05, 1.1);
         });
         shoulderPivots.forEach((arm, idx) => {
-          arm.position.x = (idx === 0 ? 1 : -1) * 0.262;
+          arm.position.x = (idx === 0 ? 1 : -1) * (isPed ? 0.23 : 0.262);
           arm.scale.set(1.04, 1.02, 1.04);
         });
         thighPivots.forEach((hip, idx) => {
@@ -5651,13 +5750,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         pHairSideR.visible = false;
 
         pHair.visible = true;
-        pHairCrown.visible = info.age < 56;
+        pHairCrown.visible = !isPed && info.age < 56;
         pSideburns.forEach((sb) => {
-          sb.visible = true;
+          sb.visible = !isPed;
         });
-        const hasBeard = info.age >= 22 && (seed >> 2) % 4 !== 0;
+        const hasBeard = !isPed && info.age >= 22 && (seed >> 2) % 4 !== 0;
         pBeard.visible = hasBeard;
-        pMustache.visible = hasBeard || (info.age >= 35 && seed % 2 === 0);
+        pMustache.visible = !isPed && (hasBeard || (info.age >= 35 && seed % 2 === 0));
       }
     };
 
@@ -5693,17 +5792,108 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       });
     });
 
-    // Clickable Patient Anatomical Regions
-    const hotspotRings: {region: BodyRegion; mesh: THREE.Mesh}[] = [];
+    // Realistic clickable exam requisition paper held in the patient's right hand (wristPivots[1])
+    const requisitionPaperGroup = new THREE.Group();
+    requisitionPaperGroup.position.set(-0.024, -0.072, 0.056);
+    requisitionPaperGroup.rotation.set(-0.34, -0.22, 0.14);
+
+    const matReqPaperBody = track(
+      new THREE.MeshStandardMaterial({
+        color: 0xfcfbf6,
+        roughness: 0.72,
+        metalness: 0.02,
+      })
+    );
+    const matReqPaperPrint = track(
+      new THREE.MeshStandardMaterial({
+        map: reqPaperAsset.texture,
+        roughness: 0.68,
+        metalness: 0.02,
+      })
+    );
+    const matReqClipAccent = track(
+      new THREE.MeshStandardMaterial({
+        color: 0x0284c7,
+        emissive: 0x0369a1,
+        emissiveIntensity: 0.25,
+        roughness: 0.35,
+      })
+    );
+
+    const paperBacking = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.155, 0.205, 0.005)),
+      matReqPaperBody
+    );
+    paperBacking.castShadow = true;
+    paperBacking.layers.enable(1);
+    paperBacking.userData.action = {
+      type: 'PATIENT_REQUISITION',
+    } satisfies SceneTargetAction;
+    requisitionPaperGroup.add(paperBacking);
+    interactiveMeshes.push(paperBacking);
+
+    const paperFrontPrint = new THREE.Mesh(
+      track(new THREE.PlaneGeometry(0.15, 0.198)),
+      matReqPaperPrint
+    );
+    paperFrontPrint.position.z = 0.0032;
+    paperFrontPrint.layers.enable(1);
+    paperFrontPrint.userData.action = {
+      type: 'PATIENT_REQUISITION',
+    } satisfies SceneTargetAction;
+    requisitionPaperGroup.add(paperFrontPrint);
+    interactiveMeshes.push(paperFrontPrint);
+
+    const paperBackPrint = new THREE.Mesh(
+      track(new THREE.PlaneGeometry(0.15, 0.198)),
+      matReqPaperPrint
+    );
+    paperBackPrint.position.z = -0.0032;
+    paperBackPrint.rotation.y = Math.PI;
+    paperBackPrint.layers.enable(1);
+    paperBackPrint.userData.action = {
+      type: 'PATIENT_REQUISITION',
+    } satisfies SceneTargetAction;
+    requisitionPaperGroup.add(paperBackPrint);
+    interactiveMeshes.push(paperBackPrint);
+
+    const paperHeaderBar = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.068, 0.016, 0.012)),
+      matReqClipAccent
+    );
+    paperHeaderBar.position.set(0, 0.104, 0);
+    paperHeaderBar.layers.enable(1);
+    paperHeaderBar.userData.action = {
+      type: 'PATIENT_REQUISITION',
+    } satisfies SceneTargetAction;
+    requisitionPaperGroup.add(paperHeaderBar);
+    interactiveMeshes.push(paperHeaderBar);
+
+    const paperHitbox = new THREE.Mesh(
+      track(new THREE.BoxGeometry(0.32, 0.36, 0.24)),
+      track(new THREE.MeshBasicMaterial({visible: false}))
+    );
+    paperHitbox.layers.set(1);
+    paperHitbox.userData.action = {
+      type: 'PATIENT_REQUISITION',
+    } satisfies SceneTargetAction;
+    requisitionPaperGroup.add(paperHitbox);
+    interactiveMeshes.push(paperHitbox);
+
+    wristPivots[1]?.add(requisitionPaperGroup);
+
+    // Clickable Patient Anatomical Regions (26 Regions + Left/Right Bilateral Support)
+    const hotspotRings: {region: BodyRegion; side: BodySide; mesh: THREE.Mesh}[] = [];
     const registerRegionHitMesh = (
       parent: THREE.Object3D,
       region: BodyRegion,
+      side: BodySide,
       radius: number,
       pos: [number, number, number],
       ringPositions: [number, number, number][]
     ) => {
       const hitMesh = new THREE.Mesh(
-        track(new THREE.SphereGeometry(radius, 14, 12)),
+        track(new THREE.SphereGeometry(radius, 12, 10)),
         track(new THREE.MeshBasicMaterial({visible: false}))
       );
       hitMesh.position.set(pos[0], pos[1], pos[2]);
@@ -5711,62 +5901,189 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       hitMesh.userData.action = {
         type: 'REGION',
         region,
+        side,
       } satisfies SceneTargetAction;
       parent.add(hitMesh);
       interactiveMeshes.push(hitMesh);
 
       ringPositions.forEach(([rx, ry, rz]) => {
         const ring = new THREE.Mesh(
-          track(new THREE.RingGeometry(radius * 0.64, radius * 0.86, 28)),
+          track(new THREE.RingGeometry(radius * 0.62, radius * 0.85, 24)),
           track(matHighlightGlow.clone())
         );
         ring.position.set(rx, ry, rz);
         parent.add(ring);
-        hotspotRings.push({region, mesh: ring});
+        hotspotRings.push({region, side, mesh: ring});
       });
     };
 
-    ANATOMY_SPOTS.forEach((spot) => {
-      if (spot.id === 'hand') {
-        wristPivots.forEach((wrist) => {
-          registerRegionHitMesh(
-            wrist,
-            'hand',
-            spot.radius,
-            [0, -0.05, 0],
-            [
-              [0, -0.05, 0.075],
-              [0, -0.05, -0.075],
-            ]
-          );
-        });
-        return;
-      }
-      if (spot.id === 'knee') {
-        kneePivots.forEach((knee) => {
-          registerRegionHitMesh(
-            knee,
-            'knee',
-            spot.radius,
-            [0, 0, 0],
-            [
-              [0, 0, 0.095],
-              [0, 0, -0.095],
-            ]
-          );
-        });
-        return;
-      }
+    // Head, Face, Nose & Neck Zones (on pHeadGroup)
+    registerRegionHitMesh(
+      pHeadGroup,
+      'head',
+      'NONE',
+      0.135,
+      [0, 0.25, -0.02],
+      [[0, 0.26, -0.15]]
+    );
+    registerRegionHitMesh(
+      pHeadGroup,
+      'facial_bones',
+      'NONE',
+      0.075,
+      [0, 0.175, 0.1],
+      [[0, 0.175, 0.15]]
+    );
+    registerRegionHitMesh(
+      pHeadGroup,
+      'nasal_bones',
+      'NONE',
+      0.055,
+      [0, 0.215, 0.145],
+      [[0, 0.215, 0.165]]
+    );
+    registerRegionHitMesh(
+      pHeadGroup,
+      'soft_tissue_neck',
+      'NONE',
+      0.068,
+      [0, 0.055, 0.055],
+      [[0, 0.055, 0.095]]
+    );
+    registerRegionHitMesh(
+      pHeadGroup,
+      'cervical',
+      'NONE',
+      0.082,
+      [0, 0.055, -0.04],
+      [[0, 0.055, -0.10]]
+    );
+
+    // Midline Spine, Thorax, Abdomen & Pelvis/Sacrum
+    registerRegionHitMesh(
+      pSpinePivot,
+      'chest',
+      'NONE',
+      0.155,
+      [0, 0.30, 0.07],
+      [[0, 0.30, 0.165]]
+    );
+    registerRegionHitMesh(
+      pSpinePivot,
+      'thoracic',
+      'NONE',
+      0.13,
+      [0, 0.30, -0.095],
+      [[0, 0.30, -0.165]]
+    );
+    registerRegionHitMesh(
+      pSpinePivot,
+      'abdomen',
+      'NONE',
+      0.135,
+      [0, 0.08, 0.07],
+      [[0, 0.08, 0.155]]
+    );
+    registerRegionHitMesh(
+      pSpinePivot,
+      'lumbar',
+      'NONE',
+      0.125,
+      [0, 0.08, -0.09],
+      [[0, 0.08, -0.155]]
+    );
+    registerRegionHitMesh(
+      patientLocalBody,
+      'pelvis',
+      'NONE',
+      0.135,
+      [0, -0.09, 0.04],
+      [[0, -0.09, 0.165]]
+    );
+    registerRegionHitMesh(
+      patientLocalBody,
+      'sacrum_coccyx',
+      'NONE',
+      0.115,
+      [0, -0.10, -0.10],
+      [[0, -0.10, -0.165]]
+    );
+
+    // Bilateral Trunk Zones: Ribs & Clavicle (idx 0 = +X = Patient LEFT, idx 1 = -X = Patient RIGHT)
+    [0, 1].forEach((idx) => {
+      const side: BodySide = idx === 0 ? 'LEFT' : 'RIGHT';
+      const sign = idx === 0 ? 1 : -1;
       registerRegionHitMesh(
-        patientLocalBody,
-        spot.id,
-        spot.radius,
-        [spot.lateralX, spot.spineY, 0],
-        [
-          [spot.lateralX, spot.spineY, 0.175],
-          [spot.lateralX, spot.spineY, -0.175],
-        ]
+        pChestGroup,
+        'clavicle',
+        side,
+        0.078,
+        [sign * 0.115, 0.125, 0.06],
+        [[sign * 0.115, 0.125, 0.145]]
       );
+      registerRegionHitMesh(
+        pChestGroup,
+        'ribs',
+        side,
+        0.105,
+        [sign * 0.14, -0.01, 0.045],
+        [[sign * 0.14, -0.01, 0.155]]
+      );
+    });
+
+    // Bilateral Upper Limbs: Shoulder -> Humerus -> Elbow -> Forearm -> Wrist -> Hand
+    [0, 1].forEach((idx) => {
+      const side: BodySide = idx === 0 ? 'LEFT' : 'RIGHT';
+      const shoulder = shoulderPivots[idx];
+      const elbow = elbowPivots[idx];
+      const wrist = wristPivots[idx];
+      registerRegionHitMesh(shoulder, 'shoulder', side, 0.105, [0, 0, 0], [
+        [0, 0, 0.095],
+      ]);
+      registerRegionHitMesh(shoulder, 'humerus', side, 0.088, [0, -0.14, 0], [
+        [0, -0.14, 0.082],
+      ]);
+      registerRegionHitMesh(elbow, 'elbow', side, 0.084, [0, 0, 0], [
+        [0, 0, 0.076],
+      ]);
+      registerRegionHitMesh(elbow, 'forearm', side, 0.078, [0, -0.125, 0], [
+        [0, -0.125, 0.07],
+      ]);
+      registerRegionHitMesh(wrist, 'wrist', side, 0.068, [0, 0.015, 0], [
+        [0, 0.015, 0.065],
+      ]);
+      registerRegionHitMesh(wrist, 'hand', side, 0.095, [0, -0.065, 0], [
+        [0, -0.065, 0.07],
+      ]);
+    });
+
+    // Bilateral Lower Limbs: Hip -> Femur -> Knee -> Tibia/Fibula -> Ankle -> Foot -> Toes
+    [0, 1].forEach((idx) => {
+      const side: BodySide = idx === 0 ? 'LEFT' : 'RIGHT';
+      const hip = thighPivots[idx];
+      const knee = kneePivots[idx];
+      const ankle = anklePivots[idx];
+      registerRegionHitMesh(hip, 'hip', side, 0.10, [0, 0.01, 0], [
+        [0, 0.01, 0.115],
+      ]);
+      registerRegionHitMesh(hip, 'femur', side, 0.095, [0, -0.21, 0], [
+        [0, -0.21, 0.098],
+      ]);
+      registerRegionHitMesh(knee, 'knee', side, 0.098, [0, 0, 0], [
+        [0, 0, 0.095],
+      ]);
+      registerRegionHitMesh(knee, 'tibia_fibula', side, 0.088, [0, -0.21, 0], [
+        [0, -0.21, 0.088],
+      ]);
+      registerRegionHitMesh(ankle, 'ankle', side, 0.078, [0, 0.005, 0], [
+        [0, 0.005, 0.082],
+      ]);
+      registerRegionHitMesh(ankle, 'foot', side, 0.082, [0, -0.02, 0.055], [
+        [0, 0.03, 0.055],
+      ]);
+      registerRegionHitMesh(ankle, 'toes', side, 0.07, [0, -0.025, 0.14], [
+        [0, 0.02, 0.14],
+      ]);
     });
 
     // =========================================================================
@@ -6552,6 +6869,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       hits: THREE.Intersection<THREE.Object3D>[]
     ): THREE.Intersection<THREE.Object3D> | null => {
       if (hits.length === 0) return null;
+      const reqHit = hits.find(
+        (h) =>
+          h.distance <= hits[0].distance + 0.55 &&
+          (h.object.userData.action as SceneTargetAction | undefined)?.type ===
+            'PATIENT_REQUISITION'
+      );
+      if (reqHit) return reqHit;
       const maxDist = hits[0].distance + 0.42;
       const regionHit = hits.find(
         (h) =>
@@ -6657,15 +6981,26 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       if (!action) return null;
       const isAr = languageRef.current === 'ar';
       switch (action.type) {
-        case 'REGION':
+        case 'REGION': {
+          const regionText = formatRegionWithSide(
+            action.region,
+            action.side,
+            isAr ? 'ar' : 'en',
+            true
+          );
           return isAr
-            ? `ضغطة لتحديد «${REGION_LABELS_I18N.ar[action.region]}» · ضغط مطول للوضعيات`
-            : `Tap to select ${REGION_LABELS_I18N.en[action.region]} · Hold for postures`;
+            ? `ضغطة لتحديد «${regionText}» · ضغط مطول للوضعيات`
+            : `Tap to select ${regionText} · Hold for postures`;
+        }
         case 'PATIENT_BODY':
         case 'PATIENT_POSTURES':
           return isAr
             ? 'اضغط ضغطاً مطولاً على المريض لفتح قائمة الوضعيات'
             : 'Long-press patient to open Posture Menu';
+        case 'PATIENT_REQUISITION':
+          return isAr
+            ? 'ورقة طلب الفحص بيد المريض — اضغط لقراءة اسم الفحص'
+            : 'Exam Requisition Slip — Tap to read exam request';
         case 'CASSETTE_RACK':
           return isAr
             ? 'انقر لأخذ كاسيت الأشعة بيدك'
@@ -7231,14 +7566,26 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       // 4. Cassette Locations & Synchronized Under-Table Bucky Movement
       const targetSpot =
         ANATOMY_SPOTS.find((s) => s.id === selectedRegionRef.current) ||
-        ANATOMY_SPOTS[2];
+        ANATOMY_SPOTS[7];
+      const childScale = patientScaleRef.current;
+      const spotLateralSign =
+        selectedSideRef.current === 'RIGHT'
+          ? 1
+          : selectedSideRef.current === 'LEFT'
+            ? -1
+            : 0;
+      const targetTableWorldX = targetSpot.tableWorldX * childScale;
+      const targetTableWorldZ =
+        spotLateralSign * targetSpot.lateralOffset * childScale;
+      const targetErectWorldY = Math.max(0.32, targetSpot.erectWorldY * childScale);
+
       rackCassette.visible = cState === 'RACK';
       tableInsertedCassette.visible = cState === 'TABLE_BUCKY';
       wallInsertedCassette.visible = cState === 'WALL_BUCKY';
 
       // Slide Table Bucky Carriage along X & Z in lockstep with the active exam region
       const drawerGoalX = THREE.MathUtils.clamp(
-        targetSpot.tableWorldX,
+        targetTableWorldX,
         -0.92,
         0.92
       );
@@ -7246,7 +7593,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
         cState === 'IN_HAND' && !isErect
           ? 0.64
           : cState === 'TABLE_BUCKY'
-            ? THREE.MathUtils.clamp(targetSpot.tableWorldZ * 0.45, -0.22, 0.28)
+            ? THREE.MathUtils.clamp(targetTableWorldZ * 0.45, -0.22, 0.28)
             : 0.44;
       tableBuckyDrawerGroup.position.x = THREE.MathUtils.damp(
         tableBuckyDrawerGroup.position.x,
@@ -7304,11 +7651,12 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       const enterP = patientEnterAnimRef.current;
 
       const arcLift = Math.sin(erectBlend * Math.PI) * 0.34;
-      const lyingY =
+      const baseLyingY =
         posture === 'TABLE_LEFT_LAT' || posture === 'TABLE_RIGHT_LAT'
           ? 1.14
           : 1.09;
-      const standingY = 0.96;
+      const lyingY = baseLyingY - (1 - childScale) * 0.06;
+      const standingY = 0.96 * childScale;
 
       let anchorGoalX = THREE.MathUtils.lerp(
         slidingTableGroup.position.x,
@@ -7405,7 +7753,11 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       const isTableOblique =
         posture === 'TABLE_RPO' || posture === 'TABLE_LPO';
       const isHandTableExam =
-        !isErect && selectedRegionRef.current === 'hand';
+        !isErect &&
+        (selectedRegionRef.current === 'hand' ||
+          selectedRegionRef.current === 'wrist' ||
+          selectedRegionRef.current === 'forearm' ||
+          selectedRegionRef.current === 'elbow');
       const isSpeaking = Boolean(patientSpeechRef.current);
 
       // Blinking Eyelids (quick natural blink every ~3.9s)
@@ -7478,6 +7830,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       // Anatomically Authentic 2-Bone Arm & Wrist Joint Targets per Posture / Walk / Speech
       shoulderPivots.forEach((sPivot, idx) => {
         const sideSign = idx === 0 ? 1 : -1; // idx 0: Left (+X), idx 1: Right (-X)
+        const armSide: BodySide = idx === 0 ? 'LEFT' : 'RIGHT';
         const ePivot = elbowPivots[idx];
         const wPivot = wristPivots[idx];
 
@@ -7492,6 +7845,12 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
           sX = swing * 0.34 - 0.04;
           sZ = sideSign * 0.1;
           eX = -0.22 - Math.max(0, -swing) * 0.25;
+          if (idx === 1) {
+            // Keep right forearm slightly bent forward while walking in holding the order slip
+            sX = Math.min(sX, -0.24);
+            eX = Math.min(eX, -0.68);
+            wX = 0.12;
+          }
         } else if (isErect && isErectLat) {
           // Lateral chest/cervical: raise arms gracefully overhead so chest clears beam
           sX = -2.22;
@@ -7533,10 +7892,16 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
           sX = isElevatedArm ? -0.45 : -0.12;
           sZ = sideSign * (isElevatedArm ? 0.24 : 0.16);
           eX = isElevatedArm ? -0.78 : -0.25;
-        } else if (!isErect && isHandTableExam && idx === 1) {
-          // Extend examined right arm smoothly outward onto hand target pad
+        } else if (
+          !isErect &&
+          isHandTableExam &&
+          (selectedSideRef.current === 'NONE'
+            ? idx === 1
+            : selectedSideRef.current === armSide)
+        ) {
+          // Extend examined arm slightly outward onto target side
           sX = 0.04;
-          sZ = -0.44;
+          sZ = sideSign * 0.44;
           eX = -0.35;
           wX = -0.15;
         } else if (isSpeaking && idx === 1 && isErect) {
@@ -7545,10 +7910,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
           sZ = -0.14;
           eX = -0.95 + Math.sin(elapsed * 5.0) * 0.12;
         } else {
-          // Natural relaxed arm hang / table supine rest
-          sX = isErect ? -0.05 : 0.06;
-          sZ = sideSign * (isErect ? 0.09 : 0.12);
-          eX = isErect ? -0.2 : -0.1;
+          // Natural relaxed arm hang / table supine rest (right hand gently presents order slip)
+          sX = isErect ? (idx === 1 ? -0.22 : -0.05) : idx === 1 ? 0.02 : 0.06;
+          sZ = sideSign * (isErect ? (idx === 1 ? 0.13 : 0.09) : idx === 1 ? 0.16 : 0.12);
+          eX = isErect ? (idx === 1 ? -0.62 : -0.2) : idx === 1 ? -0.22 : -0.1;
+          if (idx === 1) {
+            wX = 0.12;
+          }
         }
 
         const breathLift = breathWave * 0.004;
@@ -7611,18 +7979,18 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
       // 6. Ceiling X-Ray Crane & Wall Bucky Receptor
       const goalGantryX = THREE.MathUtils.lerp(
-        targetSpot.tableWorldX,
+        targetTableWorldX,
         isExposingRef.current ? 1.05 : 0.96,
         erectBlend
       );
       const goalTubeZ = THREE.MathUtils.lerp(
-        targetSpot.tableWorldZ,
+        targetTableWorldZ,
         ERECT_Z,
         erectBlend
       );
       const goalTubeY = THREE.MathUtils.lerp(
         isExposingRef.current ? 1.8 : 1.92,
-        targetSpot.erectWorldY,
+        targetErectWorldY,
         erectBlend
       );
       const goalPivotZ = THREE.MathUtils.lerp(0, Math.PI / 2, erectBlend);
@@ -7654,7 +8022,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
       erectBuckyCarriage.position.y = THREE.MathUtils.damp(
         erectBuckyCarriage.position.y,
-        targetSpot.erectWorldY,
+        targetErectWorldY,
         7.5,
         delta
       );
@@ -7680,19 +8048,27 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       leadApronMesh.visible =
         patientWorldAnchor.visible &&
         shieldUsedRef.current &&
-        selectedRegionRef.current !== 'pelvis';
+        selectedRegionRef.current !== 'pelvis' &&
+        selectedRegionRef.current !== 'hip' &&
+        selectedRegionRef.current !== 'sacrum_coccyx';
 
-      hotspotRings.forEach(({region, mesh}) => {
+      const activeRegion = selectedRegionRef.current;
+      const activeSide = selectedSideRef.current;
+      const activeBilateral = isBilateralRegion(activeRegion);
+      hotspotRings.forEach(({region, side, mesh}) => {
         if (!patientWorldAnchor.visible) {
           mesh.visible = false;
           return;
         }
-        mesh.visible = true;
+        const isSel =
+          region === activeRegion &&
+          (!activeBilateral || activeSide === 'NONE' || side === activeSide);
+        mesh.visible = isSel;
+        if (!isSel) return;
         const mat = mesh.material as THREE.MeshBasicMaterial;
-        const isSel = region === selectedRegionRef.current;
-        mat.color.setHex(isSel ? 0x22d3ee : 0x64748b);
-        mat.opacity = isSel ? 0.9 : 0.22;
-        const s = isSel ? 1.06 + Math.sin(elapsed * 4) * 0.05 : 1;
+        mat.color.setHex(0x22d3ee);
+        mat.opacity = 0.88;
+        const s = 1.06 + Math.sin(elapsed * 4) * 0.06;
         mesh.scale.set(s, s, 1);
       });
 

@@ -15,18 +15,25 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import type {
+  BodySide,
   ExamProtocol,
   PatientCase,
   PatientPosture,
   ProjectionType,
   ScanEvaluation,
 } from '../types/radiology';
-import {FILM_CARTON_COST, getRadiographImage} from '../data/radiologyData';
+import {
+  FILM_CARTON_COST,
+  getRadiographImage,
+  isPediatricPatientAge,
+} from '../data/radiologyData';
 import {
   MODALITY_LABELS_I18N,
   POSTURE_SHORT_I18N,
   PROJECTION_LABELS_I18N,
   REGION_LABELS_I18N,
+  formatRegionWithSide,
+  isBilateralRegion,
   useLanguage,
 } from '../i18n/translations';
 
@@ -36,6 +43,7 @@ interface RadiographDisplayProps {
   evaluation: ScanEvaluation;
   actualPosture?: PatientPosture;
   actualProjection?: ProjectionType;
+  actualSide?: BodySide;
   kvp: number;
   mas: number;
   filmsRemaining: number;
@@ -103,6 +111,12 @@ function getEvaluationText(
         title: 'Wrong Anatomical Region',
         feedback: `You imaged ${regionLabel}, but the requested region does not match the patient's exam.`,
       };
+    case 'WRONG_SIDE':
+      return {
+        title: 'Wrong Side (Left / Right)',
+        feedback:
+          'You imaged the wrong side (Left vs Right) for this bilateral study. Select the requested side and retake.',
+      };
     case 'WRONG_POSTURE':
       return {
         title: 'Incorrect Patient Posture',
@@ -136,6 +150,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
   evaluation,
   actualPosture,
   actualProjection,
+  actualSide,
   kvp,
   mas,
   filmsRemaining,
@@ -146,6 +161,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
 }) => {
   const {lang} = useLanguage();
   const isAr = lang === 'ar';
+  const isChild = isPediatricPatientAge(patient.age);
 
   // View Controls
   const [viewPreset, setViewPreset] = useState<ViewPresetId>('STANDARD');
@@ -165,6 +181,8 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
     actualPosture ?? requestedExam.recommendedPosture;
   const effectiveProjection: ProjectionType =
     actualProjection ?? requestedExam.recommendedProjection;
+  const effectiveSide: BodySide =
+    evaluation.targetSideScanned ?? actualSide ?? patient.requestedSide ?? 'NONE';
 
   const {src: imageSrc, mirrorX: autoMirrorX} = useMemo(
     () =>
@@ -173,21 +191,36 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
         modality: requestedExam.modality,
         projection: effectiveProjection,
         posture: effectivePosture,
+        side: effectiveSide,
       }),
     [
       evaluation.targetRegionScanned,
       requestedExam.modality,
       effectiveProjection,
       effectivePosture,
+      effectiveSide,
     ]
   );
 
-  const regionLabel =
+  const regionLabel = formatRegionWithSide(
+    evaluation.targetRegionScanned,
+    effectiveSide,
+    lang,
+    true
+  );
+  const regionBaseLabel =
     REGION_LABELS_I18N[lang][evaluation.targetRegionScanned];
   const modalityLabel = MODALITY_LABELS_I18N[lang][requestedExam.modality];
   const postureLabel = POSTURE_SHORT_I18N[lang][effectivePosture];
   const projectionLabel = PROJECTION_LABELS_I18N[lang][effectiveProjection];
-  const evalText = getEvaluationText(evaluation, lang, regionLabel);
+  const evalText = getEvaluationText(evaluation, lang, regionBaseLabel);
+  const sideMarker =
+    isBilateralRegion(evaluation.targetRegionScanned) &&
+    effectiveSide !== 'NONE'
+      ? effectiveSide === 'RIGHT'
+        ? 'R'
+        : 'L'
+      : null;
 
   const handleSelectViewPreset = (preset: (typeof VIEW_PRESETS)[number]) => {
     setViewPreset(preset.id);
@@ -237,11 +270,22 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
             className="w-10 h-10 rounded-lg object-cover border border-cyan-500/40 shrink-0"
           />
           <div className="min-w-0">
-            <div className="text-sm font-bold text-white truncate">
-              {patient.nameAr} · {regionLabel}
+            <div className="flex items-center gap-1.5 text-sm font-bold text-white truncate">
+              <span className="truncate">
+                {patient.nameAr} ·{' '}
+                <span dir="ltr" className="text-cyan-200">
+                  {requestedExam.titleEn}
+                </span>
+              </span>
+              {isChild && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-amber-200 text-[10px] font-bold shrink-0">
+                  {isAr ? `طفل (${patient.age}س)` : `Pediatric (${patient.age}y)`}
+                </span>
+              )}
             </div>
             <div className="text-[11px] text-slate-400 truncate">
-              {modalityLabel} · <span className="text-cyan-300 font-semibold">{postureLabel}</span> ·{' '}
+              {modalityLabel} · {regionLabel} ·{' '}
+              <span className="text-cyan-300 font-semibold">{postureLabel}</span> ·{' '}
               {kvp} kVp · {mas} mAs
             </div>
           </div>
@@ -267,10 +311,10 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
       </div>
 
       {/* Main Two-Column Organized View + Mask Workspace */}
-      <div className="grid grid-cols-1 min-[600px]:grid-cols-12 gap-3 sm:gap-4 items-start">
+      <div className="hud-radiograph-grid grid grid-cols-1 min-[600px]:grid-cols-12 gap-3 sm:gap-4 items-start">
         {/* LEFT/TOP: Illuminated Radiograph View + Collimation Mask Viewport */}
-        <div className="min-[600px]:col-span-7 rounded-xl border border-slate-800 bg-[#08101C] p-2.5 sm:p-4 flex flex-col items-center gap-2.5 sm:gap-3">
-          <div className="relative w-full max-w-[240px] sm:max-w-[275px] lg:max-w-[380px] aspect-square rounded-xl bg-[#04080F] border-2 border-cyan-900/60 overflow-hidden flex items-center justify-center shadow-[0_0_45px_rgba(34,211,238,0.12)]">
+        <div className="hud-radiograph-viewport min-[600px]:col-span-7 rounded-xl border border-slate-800 bg-[#08101C] p-2.5 sm:p-4 flex flex-col items-center gap-2.5 sm:gap-3">
+          <div className="hud-radiograph-box relative w-full max-w-[240px] sm:max-w-[275px] lg:max-w-[380px] aspect-square rounded-xl bg-[#04080F] border-2 border-cyan-900/60 overflow-hidden flex items-center justify-center shadow-[0_0_45px_rgba(34,211,238,0.12)]">
             <div
               className="w-full h-full flex items-center justify-center transition-transform duration-200"
               style={{
@@ -317,6 +361,11 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                   <div className="truncate">{kvp} kVp · {mas} mAs</div>
                   <div className="text-[9px] sm:text-[10px] text-cyan-300 truncate">{projectionLabel}</div>
                 </div>
+                {sideMarker && (
+                  <div className="pointer-events-none absolute bottom-2.5 right-3 z-10 w-6 h-6 rounded border border-cyan-300/70 bg-[#040912]/85 flex items-center justify-center text-xs font-mono-num font-black text-cyan-200">
+                    {sideMarker}
+                  </div>
+                )}
                 <div className="pointer-events-none absolute bottom-2.5 left-3 z-10 text-xs font-mono-num font-bold text-cyan-100 bg-[#040912]/70 px-2 py-0.5 rounded">
                   {effectiveProjection} · {zoomPct}%
                 </div>
@@ -390,7 +439,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
         </div>
 
         {/* RIGHT/BOTTOM: Organized View Controls, Mask Controls, and Approval */}
-        <div className="min-[600px]:col-span-5 space-y-3">
+        <div className="hud-radiograph-controls min-[600px]:col-span-5 space-y-2.5 sm:space-y-3">
           {/* Card 1: View Controls */}
           <section className="rounded-xl border border-slate-800 bg-[#0D1624] p-4 space-y-3">
             <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800/80">

@@ -8,6 +8,7 @@ import {
   X,
 } from 'lucide-react';
 import type {
+  BodySide,
   CompletedCase,
   ExamProtocol,
   PatientCase,
@@ -34,6 +35,7 @@ interface ClinicPCModalProps {
   evaluation: ScanEvaluation | null;
   actualPosture?: PatientPosture;
   actualProjection?: ProjectionType;
+  actualSide?: BodySide;
   isDeveloping: boolean;
   hasDR: boolean;
   hasAutoProc: boolean;
@@ -64,6 +66,7 @@ export const ClinicPCModal: React.FC<ClinicPCModalProps> = ({
   evaluation,
   actualPosture,
   actualProjection,
+  actualSide,
   isDeveloping,
   hasDR,
   hasAutoProc,
@@ -207,6 +210,7 @@ export const ClinicPCModal: React.FC<ClinicPCModalProps> = ({
                   evaluation={evaluation}
                   actualPosture={actualPosture}
                   actualProjection={actualProjection}
+                  actualSide={actualSide}
                   kvp={kvp}
                   mas={mas}
                   filmsRemaining={filmsRemaining}

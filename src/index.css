@@ -229,6 +229,104 @@ input[type="range"].radiology-slider::-moz-range-thumb {
     width: 58px !important;
     height: 42px !important;
   }
+  .hud-region-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+  .hud-region-card {
+    min-height: 46px !important;
+    padding: 6px 8px !important;
+  }
+  .hud-shop-films-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .hud-shop-upgrades-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .hud-shop-card {
+    padding: 8px 10px !important;
+    gap: 6px !important;
+    border-radius: 10px !important;
+  }
+  .hud-shop-card-top {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+  .hud-shop-card-top > * + * {
+    margin-top: 0 !important;
+  }
+  .hud-shop-img {
+    width: 58px !important;
+    height: 58px !important;
+    aspect-ratio: 1 / 1 !important;
+  }
+  .hud-shop-title {
+    font-size: 11.5px !important;
+  }
+  .hud-shop-desc {
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+  }
+  .hud-shop-btn {
+    padding: 5px 8px !important;
+    font-size: 10.5px !important;
+  }
+  .hud-shop-sec-title,
+  .hud-view-title {
+    font-size: 14px !important;
+  }
+  .hud-view-sub {
+    font-size: 10.5px !important;
+  }
+  .hud-protocols-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .hud-protocol-card {
+    padding: 8px 10px !important;
+    gap: 8px !important;
+  }
+  .hud-protocol-thumb {
+    width: 52px !important;
+    height: 64px !important;
+  }
+  .hud-radiograph-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .hud-radiograph-viewport {
+    grid-column: span 6 / span 6 !important;
+    padding: 8px !important;
+  }
+  .hud-radiograph-controls {
+    grid-column: span 6 / span 6 !important;
+  }
+  .hud-radiograph-box {
+    max-width: min(215px, 52dvh) !important;
+  }
+  .hud-auth-main {
+    padding: 8px 12px !important;
+  }
+  .hud-auth-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .hud-auth-card {
+    grid-column: span 7 / span 7 !important;
+    padding: 12px !important;
+  }
+  .hud-auth-hero {
+    grid-column: span 5 / span 5 !important;
+  }
+  .hud-log-table th,
+  .hud-log-table td {
+    padding: 6px 8px !important;
+    font-size: 11px !important;
+  }
 }
 
 /* Even tighter sizing for ultra-short phones (<= 390px tall in landscape) */
@@ -495,4 +593,123 @@ html.force-landscape-stage .hud-posture-card {
 html.force-landscape-stage .hud-posture-svg {
   width: 58px !important;
   height: 42px !important;
+}
+
+html.force-landscape-stage .hud-region-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+html.force-landscape-stage .hud-region-card {
+  min-height: 46px !important;
+  padding: 6px 8px !important;
+}
+
+html.force-landscape-stage .hud-shop-films-grid,
+html.force-landscape-stage .hud-shop-upgrades-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+html.force-landscape-stage .hud-shop-card {
+  padding: 8px 10px !important;
+  gap: 6px !important;
+  border-radius: 10px !important;
+}
+
+html.force-landscape-stage .hud-shop-card-top {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+html.force-landscape-stage .hud-shop-card-top > * + * {
+  margin-top: 0 !important;
+}
+
+html.force-landscape-stage .hud-shop-img {
+  width: 56px !important;
+  height: 56px !important;
+  aspect-ratio: 1 / 1 !important;
+}
+
+html.force-landscape-stage .hud-shop-title {
+  font-size: 11px !important;
+}
+
+html.force-landscape-stage .hud-shop-desc {
+  font-size: 9.5px !important;
+  line-height: 1.25 !important;
+}
+
+html.force-landscape-stage .hud-shop-btn {
+  padding: 5px 8px !important;
+  font-size: 10px !important;
+}
+
+html.force-landscape-stage .hud-shop-sec-title,
+html.force-landscape-stage .hud-view-title {
+  font-size: 13.5px !important;
+}
+
+html.force-landscape-stage .hud-view-sub {
+  font-size: 10px !important;
+}
+
+html.force-landscape-stage .hud-protocols-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+html.force-landscape-stage .hud-protocol-card {
+  padding: 8px 10px !important;
+  gap: 8px !important;
+}
+
+html.force-landscape-stage .hud-protocol-thumb {
+  width: 50px !important;
+  height: 62px !important;
+}
+
+html.force-landscape-stage .hud-radiograph-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+html.force-landscape-stage .hud-radiograph-viewport {
+  grid-column: span 6 / span 6 !important;
+  padding: 8px !important;
+}
+
+html.force-landscape-stage .hud-radiograph-controls {
+  grid-column: span 6 / span 6 !important;
+}
+
+html.force-landscape-stage .hud-radiograph-box {
+  max-width: min(210px, 50vw) !important;
+}
+
+html.force-landscape-stage .hud-auth-main {
+  padding: 8px 12px !important;
+}
+
+html.force-landscape-stage .hud-auth-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html.force-landscape-stage .hud-auth-card {
+  grid-column: span 7 / span 7 !important;
+  padding: 12px !important;
+}
+
+html.force-landscape-stage .hud-auth-hero {
+  grid-column: span 5 / span 5 !important;
+}
+
+html.force-landscape-stage .hud-log-table th,
+html.force-landscape-stage .hud-log-table td {
+  padding: 6px 8px !important;
+  font-size: 10.5px !important;
 }

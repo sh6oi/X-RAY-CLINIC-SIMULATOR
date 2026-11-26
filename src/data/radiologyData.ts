@@ -1,5 +1,6 @@
 import type {
   BodyRegion,
+  BodySide,
   ClinicRank,
   ExamProtocol,
   Modality,
@@ -10,6 +11,11 @@ import type {
   UpgradeId,
   UpgradeItem,
 } from '../types/radiology';
+import {
+  formatRegionWithSide,
+  isBilateralRegion,
+  SIDE_SHORT_I18N,
+} from '../i18n/translations';
 import {ASSETS} from './assets';
 
 export const CLINIC_ROOM_IMAGE = ASSETS.clinicRoomImg;
@@ -24,13 +30,32 @@ export const PATIENT_AVATARS = {
 };
 
 export const REGION_SCAN_IMAGES: Record<BodyRegion, string> = {
-  chest: ASSETS.xrayChestImg,
-  cervical: ASSETS.xrayCervicalImg,
-  lumbar: ASSETS.xrayLumbarImg,
-  hand: ASSETS.xrayHandImg,
-  knee: ASSETS.xrayKneeImg,
-  pelvis: ASSETS.xrayPelvisImg,
   head: ASSETS.xraySkullImg,
+  facial_bones: ASSETS.xrayFacialBonesImg,
+  nasal_bones: ASSETS.xrayNasalBonesImg,
+  soft_tissue_neck: ASSETS.xrayNeckAirwayImg,
+  cervical: ASSETS.xrayCervicalApImg,
+  thoracic: ASSETS.xrayThoracicApImg,
+  lumbar: ASSETS.xrayLumbarImg,
+  chest: ASSETS.xrayChestImg,
+  ribs: ASSETS.xrayRibsApImg,
+  abdomen: ASSETS.xrayAbdomenKubImg,
+  shoulder: ASSETS.xrayShoulderApImg,
+  clavicle: ASSETS.xrayClavicleApImg,
+  humerus: ASSETS.xrayHumerusApImg,
+  elbow: ASSETS.xrayElbowApImg,
+  forearm: ASSETS.xrayForearmApImg,
+  wrist: ASSETS.xrayWristPaImg,
+  hand: ASSETS.xrayHandImg,
+  pelvis: ASSETS.xrayPelvisImg,
+  hip: ASSETS.xrayHipApImg,
+  femur: ASSETS.xrayFemurApImg,
+  knee: ASSETS.xrayKneeImg,
+  tibia_fibula: ASSETS.xrayTibiaFibulaImg,
+  ankle: ASSETS.xrayAnkleApImg,
+  foot: ASSETS.xrayFootApImg,
+  toes: ASSETS.xrayToesApImg,
+  sacrum_coccyx: ASSETS.xraySacrumCoccyxImg,
 };
 
 export const CT_SCAN_IMAGE = ASSETS.ctChestImg;
@@ -41,95 +66,258 @@ export function getRadiographImage({
   modality,
   projection,
   posture,
+  side,
 }: {
   region: BodyRegion;
   modality: Modality;
   projection: ProjectionType;
   posture?: PatientPosture;
+  side?: BodySide;
 }): {src: string; mirrorX: boolean} {
   if (modality === 'CT') {
     return {
-      src: region === 'head' ? ASSETS.ctHeadAxialImg : ASSETS.ctChestImg,
+      src:
+        region === 'head' || region === 'facial_bones' || region === 'nasal_bones'
+          ? ASSETS.ctHeadAxialImg
+          : ASSETS.ctChestImg,
       mirrorX: false,
     };
   }
 
   if (modality === 'MRI') {
-    if (region === 'head') {
+    if (
+      region === 'head' ||
+      region === 'facial_bones' ||
+      region === 'nasal_bones'
+    ) {
       return {src: ASSETS.mriBrainSagittalImg, mirrorX: false};
     }
-    if (region === 'knee') {
-      return {src: ASSETS.mriKneeSagittalImg, mirrorX: false};
+    if (
+      region === 'knee' ||
+      region === 'hip' ||
+      region === 'femur' ||
+      region === 'tibia_fibula' ||
+      region === 'ankle' ||
+      region === 'foot' ||
+      region === 'toes'
+    ) {
+      return {
+        src: ASSETS.mriKneeSagittalImg,
+        mirrorX: side === 'RIGHT',
+      };
     }
     return {src: ASSETS.mriLumbarImg, mirrorX: false};
   }
 
-  const isRightSide =
+  const isPostureRight =
     posture === 'ERECT_RIGHT_LAT' ||
     posture === 'TABLE_RIGHT_LAT' ||
     posture === 'ERECT_LAO' ||
     posture === 'TABLE_LPO';
+  const mirrorRightToLeft =
+    isBilateralRegion(region) && side !== undefined && side !== 'NONE'
+      ? side === 'LEFT'
+      : isPostureRight;
+  const mirrorLeftToRight =
+    isBilateralRegion(region) && side !== undefined && side !== 'NONE'
+      ? side === 'RIGHT'
+      : isPostureRight;
 
   switch (region) {
-    case 'chest':
-      if (projection === 'LATERAL') {
-        return {src: ASSETS.xrayChestLatImg, mirrorX: isRightSide};
-      }
-      if (projection === 'OBLIQUE') {
-        return {src: ASSETS.xrayChestObliqueImg, mirrorX: isRightSide};
-      }
-      return {src: ASSETS.xrayChestImg, mirrorX: false};
-
-    case 'cervical':
-      if (projection === 'LATERAL') {
-        return {src: ASSETS.xrayCervicalImg, mirrorX: isRightSide};
-      }
-      if (projection === 'OBLIQUE') {
-        return {src: ASSETS.xrayCervicalObliqueImg, mirrorX: isRightSide};
-      }
-      return {src: ASSETS.xrayCervicalApImg, mirrorX: false};
-
-    case 'lumbar':
-      if (projection === 'LATERAL') {
-        return {src: ASSETS.xrayLumbarLatImg, mirrorX: isRightSide};
-      }
-      if (projection === 'OBLIQUE') {
-        return {src: ASSETS.xrayLumbarObliqueImg, mirrorX: isRightSide};
-      }
-      return {src: ASSETS.xrayLumbarImg, mirrorX: false};
-
     case 'head':
       if (projection === 'LATERAL') {
-        return {src: ASSETS.xraySkullLatImg, mirrorX: isRightSide};
+        return {src: ASSETS.xraySkullLatImg, mirrorX: isPostureRight};
       }
       if (projection === 'OBLIQUE') {
-        return {src: ASSETS.xraySkullObliqueImg, mirrorX: isRightSide};
+        return {src: ASSETS.xraySkullObliqueImg, mirrorX: isPostureRight};
       }
       return {src: ASSETS.xraySkullImg, mirrorX: false};
 
-    case 'knee':
+    case 'facial_bones':
       if (projection === 'LATERAL') {
-        return {src: ASSETS.xrayKneeLatImg, mirrorX: isRightSide};
+        return {src: ASSETS.xraySkullLatImg, mirrorX: isPostureRight};
       }
       if (projection === 'OBLIQUE') {
-        return {src: ASSETS.xrayKneeObliqueImg, mirrorX: isRightSide};
+        return {src: ASSETS.xraySkullObliqueImg, mirrorX: isPostureRight};
       }
-      return {src: ASSETS.xrayKneeImg, mirrorX: false};
+      return {src: ASSETS.xrayFacialBonesImg, mirrorX: false};
+
+    case 'nasal_bones':
+      if (projection === 'AP' || projection === 'PA') {
+        return {src: ASSETS.xrayFacialBonesImg, mirrorX: false};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xraySkullObliqueImg, mirrorX: isPostureRight};
+      }
+      return {src: ASSETS.xrayNasalBonesImg, mirrorX: isPostureRight};
+
+    case 'soft_tissue_neck':
+      if (projection === 'AP' || projection === 'PA') {
+        return {src: ASSETS.xrayCervicalApImg, mirrorX: false};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayCervicalObliqueImg, mirrorX: isPostureRight};
+      }
+      return {src: ASSETS.xrayNeckAirwayImg, mirrorX: isPostureRight};
+
+    case 'cervical':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayCervicalImg, mirrorX: isPostureRight};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayCervicalObliqueImg, mirrorX: isPostureRight};
+      }
+      return {src: ASSETS.xrayCervicalApImg, mirrorX: false};
+
+    case 'thoracic':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayThoracicLatImg, mirrorX: isPostureRight};
+      }
+      return {src: ASSETS.xrayThoracicApImg, mirrorX: false};
+
+    case 'lumbar':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayLumbarLatImg, mirrorX: isPostureRight};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayLumbarObliqueImg, mirrorX: isPostureRight};
+      }
+      return {src: ASSETS.xrayLumbarImg, mirrorX: false};
+
+    case 'chest':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayChestLatImg, mirrorX: isPostureRight};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayChestObliqueImg, mirrorX: isPostureRight};
+      }
+      return {src: ASSETS.xrayChestImg, mirrorX: false};
+
+    case 'ribs':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayChestLatImg, mirrorX: isPostureRight};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayChestObliqueImg, mirrorX: isPostureRight};
+      }
+      return {src: ASSETS.xrayRibsApImg, mirrorX: mirrorLeftToRight};
+
+    case 'abdomen':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayLumbarLatImg, mirrorX: isPostureRight};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayLumbarObliqueImg, mirrorX: isPostureRight};
+      }
+      return {src: ASSETS.xrayAbdomenKubImg, mirrorX: false};
+
+    case 'shoulder':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayShoulderLatImg, mirrorX: mirrorRightToLeft};
+      }
+      return {src: ASSETS.xrayShoulderApImg, mirrorX: mirrorRightToLeft};
+
+    case 'clavicle':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayShoulderLatImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayClavicleApImg, mirrorX: mirrorLeftToRight};
+
+    case 'humerus':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayHumerusLatImg, mirrorX: mirrorRightToLeft};
+      }
+      return {src: ASSETS.xrayHumerusApImg, mirrorX: mirrorRightToLeft};
+
+    case 'elbow':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayElbowLatImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayElbowApImg, mirrorX: mirrorRightToLeft};
+
+    case 'forearm':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayForearmLatImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayForearmApImg, mirrorX: mirrorRightToLeft};
+
+    case 'wrist':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayHandLatImg, mirrorX: mirrorLeftToRight};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayHandObliqueImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayWristPaImg, mirrorX: mirrorRightToLeft};
 
     case 'hand':
       if (projection === 'LATERAL') {
-        return {src: ASSETS.xrayHandLatImg, mirrorX: isRightSide};
+        return {src: ASSETS.xrayHandLatImg, mirrorX: mirrorLeftToRight};
       }
       if (projection === 'OBLIQUE') {
-        return {src: ASSETS.xrayHandObliqueImg, mirrorX: isRightSide};
+        return {src: ASSETS.xrayHandObliqueImg, mirrorX: mirrorLeftToRight};
       }
-      return {src: ASSETS.xrayHandImg, mirrorX: false};
+      return {src: ASSETS.xrayHandImg, mirrorX: mirrorLeftToRight};
 
     case 'pelvis':
-      if (projection === 'OBLIQUE' || projection === 'LATERAL') {
-        return {src: ASSETS.xrayPelvisObliqueImg, mirrorX: isRightSide};
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xraySacrumLatImg, mirrorX: isPostureRight};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayPelvisObliqueImg, mirrorX: isPostureRight};
       }
       return {src: ASSETS.xrayPelvisImg, mirrorX: false};
+
+    case 'sacrum_coccyx':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xraySacrumLatImg, mirrorX: isPostureRight};
+      }
+      return {src: ASSETS.xraySacrumCoccyxImg, mirrorX: false};
+
+    case 'hip':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayPelvisObliqueImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayHipApImg, mirrorX: mirrorLeftToRight};
+
+    case 'femur':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayFemurLatImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayFemurApImg, mirrorX: mirrorLeftToRight};
+
+    case 'knee':
+      if (projection === 'LATERAL') {
+        return {src: ASSETS.xrayKneeLatImg, mirrorX: mirrorLeftToRight};
+      }
+      if (projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayKneeObliqueImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayKneeImg, mirrorX: mirrorLeftToRight};
+
+    case 'tibia_fibula':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayTibiaLatImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayTibiaFibulaImg, mirrorX: mirrorRightToLeft};
+
+    case 'ankle':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayAnkleLatImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayAnkleApImg, mirrorX: mirrorLeftToRight};
+
+    case 'foot':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayFootLatImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayFootApImg, mirrorX: mirrorRightToLeft};
+
+    case 'toes':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {src: ASSETS.xrayFootLatImg, mirrorX: mirrorLeftToRight};
+      }
+      return {src: ASSETS.xrayToesApImg, mirrorX: mirrorRightToLeft};
   }
 }
 
@@ -144,13 +332,32 @@ export const MEGA_CRATE_COST = 1200;
 export const EMERGENCY_LOAN_DEBT = 75;
 
 export const REGION_LABELS_AR: Record<BodyRegion, string> = {
-  head: 'الرأس والجمجمة',
-  cervical: 'الفقرات العنقية (الرقبة)',
-  chest: 'الصدر والرئتين',
-  lumbar: 'العمود الفقري القطني',
-  pelvis: 'الحوض والورك',
-  hand: 'اليد والرسغ',
-  knee: 'الركبة',
+  head: 'الجمجمة (Skull)',
+  facial_bones: 'عظام الوجه (Facial bones)',
+  nasal_bones: 'الأنف (Nasal bones)',
+  soft_tissue_neck: 'العنق (Soft tissue neck)',
+  cervical: 'الفقرات العنقية (C-spine)',
+  thoracic: 'الفقرات الصدرية (T-spine)',
+  lumbar: 'الفقرات القطنية (L-spine)',
+  chest: 'الصدر (Chest)',
+  ribs: 'الأضلاع (Ribs)',
+  abdomen: 'البطن (Abdomen)',
+  shoulder: 'الكتف (Shoulder)',
+  clavicle: 'الترقوة (Clavicle)',
+  humerus: 'عظمة العضد (Humerus)',
+  elbow: 'مفصل الكوع (Elbow)',
+  forearm: 'عظمة الساعد (Forearm)',
+  wrist: 'مفصل الرسغ (Wrist)',
+  hand: 'اليد (Hand)',
+  pelvis: 'الحوض (Pelvis)',
+  hip: 'مفصل الورك (Hip)',
+  femur: 'عظمة الفخذ (Femur)',
+  knee: 'مفصل الركبة (Knee)',
+  tibia_fibula: 'عظمة الساق (Tibia/Fibula)',
+  ankle: 'مفصل الكاحل (Ankle)',
+  foot: 'القدم (Foot)',
+  toes: 'أصابع القدم (Toes)',
+  sacrum_coccyx: 'العجز والعصعص (Sacrum/Coccyx)',
 };
 
 export const PROJECTION_LABELS_AR: Record<ProjectionType, string> = {
@@ -163,40 +370,347 @@ export const PROJECTION_LABELS_AR: Record<ProjectionType, string> = {
 };
 
 export const POSTURE_LABELS_AR: Record<PatientPosture, string> = {
-  SUPINE: 'مستلقٍ على الظهر (Supine)',
-  PRONE: 'مستلقٍ على البطن (Prone)',
-  TABLE_LEFT_LAT: 'نائم جانبياً — يسار (Left Lateral)',
-  TABLE_RIGHT_LAT: 'نائم جانبياً — يمين (Right Lateral)',
-  TABLE_RPO: 'طاولة مائل خلفي يمين (RPO 45°)',
-  TABLE_LPO: 'طاولة مائل خلفي يسار (LPO 45°)',
-  ERECT_PA: 'واقف (Erect) · خلفي-أمامي PA',
-  ERECT_AP: 'واقف (Erect) · أمامي-خلفي AP',
-  ERECT_LEFT_LAT: 'واقف (Erect) · جانبي أيسر (Left Lat)',
-  ERECT_RIGHT_LAT: 'واقف (Erect) · جانبي أيمن (Right Lat)',
-  ERECT_RAO: 'واقف (Erect) · مائل أمامي أيمن (RAO 45°)',
-  ERECT_LAO: 'واقف (Erect) · مائل أمامي أيسر (LAO 45°)',
+  SUPINE: 'Supine (On Back)',
+  PRONE: 'Prone (On Stomach)',
+  TABLE_LEFT_LAT: 'Table Left Lateral',
+  TABLE_RIGHT_LAT: 'Table Right Lateral',
+  TABLE_RPO: 'Table Right Posterior Oblique (RPO 45°)',
+  TABLE_LPO: 'Table Left Posterior Oblique (LPO 45°)',
+  ERECT_PA: 'Erect · PA Standing',
+  ERECT_AP: 'Erect · AP Standing',
+  ERECT_LEFT_LAT: 'Erect · Left Lateral',
+  ERECT_RIGHT_LAT: 'Erect · Right Lateral',
+  ERECT_RAO: 'Erect · Right Anterior Oblique (RAO 45°)',
+  ERECT_LAO: 'Erect · Left Anterior Oblique (LAO 45°)',
 };
 
 export const POSTURE_SHORT_AR: Record<PatientPosture, string> = {
-  SUPINE: 'Supine (على الظهر)',
-  PRONE: 'Prone (على البطن)',
-  TABLE_LEFT_LAT: 'Left Lat (طاولة)',
-  TABLE_RIGHT_LAT: 'Right Lat (طاولة)',
-  TABLE_RPO: 'Table RPO (مائل)',
-  TABLE_LPO: 'Table LPO (مائل)',
-  ERECT_PA: 'Erect PA (واقف)',
-  ERECT_AP: 'Erect AP (واقف)',
-  ERECT_LEFT_LAT: 'Erect Left Lat',
-  ERECT_RIGHT_LAT: 'Erect Right Lat',
-  ERECT_RAO: 'Erect RAO (مائل)',
-  ERECT_LAO: 'Erect LAO (مائل)',
+  SUPINE: 'Supine',
+  PRONE: 'Prone',
+  TABLE_LEFT_LAT: 'Table Left Lateral',
+  TABLE_RIGHT_LAT: 'Table Right Lateral',
+  TABLE_RPO: 'Table RPO',
+  TABLE_LPO: 'Table LPO',
+  ERECT_PA: 'Erect PA',
+  ERECT_AP: 'Erect AP',
+  ERECT_LEFT_LAT: 'Erect Left Lateral',
+  ERECT_RIGHT_LAT: 'Erect Right Lateral',
+  ERECT_RAO: 'Erect RAO',
+  ERECT_LAO: 'Erect LAO',
 };
 
 export const EXAMS: ExamProtocol[] = [
+  // ================= HEAD, FACE & NECK =================
+  {
+    id: 'skull_ap',
+    titleAr: 'الجمجمة (Skull AP/PA)',
+    titleEn: 'Skull AP/PA',
+    region: 'head',
+    regionLabelAr: 'الجمجمة',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'ERECT_AP',
+    postureLabelAr: 'واقف (Erect) · AP',
+    kvpRange: [70, 80],
+    masRange: [16, 25],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.head,
+    clinicalTipAr:
+      'تصوير الجمجمة AP/PA يتطلب 70–80 kVp و 16–25 mAs لإظهار عظام القحف والجيوب الأنفية بدقة.',
+  },
+  {
+    id: 'skull_supine',
+    titleAr: 'الجمجمة للطوارئ (مستلقٍ AP)',
+    titleEn: 'Trauma Skull (Supine AP)',
+    region: 'head',
+    regionLabelAr: 'الجمجمة',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [70, 80],
+    masRange: [16, 25],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.head,
+    clinicalTipAr:
+      'لحالات الرضوض التي يتعذر وقوفها: 70–80 kVp و 16–25 mAs بوضعية الاستلقاء على الظهر.',
+  },
+  {
+    id: 'skull_lat',
+    titleAr: 'الجمجمة الجانبية (Skull Lateral)',
+    titleEn: 'Skull Lateral',
+    region: 'head',
+    regionLabelAr: 'الجمجمة',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'LATERAL',
+    projectionLabelAr: 'جانبي (Lateral)',
+    recommendedPosture: 'ERECT_RIGHT_LAT',
+    postureLabelAr: 'واقف (Erect) · جانبي أيمن',
+    kvpRange: [65, 75],
+    masRange: [10, 16],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.head,
+    clinicalTipAr:
+      'الإسقاط الجانبي للجمجمة يحتاج طاقة أقل: 65–75 kVp و 10–16 mAs لإبراز السرج التركي والقحف الجانبي.',
+  },
+  {
+    id: 'facial_bones_pa',
+    titleAr: 'عظام الوجه (Facial bones)',
+    titleEn: 'Facial Bones (Waters PA)',
+    region: 'facial_bones',
+    regionLabelAr: 'عظام الوجه',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'PA',
+    projectionLabelAr: 'خلفي-أمامي (PA)',
+    recommendedPosture: 'ERECT_PA',
+    postureLabelAr: 'واقف (Erect) · PA',
+    kvpRange: [65, 75],
+    masRange: [8, 16],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.facial_bones,
+    clinicalTipAr:
+      'لتقييم عظام الوجنة والحجاج والجيوب الفكية: يُستخدم 65–75 kVp و 8–16 mAs بوضعية Erect PA.',
+  },
+  {
+    id: 'nasal_bones_lat',
+    titleAr: 'الأنف (Nasal bones)',
+    titleEn: 'Nasal Bones (Lateral)',
+    region: 'nasal_bones',
+    regionLabelAr: 'الأنف',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'LATERAL',
+    projectionLabelAr: 'جانبي (Lateral)',
+    recommendedPosture: 'ERECT_RIGHT_LAT',
+    postureLabelAr: 'واقف (Erect) · جانبي أيمن',
+    kvpRange: [55, 65],
+    masRange: [3, 6],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.nasal_bones,
+    clinicalTipAr:
+      'عظام الأنف الرقيقة تتطلب جرعة منخفضة: 55–65 kVp و 3–6 mAs حتى لا تحترق التفاصيل الدقيقة.',
+  },
+  {
+    id: 'soft_tissue_neck_lat',
+    titleAr: 'العنق — الأنسجة الرخوة (Soft tissue neck)',
+    titleEn: 'Soft Tissue Neck (Lateral)',
+    region: 'soft_tissue_neck',
+    regionLabelAr: 'العنق (الأنسجة الرخوة)',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'LATERAL',
+    projectionLabelAr: 'جانبي (Lateral)',
+    recommendedPosture: 'ERECT_RIGHT_LAT',
+    postureLabelAr: 'واقف (Erect) · جانبي أيمن',
+    kvpRange: [65, 75],
+    masRange: [8, 16],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.soft_tissue_neck,
+    clinicalTipAr:
+      'لتقييم مجرى الهواء العلوي ولسان المزمار والحنجرة: 65–75 kVp و 8–16 mAs بوضع جانبي قائم.',
+  },
+  {
+    id: 'cervical_ap',
+    titleAr: 'الفقرات العنقية (C-spine AP)',
+    titleEn: 'Cervical Spine AP',
+    region: 'cervical',
+    regionLabelAr: 'الفقرات العنقية',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'ERECT_AP',
+    postureLabelAr: 'واقف (Erect) · AP',
+    kvpRange: [70, 80],
+    masRange: [8, 16],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.cervical,
+    clinicalTipAr:
+      'الفقرات العنقية AP تحتاج 70–80 kVp و 8–16 mAs لإبراز أجسام الفقرات C3–C7 بوضوح.',
+  },
+  {
+    id: 'cervical_lat',
+    titleAr: 'الفقرات العنقية الجانبية (C-spine Lateral)',
+    titleEn: 'Cervical Spine Lateral',
+    region: 'cervical',
+    regionLabelAr: 'الفقرات العنقية',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'LATERAL',
+    projectionLabelAr: 'جانبي (Lateral)',
+    recommendedPosture: 'ERECT_RIGHT_LAT',
+    postureLabelAr: 'واقف (Erect) · جانبي أيمن',
+    kvpRange: [70, 80],
+    masRange: [12, 20],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.cervical,
+    clinicalTipAr:
+      'الوضع الجانبي للفقرات العنقية C1–C7 يستخدم 70–80 kVp و 12–20 mAs مع خفض الكتفين.',
+  },
+  {
+    id: 'cervical_oblique_lao',
+    titleAr: 'الثقوب العصبية العنقية (C-spine Oblique)',
+    titleEn: 'Cervical Spine Oblique (LAO)',
+    region: 'cervical',
+    regionLabelAr: 'الفقرات العنقية',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'OBLIQUE',
+    projectionLabelAr: 'مائل (Oblique 45°)',
+    recommendedPosture: 'ERECT_LAO',
+    postureLabelAr: 'واقف مائل أيسر LAO',
+    kvpRange: [70, 80],
+    masRange: [10, 18],
+    baseFee: 18,
+    imagePath: REGION_SCAN_IMAGES.cervical,
+    clinicalTipAr:
+      'تدوير المريض 45 درجة (LAO) يفتح الثقوب بين الفقرات العنقية عند 70–80 kVp و 10–18 mAs.',
+  },
+
+  // ================= THORAX, SPINE & ABDOMEN =================
+  {
+    id: 'thoracic_ap',
+    titleAr: 'الفقرات الصدرية (T-spine AP)',
+    titleEn: 'Thoracic Spine AP',
+    region: 'thoracic',
+    regionLabelAr: 'الفقرات الصدرية',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [75, 85],
+    masRange: [20, 40],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.thoracic,
+    clinicalTipAr:
+      'تصوير الفقرات الصدرية T1–T12 الأمامي يتطلب 75–85 kVp و 20–40 mAs بوضع الاستلقاء على الظهر.',
+  },
+  {
+    id: 'thoracic_lat',
+    titleAr: 'الفقرات الصدرية الجانبية (T-spine Lateral)',
+    titleEn: 'Thoracic Spine Lateral',
+    region: 'thoracic',
+    regionLabelAr: 'الفقرات الصدرية',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'LATERAL',
+    projectionLabelAr: 'جانبي (Lateral)',
+    recommendedPosture: 'TABLE_LEFT_LAT',
+    postureLabelAr: 'نائم جانبياً · يسار (Left Lat)',
+    kvpRange: [80, 90],
+    masRange: [40, 80],
+    baseFee: 18,
+    imagePath: REGION_SCAN_IMAGES.thoracic,
+    clinicalTipAr:
+      'اختراق الكتفين والقفص الصدري جانبياً يتطلب 80–90 kVp و 40–80 mAs على طاولة الأشعة.',
+  },
+  {
+    id: 'lumbar_ap',
+    titleAr: 'الفقرات القطنية (L-spine AP)',
+    titleEn: 'Lumbar Spine AP',
+    region: 'lumbar',
+    regionLabelAr: 'الفقرات القطنية',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [75, 85],
+    masRange: [20, 40],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.lumbar,
+    clinicalTipAr:
+      'الفقرات القطنية L1–L5 بوضع Supine AP تحتاج 75–85 kVp و 20–40 mAs لإبراز التفاصيل العظمية.',
+  },
+  {
+    id: 'lumbar_lat_left',
+    titleAr: 'الفقرات القطنية الجانبية (L-spine Lateral)',
+    titleEn: 'Lumbar Spine Lateral (Left)',
+    region: 'lumbar',
+    regionLabelAr: 'الفقرات القطنية',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'LATERAL',
+    projectionLabelAr: 'جانبي (Lateral)',
+    recommendedPosture: 'TABLE_LEFT_LAT',
+    postureLabelAr: 'نائم جانبياً · يسار (Left Lat)',
+    kvpRange: [85, 95],
+    masRange: [40, 80],
+    baseFee: 18,
+    imagePath: REGION_SCAN_IMAGES.lumbar,
+    clinicalTipAr:
+      'السُمك الجانبي لمنطقة البطن والقطنية يتطلب طاقة عالية: 85–95 kVp و 40–80 mAs.',
+  },
+  {
+    id: 'lumbar_lat_right',
+    titleAr: 'الفقرات القطنية الجانبية يمين (L-spine Lateral R)',
+    titleEn: 'Lumbar Spine Lateral (Right)',
+    region: 'lumbar',
+    regionLabelAr: 'الفقرات القطنية',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'LATERAL',
+    projectionLabelAr: 'جانبي (Lateral)',
+    recommendedPosture: 'TABLE_RIGHT_LAT',
+    postureLabelAr: 'نائم جانبياً · يمين (Right Lat)',
+    kvpRange: [85, 95],
+    masRange: [40, 80],
+    baseFee: 18,
+    imagePath: REGION_SCAN_IMAGES.lumbar,
+    clinicalTipAr:
+      'الإسقاط الجانبي الأيمن للفقرات القطنية L1–S1 يلتزم بـ 85–95 kVp و 40–80 mAs.',
+  },
+  {
+    id: 'lumbar_erect_pa',
+    titleAr: 'تقوس العمود الفقري (Scoliosis Erect PA)',
+    titleEn: 'Upright Lumbar / Scoliosis PA',
+    region: 'lumbar',
+    regionLabelAr: 'الفقرات القطنية',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'PA',
+    projectionLabelAr: 'خلفي-أمامي (PA)',
+    recommendedPosture: 'ERECT_PA',
+    postureLabelAr: 'واقف (Erect) · PA',
+    kvpRange: [75, 85],
+    masRange: [20, 40],
+    baseFee: 18,
+    imagePath: REGION_SCAN_IMAGES.lumbar,
+    clinicalTipAr:
+      'تُجرى بوضعية الوقوف Erect PA عند 75–85 kVp و 20–40 mAs لتقييم الجنف تحت وزن الجسم.',
+  },
+  {
+    id: 'lumbar_oblique_rpo',
+    titleAr: 'الفقرات القطنية المائلة (L-spine RPO)',
+    titleEn: 'Lumbar Spine Oblique (RPO)',
+    region: 'lumbar',
+    regionLabelAr: 'الفقرات القطنية',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'OBLIQUE',
+    projectionLabelAr: 'مائل (Oblique 45°)',
+    recommendedPosture: 'TABLE_RPO',
+    postureLabelAr: 'طاولة مائل خلفي يمين RPO',
+    kvpRange: [75, 85],
+    masRange: [20, 40],
+    baseFee: 18,
+    imagePath: REGION_SCAN_IMAGES.lumbar,
+    clinicalTipAr:
+      'إمالة المريض 45 درجة RPO تظهر البرزخ الفقري عند 75–85 kVp و 20–40 mAs.',
+  },
   {
     id: 'chest_pa',
-    titleAr: 'أشعة الصدر (واقف PA)',
-    titleEn: 'Chest X-Ray (Erect PA)',
+    titleAr: 'الصدر (Chest PA)',
+    titleEn: 'Chest PA (Erect)',
     region: 'chest',
     regionLabelAr: 'الصدر',
     modality: 'XRAY',
@@ -205,17 +719,17 @@ export const EXAMS: ExamProtocol[] = [
     projectionLabelAr: 'خلفي-أمامي (PA)',
     recommendedPosture: 'ERECT_PA',
     postureLabelAr: 'واقف (Erect) · PA',
-    kvpRange: [105, 125],
-    masRange: [2, 6],
+    kvpRange: [110, 125],
+    masRange: [1.5, 4],
     baseFee: 15,
     imagePath: REGION_SCAN_IMAGES.chest,
     clinicalTipAr:
-      'يُقف المريض بوضع Erect PA مواجهاً للحامل الجداري مع كتم النفس بجهد 105–125 kVp لإظهار الرئتين بالكامل.',
+      'أشعة الصدر PA القياسية للبالغين: 110–125 kVp مع كمية منخفضة جداً 1.5–4 mAs وكتم النفس.',
   },
   {
     id: 'chest_ap_supine',
-    titleAr: 'أشعة الصدر للطوارئ (مستلقٍ AP)',
-    titleEn: 'Chest X-Ray (Supine AP)',
+    titleAr: 'الصدر للطوارئ (Chest Supine AP)',
+    titleEn: 'Chest AP (Supine)',
     region: 'chest',
     regionLabelAr: 'الصدر',
     modality: 'XRAY',
@@ -224,17 +738,36 @@ export const EXAMS: ExamProtocol[] = [
     projectionLabelAr: 'أمامي-خلفي (AP)',
     recommendedPosture: 'SUPINE',
     postureLabelAr: 'على الظهر (Supine)',
-    kvpRange: [95, 115],
-    masRange: [3, 7],
+    kvpRange: [110, 125],
+    masRange: [1.5, 4],
     baseFee: 16,
     imagePath: REGION_SCAN_IMAGES.chest,
     clinicalTipAr:
-      'للمرضى غير القادرين على الوقوف: يُوضع المريض مستلقياً على الظهر (Supine AP) مع كتم النفس وتقليل التكبير.',
+      'للمرضى غير القادرين على الوقوف: 110–125 kVp و 1.5–4 mAs بوضعية الاستلقاء Supine AP.',
+  },
+  {
+    id: 'chest_ap_erect',
+    titleAr: 'الصدر الواقف (Chest Erect AP)',
+    titleEn: 'Chest AP (Erect)',
+    region: 'chest',
+    regionLabelAr: 'الصدر',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'ERECT_AP',
+    postureLabelAr: 'واقف (Erect) · AP',
+    kvpRange: [110, 125],
+    masRange: [1.5, 4],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.chest,
+    clinicalTipAr:
+      'إسقاط Erect AP للصدر بجهد 110–125 kVp و 1.5–4 mAs مع كتم الشهيق.',
   },
   {
     id: 'chest_lat_left',
-    titleAr: 'أشعة الصدر الجانبية (واقف يسار)',
-    titleEn: 'Chest X-Ray (Erect Left Lateral)',
+    titleAr: 'الصدر الجانبي (Chest Lateral يسار)',
+    titleEn: 'Chest Lateral (Left Erect)',
     region: 'chest',
     regionLabelAr: 'الصدر',
     modality: 'XRAY',
@@ -243,17 +776,17 @@ export const EXAMS: ExamProtocol[] = [
     projectionLabelAr: 'جانبي (Lateral)',
     recommendedPosture: 'ERECT_LEFT_LAT',
     postureLabelAr: 'واقف (Erect) · جانبي أيسر',
-    kvpRange: [110, 128],
-    masRange: [4, 9],
-    baseFee: 15,
+    kvpRange: [110, 125],
+    masRange: [4, 8],
+    baseFee: 16,
     imagePath: REGION_SCAN_IMAGES.chest,
     clinicalTipAr:
-      'الوضع الجانبي الأيسر الواقف (Left Lateral) يقرّب القلب من المستقبل لتقليل التكبير مع رفع الذراعين للأعلى.',
+      'الصدر الجانبي يحتاج ضعف mAs الصدر الأمامي: 110–125 kVp و 4–8 mAs مع رفع الذراعين.',
   },
   {
     id: 'chest_lat_right',
-    titleAr: 'أشعة الصدر الجانبية (واقف يمين)',
-    titleEn: 'Chest X-Ray (Erect Right Lateral)',
+    titleAr: 'الصدر الجانبي (Chest Lateral يمين)',
+    titleEn: 'Chest Lateral (Right Erect)',
     region: 'chest',
     regionLabelAr: 'الصدر',
     modality: 'XRAY',
@@ -262,564 +795,416 @@ export const EXAMS: ExamProtocol[] = [
     projectionLabelAr: 'جانبي (Lateral)',
     recommendedPosture: 'ERECT_RIGHT_LAT',
     postureLabelAr: 'واقف (Erect) · جانبي أيمن',
-    kvpRange: [110, 128],
-    masRange: [4, 9],
+    kvpRange: [110, 125],
+    masRange: [4, 8],
     baseFee: 16,
     imagePath: REGION_SCAN_IMAGES.chest,
     clinicalTipAr:
-      'يُوجَّه الجانب الأيمن للحامل الجداري لتقييم الآفات الرئوية اليمنى مع رفع الذراعين وحبس الشهيق.',
+      'الجانب الأيمن ملاصق للحامل الجداري مع كتم النفس بجهد 110–125 kVp و 4–8 mAs.',
   },
   {
-    id: 'cervical_lat',
-    titleAr: 'أشعة الفقرات العنقية (واقف جانبي)',
-    titleEn: 'Cervical Spine (Erect Lateral)',
-    region: 'cervical',
-    regionLabelAr: 'الرقبة',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'LATERAL',
-    projectionLabelAr: 'جانبي (Lateral)',
-    recommendedPosture: 'ERECT_RIGHT_LAT',
-    postureLabelAr: 'واقف (Erect) · جانبي أيمن',
-    kvpRange: [68, 82],
-    masRange: [12, 22],
-    baseFee: 15,
-    imagePath: REGION_SCAN_IMAGES.cervical,
-    clinicalTipAr:
-      'الوضع الجانبي الواقف (Erect Lateral) يُظهر الفقرات C1–C7 واستقامة العمود العنقي مع خفض الكتفين.',
-  },
-  {
-    id: 'cervical_ap',
-    titleAr: 'أشعة الفقرات العنقية (واقف AP)',
-    titleEn: 'Cervical Spine (Erect AP)',
-    region: 'cervical',
-    regionLabelAr: 'الرقبة',
+    id: 'ribs_ap',
+    titleAr: 'الأضلاع (Ribs)',
+    titleEn: 'Ribs (AP / Oblique)',
+    region: 'ribs',
+    regionLabelAr: 'الأضلاع',
+    sideRequired: true,
     modality: 'XRAY',
     modalityLabelAr: 'أشعة سينية',
     recommendedProjection: 'AP',
     projectionLabelAr: 'أمامي-خلفي (AP)',
     recommendedPosture: 'ERECT_AP',
     postureLabelAr: 'واقف (Erect) · AP',
-    kvpRange: [66, 78],
-    masRange: [10, 18],
-    baseFee: 16,
-    imagePath: REGION_SCAN_IMAGES.cervical,
+    kvpRange: [65, 75],
+    masRange: [12, 25],
+    baseFee: 17,
+    imagePath: REGION_SCAN_IMAGES.ribs,
     clinicalTipAr:
-      'يُرفع الذقن قليلاً وتُوجّه الأشعة نحو منتصف الرقبة C4 لإبراز أجسام الفقرات والنتوءات الشوكية.',
+      'عظام الأضلاع تتطلب kVp أقل من الصدر لإظهار العظم بدل الرئة: 65–75 kVp و 12–25 mAs مع تحديد الجهة (يمين أو يسار).',
   },
   {
-    id: 'lumbar_ap',
-    titleAr: 'أشعة القطنية (مستلقٍ على الظهر)',
-    titleEn: 'Lumbar Spine (Supine AP)',
-    region: 'lumbar',
-    regionLabelAr: 'أسفل الظهر',
+    id: 'abdomen_ap',
+    titleAr: 'البطن (Abdomen AP)',
+    titleEn: 'Abdomen AP (KUB)',
+    region: 'abdomen',
+    regionLabelAr: 'البطن',
     modality: 'XRAY',
     modalityLabelAr: 'أشعة سينية',
     recommendedProjection: 'AP',
     projectionLabelAr: 'أمامي-خلفي (AP)',
     recommendedPosture: 'SUPINE',
     postureLabelAr: 'على الظهر (Supine)',
-    kvpRange: [74, 88],
-    masRange: [24, 40],
-    baseFee: 15,
-    imagePath: REGION_SCAN_IMAGES.lumbar,
-    clinicalTipAr:
-      'يستلقي المريض على ظهره (Supine) لتصوير الفقرات L1–L5 بجرعة 24–40 mAs لإبراز تفاصيل العظام.',
-  },
-  {
-    id: 'lumbar_lat_left',
-    titleAr: 'أشعة القطنية الجانبية (نائم يسار)',
-    titleEn: 'Lumbar Spine (Left Lateral)',
-    region: 'lumbar',
-    regionLabelAr: 'أسفل الظهر',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'LATERAL',
-    projectionLabelAr: 'جانبي (Lateral)',
-    recommendedPosture: 'TABLE_LEFT_LAT',
-    postureLabelAr: 'نائم جانبياً · يسار (Left Lat)',
-    kvpRange: [80, 95],
-    masRange: [28, 45],
-    baseFee: 15,
-    imagePath: REGION_SCAN_IMAGES.lumbar,
-    clinicalTipAr:
-      'يستلقي المريض على جانبه الأيسر (Left Lateral) مع ثني الركبتين قليلاً لاستقرار الحوض وإظهار المسافات الغضروفية.',
-  },
-  {
-    id: 'lumbar_lat_right',
-    titleAr: 'أشعة القطنية الجانبية (نائم يمين)',
-    titleEn: 'Lumbar Spine (Right Lateral)',
-    region: 'lumbar',
-    regionLabelAr: 'أسفل الظهر',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'LATERAL',
-    projectionLabelAr: 'جانبي (Lateral)',
-    recommendedPosture: 'TABLE_RIGHT_LAT',
-    postureLabelAr: 'نائم جانبياً · يمين (Right Lat)',
-    kvpRange: [80, 95],
-    masRange: [28, 45],
+    kvpRange: [75, 85],
+    masRange: [15, 30],
     baseFee: 16,
-    imagePath: REGION_SCAN_IMAGES.lumbar,
+    imagePath: REGION_SCAN_IMAGES.abdomen,
     clinicalTipAr:
-      'يستلقي المريض على جانبه الأيمن عند وجود ألم بالجهة اليسرى لتقييم الأقراص بين الفقرات L1–S1.',
+      'أشعة البطن KUB بوضعية Supine AP عند 75–85 kVp و 15–30 mAs لإظهار الغازات والحصوات الكلوية.',
   },
+
+  // ================= UPPER LIMB (BILATERAL R/L) =================
   {
-    id: 'lumbar_erect_pa',
-    titleAr: 'أشعة تقوس العمود الفقري (واقف PA)',
-    titleEn: 'Scoliosis / Upright Spine (Erect PA)',
-    region: 'lumbar',
-    regionLabelAr: 'العمود الفقري',
+    id: 'shoulder_ap',
+    titleAr: 'الكتف (Shoulder AP)',
+    titleEn: 'Shoulder AP',
+    region: 'shoulder',
+    regionLabelAr: 'الكتف',
+    sideRequired: true,
     modality: 'XRAY',
     modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'PA',
-    projectionLabelAr: 'خلفي-أمامي (PA)',
-    recommendedPosture: 'ERECT_PA',
-    postureLabelAr: 'واقف (Erect) · PA',
-    kvpRange: [76, 90],
-    masRange: [22, 36],
-    baseFee: 18,
-    imagePath: REGION_SCAN_IMAGES.lumbar,
-    clinicalTipAr:
-      'تُؤخذ بوضعية الوقوف الحر Erect PA لتقييم درجة الجنف والانحناء تحت وزن الجسم الطبيعي.',
-  },
-  {
-    id: 'spine_prone',
-    titleAr: 'أشعة الظهر والعمود الفقري (انبطاح)',
-    titleEn: 'Thoracolumbar Spine (Prone PA)',
-    region: 'lumbar',
-    regionLabelAr: 'الظهر والعمود',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'PA',
-    projectionLabelAr: 'خلفي-أمامي (PA)',
-    recommendedPosture: 'PRONE',
-    postureLabelAr: 'على البطن (Prone)',
-    kvpRange: [74, 88],
-    masRange: [22, 38],
-    baseFee: 15,
-    imagePath: REGION_SCAN_IMAGES.lumbar,
-    clinicalTipAr:
-      'وضعية الانبطاح على البطن (Prone) تُستخدم لتقييم انحناءات العمود الفقري وتقليل تباعد الأشعة للفقرات.',
-  },
-  {
-    id: 'chest_decubitus_right',
-    titleAr: 'أشعة الصدر الجانبية (نائم يمين)',
-    titleEn: 'Chest Decubitus (Right Lateral)',
-    region: 'chest',
-    regionLabelAr: 'الصدر',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'LATERAL',
-    projectionLabelAr: 'جانبي (Lateral)',
-    recommendedPosture: 'TABLE_RIGHT_LAT',
-    postureLabelAr: 'نائم جانبياً · يمين (Right Lat)',
-    kvpRange: [100, 120],
-    masRange: [3, 8],
-    baseFee: 15,
-    imagePath: REGION_SCAN_IMAGES.chest,
-    clinicalTipAr:
-      'الاستلقاء على الجانب الأيمن (Right Lateral Decubitus) يساعد في رصد تجمعات السوائل الجنبية الحرة.',
-  },
-  {
-    id: 'chest_decubitus_left',
-    titleAr: 'أشعة الصدر الجانبية (نائم يسار)',
-    titleEn: 'Chest Decubitus (Left Lateral)',
-    region: 'chest',
-    regionLabelAr: 'الصدر',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'LATERAL',
-    projectionLabelAr: 'جانبي (Lateral)',
-    recommendedPosture: 'TABLE_LEFT_LAT',
-    postureLabelAr: 'نائم جانبياً · يسار (Left Lat)',
-    kvpRange: [100, 120],
-    masRange: [3, 8],
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'ERECT_AP',
+    postureLabelAr: 'واقف (Erect) · AP',
+    kvpRange: [65, 75],
+    masRange: [8, 16],
     baseFee: 16,
-    imagePath: REGION_SCAN_IMAGES.chest,
+    imagePath: REGION_SCAN_IMAGES.shoulder,
     clinicalTipAr:
-      'الاستلقاء على الجانب الأيسر يوضح السوائل الجنبية الحرة في الجنب الأيسر أو استرواح الصدر الأيمن.',
+      'الكتف AP يتطلب 65–75 kVp و 8–16 mAs مع تحديد الكتف المطلوب (الأيمن أو الأيسر).',
   },
   {
-    id: 'hand_pa',
-    titleAr: 'أشعة اليد والرسغ (PA)',
-    titleEn: 'Hand & Wrist (PA)',
-    region: 'hand',
-    regionLabelAr: 'اليد والرسغ',
+    id: 'clavicle_ap',
+    titleAr: 'الترقوة (Clavicle)',
+    titleEn: 'Clavicle AP',
+    region: 'clavicle',
+    regionLabelAr: 'الترقوة',
+    sideRequired: true,
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'ERECT_AP',
+    postureLabelAr: 'واقف (Erect) · AP',
+    kvpRange: [65, 75],
+    masRange: [8, 16],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.clavicle,
+    clinicalTipAr:
+      'تصوير عظمة الترقوة عند 65–75 kVp و 8–16 mAs مع تحديد الطرف المصاب (يمين/يسار).',
+  },
+  {
+    id: 'humerus_ap',
+    titleAr: 'عظمة العضد (Humerus)',
+    titleEn: 'Humerus AP',
+    region: 'humerus',
+    regionLabelAr: 'عظمة العضد',
+    sideRequired: true,
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [60, 70],
+    masRange: [5, 10],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.humerus,
+    clinicalTipAr:
+      'عظمة العضد تشمل مفصلي الكتف والكوع عند 60–70 kVp و 5–10 mAs مع تحديد الذراع اليمين أو اليسار.',
+  },
+  {
+    id: 'elbow_ap',
+    titleAr: 'مفصل الكوع (Elbow)',
+    titleEn: 'Elbow Joint AP',
+    region: 'elbow',
+    regionLabelAr: 'مفصل الكوع',
+    sideRequired: true,
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [55, 65],
+    masRange: [3, 6],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.elbow,
+    clinicalTipAr:
+      'مفصل الكوع يتطلب 55–65 kVp و 3–6 mAs بسط كامل للذراع وتحديد الجهة اليمنى أو اليسرى.',
+  },
+  {
+    id: 'forearm_ap',
+    titleAr: 'عظمة الساعد (Forearm)',
+    titleEn: 'Forearm AP (Radius & Ulna)',
+    region: 'forearm',
+    regionLabelAr: 'عظمة الساعد',
+    sideRequired: true,
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [55, 65],
+    masRange: [3, 6],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.forearm,
+    clinicalTipAr:
+      'الكعبرة والزند تتطلب 55–65 kVp و 3–6 mAs مع شمول مفصلي الكوع والرسغ وتحديد الجهة.',
+  },
+  {
+    id: 'wrist_pa',
+    titleAr: 'مفصل الرسغ (Wrist)',
+    titleEn: 'Wrist Joint PA',
+    region: 'wrist',
+    regionLabelAr: 'مفصل الرسغ',
+    sideRequired: true,
     modality: 'XRAY',
     modalityLabelAr: 'أشعة سينية',
     recommendedProjection: 'PA',
     projectionLabelAr: 'خلفي-أمامي (PA)',
     recommendedPosture: 'SUPINE',
     postureLabelAr: 'على الظهر (Supine)',
-    kvpRange: [48, 60],
-    masRange: [2, 5],
+    kvpRange: [50, 60],
+    masRange: [2, 4],
     baseFee: 15,
-    imagePath: REGION_SCAN_IMAGES.hand,
+    imagePath: REGION_SCAN_IMAGES.wrist,
     clinicalTipAr:
-      'الأطراف الدقيقة لا تحتاج طاقة اختراق عالية؛ يُكتفى بـ 48–60 kVp لإبراز السلاميات والمشط.',
+      'الرسغ وعظامه الدقيقة تحتاج 50–60 kVp و 2–4 mAs مع تحديد الرسغ الأيمن أو الأيسر.',
   },
   {
-    id: 'hand_lat',
-    titleAr: 'أشعة اليد والرسغ الجانبية (Lateral)',
-    titleEn: 'Hand & Wrist (Lateral)',
+    id: 'hand_pa',
+    titleAr: 'اليد (Hand PA)',
+    titleEn: 'Hand PA',
     region: 'hand',
-    regionLabelAr: 'اليد والرسغ',
+    regionLabelAr: 'اليد',
+    sideRequired: true,
     modality: 'XRAY',
     modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'LATERAL',
-    projectionLabelAr: 'جانبي (Lateral)',
-    recommendedPosture: 'TABLE_LEFT_LAT',
-    postureLabelAr: 'جانبي (Left Lat)',
-    kvpRange: [48, 58],
+    recommendedProjection: 'PA',
+    projectionLabelAr: 'خلفي-أمامي (PA)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [50, 60],
     masRange: [2, 4],
     baseFee: 15,
     imagePath: REGION_SCAN_IMAGES.hand,
     clinicalTipAr:
-      'الإسقاط الجانبي يكشف خلع العظام الرسغية وانزياح الكسور الأمامي والخلفي بوضوح.',
-  },
-  {
-    id: 'knee_ap',
-    titleAr: 'أشعة مفصل الركبة (مستلقٍ AP)',
-    titleEn: 'Knee Joint (Supine AP)',
-    region: 'knee',
-    regionLabelAr: 'الركبة',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'AP',
-    projectionLabelAr: 'أمامي-خلفي (AP)',
-    recommendedPosture: 'SUPINE',
-    postureLabelAr: 'على الظهر (Supine)',
-    kvpRange: [58, 70],
-    masRange: [6, 12],
-    baseFee: 15,
-    imagePath: REGION_SCAN_IMAGES.knee,
-    clinicalTipAr:
-      'توجيه الشعاع نحو الحافة السفلية للرضفة بجرعة متوسطة (58–70 kVp) يوضح المسافة المفصلية.',
-  },
-  {
-    id: 'knee_lat_left',
-    titleAr: 'أشعة الركبة الجانبية (نائم يسار)',
-    titleEn: 'Knee Joint (Left Lateral)',
-    region: 'knee',
-    regionLabelAr: 'الركبة',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'LATERAL',
-    projectionLabelAr: 'جانبي (Lateral)',
-    recommendedPosture: 'TABLE_LEFT_LAT',
-    postureLabelAr: 'نائم جانبياً · يسار',
-    kvpRange: [58, 70],
-    masRange: [5, 10],
-    baseFee: 16,
-    imagePath: REGION_SCAN_IMAGES.knee,
-    clinicalTipAr:
-      'الوضع الجانبي مع ثني خفيف يكشف ارتشاح المفصل وموضع الرضفة وكسور الهضبة الظنبوبية.',
-  },
-  {
-    id: 'knee_erect_ap',
-    titleAr: 'أشعة الركبة بالتحميل (واقف AP)',
-    titleEn: 'Weight-Bearing Knee (Erect AP)',
-    region: 'knee',
-    regionLabelAr: 'الركبة',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'AP',
-    projectionLabelAr: 'أمامي-خلفي (AP)',
-    recommendedPosture: 'ERECT_AP',
-    postureLabelAr: 'واقف (Erect) · AP',
-    kvpRange: [60, 72],
-    masRange: [6, 12],
-    baseFee: 18,
-    imagePath: REGION_SCAN_IMAGES.knee,
-    clinicalTipAr:
-      'التصوير أثناء الوقوف يُظهر التضيق الحقيقي لمسافة الغضروف المفصلي تحت حمل وزن الجسم.',
-  },
-  {
-    id: 'pelvis_ap',
-    titleAr: 'أشعة الحوض والورك (مستلقٍ AP)',
-    titleEn: 'Pelvis (Supine AP)',
-    region: 'pelvis',
-    regionLabelAr: 'الحوض',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'AP',
-    projectionLabelAr: 'أمامي-خلفي (AP)',
-    recommendedPosture: 'SUPINE',
-    postureLabelAr: 'على الظهر (Supine)',
-    kvpRange: [74, 86],
-    masRange: [20, 32],
-    baseFee: 15,
-    imagePath: REGION_SCAN_IMAGES.pelvis,
-    clinicalTipAr:
-      'الاستلقاء على الظهر (Supine) مع تدوير القدمين للداخل قليلاً يُظهر عنق عظم الفخذ بالكامل.',
-  },
-  {
-    id: 'pelvis_prone',
-    titleAr: 'أشعة العجز والحوض الخلفية (انبطاح PA)',
-    titleEn: 'Sacrum & SI Joints (Prone PA)',
-    region: 'pelvis',
-    regionLabelAr: 'الحوض',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'PA',
-    projectionLabelAr: 'خلفي-أمامي (PA)',
-    recommendedPosture: 'PRONE',
-    postureLabelAr: 'على البطن (Prone)',
-    kvpRange: [74, 86],
-    masRange: [20, 32],
-    baseFee: 16,
-    imagePath: REGION_SCAN_IMAGES.pelvis,
-    clinicalTipAr:
-      'وضعية الانبطاح تقلل الجرعة على الأعضاء الأمامية وتبرز المفاصل العجزية الحرقفية بوضوح.',
-  },
-  {
-    id: 'skull_ap',
-    titleAr: 'أشعة الجمجمة والجيوب (واقف AP)',
-    titleEn: 'Skull & Sinuses (Erect AP)',
-    region: 'head',
-    regionLabelAr: 'الرأس',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'AP',
-    projectionLabelAr: 'أمامي-خلفي (AP)',
-    recommendedPosture: 'ERECT_AP',
-    postureLabelAr: 'واقف (Erect) · AP',
-    kvpRange: [70, 82],
-    masRange: [14, 24],
-    baseFee: 15,
-    imagePath: REGION_SCAN_IMAGES.head,
-    clinicalTipAr:
-      'الوضعية القائمة (Erect AP) ضرورية لتصوير الجيوب الأنفية وكشف أي مستويات سوائل هوائية.',
-  },
-  {
-    id: 'skull_lat',
-    titleAr: 'أشعة الجمجمة الجانبية (واقف يمين)',
-    titleEn: 'Skull & Sella Turcica (Erect Lateral)',
-    region: 'head',
-    regionLabelAr: 'الرأس',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'LATERAL',
-    projectionLabelAr: 'جانبي (Lateral)',
-    recommendedPosture: 'ERECT_RIGHT_LAT',
-    postureLabelAr: 'واقف (Erect) · جانبي أيمن',
-    kvpRange: [68, 80],
-    masRange: [12, 20],
-    baseFee: 16,
-    imagePath: REGION_SCAN_IMAGES.head,
-    clinicalTipAr:
-      'تُظهر عظام القحف والسرج التركي والجيوب الوتدية عند محاذاة الخط الحجاجي الصماخي.',
-  },
-  {
-    id: 'skull_supine',
-    titleAr: 'أشعة الجمجمة للطوارئ (مستلقٍ AP)',
-    titleEn: 'Trauma Skull (Supine AP)',
-    region: 'head',
-    regionLabelAr: 'الرأس',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'AP',
-    projectionLabelAr: 'أمامي-خلفي (AP)',
-    recommendedPosture: 'SUPINE',
-    postureLabelAr: 'على الظهر (Supine)',
-    kvpRange: [72, 84],
-    masRange: [14, 22],
-    baseFee: 16,
-    imagePath: REGION_SCAN_IMAGES.head,
-    clinicalTipAr:
-      'تُستخدم لمرضى الإصابات والرضوض الذين يتعذر وقوفهم للكشف عن شروخ القحف.',
-  },
-  {
-    id: 'chest_ap_erect',
-    titleAr: 'أشعة الصدر الواقف (أمامي-خلفي AP)',
-    titleEn: 'Chest X-Ray (Erect AP)',
-    region: 'chest',
-    regionLabelAr: 'الصدر',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'AP',
-    projectionLabelAr: 'أمامي-خلفي (AP)',
-    recommendedPosture: 'ERECT_AP',
-    postureLabelAr: 'واقف (Erect) · AP',
-    kvpRange: [100, 120],
-    masRange: [3, 7],
-    baseFee: 16,
-    imagePath: REGION_SCAN_IMAGES.chest,
-    clinicalTipAr:
-      'يُستند ظهر المريض للحامل الجداري (Erect AP) عندما يتعذر عليه مواجهة الحامل؛ مع الانتباه لتكبير ظل القلب الطفيف.',
-  },
-  {
-    id: 'chest_oblique_rao',
-    titleAr: 'أشعة الصدر المائلة (واقف مائل RAO)',
-    titleEn: 'Chest Ribs & Oblique (Erect RAO)',
-    region: 'chest',
-    regionLabelAr: 'الصدر والأضلاع',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'OBLIQUE',
-    projectionLabelAr: 'مائل (Oblique 45°)',
-    recommendedPosture: 'ERECT_RAO',
-    postureLabelAr: 'واقف مائل أمامي أيمن RAO',
-    kvpRange: [72, 86],
-    masRange: [8, 16],
-    baseFee: 18,
-    imagePath: REGION_SCAN_IMAGES.chest,
-    clinicalTipAr:
-      'تدوير المريض 45 درجة (RAO) يفتح الأضلاع الجانبية والزاوية الإبطية لرصد شروخ الأضلاع الدقيقة.',
-  },
-  {
-    id: 'cervical_oblique_lao',
-    titleAr: 'أشعة الثقوب العصبية العنقية (مائل LAO)',
-    titleEn: 'Cervical Neural Foramina (Erect LAO)',
-    region: 'cervical',
-    regionLabelAr: 'الرقبة',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'OBLIQUE',
-    projectionLabelAr: 'مائل (Oblique 45°)',
-    recommendedPosture: 'ERECT_LAO',
-    postureLabelAr: 'واقف مائل أيسر LAO',
-    kvpRange: [68, 80],
-    masRange: [10, 18],
-    baseFee: 18,
-    imagePath: REGION_SCAN_IMAGES.cervical,
-    clinicalTipAr:
-      'الوضع المائل بزاوية 45 درجة (LAO) يكشف الثقوب بين الفقرات العنقية لتقييم انضغاط الجذور العصبية.',
-  },
-  {
-    id: 'lumbar_oblique_rpo',
-    titleAr: 'أشعة القطنية المائلة (طاولة RPO)',
-    titleEn: 'Lumbar Pars Oblique (Table RPO)',
-    region: 'lumbar',
-    regionLabelAr: 'أسفل الظهر',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'OBLIQUE',
-    projectionLabelAr: 'مائل (Oblique 45°)',
-    recommendedPosture: 'TABLE_RPO',
-    postureLabelAr: 'طاولة مائل خلفي يمين RPO',
-    kvpRange: [76, 90],
-    masRange: [24, 40],
-    baseFee: 18,
-    imagePath: REGION_SCAN_IMAGES.lumbar,
-    clinicalTipAr:
-      'إمالة المريض 45 درجة (RPO) تُظهر علامة "الكلب الأسكتلندي" (Pars Interarticularis) لاستبعاد انحلال الفقار.',
-  },
-  {
-    id: 'lumbar_oblique_lpo',
-    titleAr: 'أشعة القطنية المائلة اليسرى (طاولة LPO)',
-    titleEn: 'Lumbar Pars Oblique (Table LPO)',
-    region: 'lumbar',
-    regionLabelAr: 'أسفل الظهر',
-    modality: 'XRAY',
-    modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'OBLIQUE',
-    projectionLabelAr: 'مائل (Oblique 45°)',
-    recommendedPosture: 'TABLE_LPO',
-    postureLabelAr: 'طاولة مائل خلفي يسار LPO',
-    kvpRange: [76, 90],
-    masRange: [24, 40],
-    baseFee: 18,
-    imagePath: REGION_SCAN_IMAGES.lumbar,
-    clinicalTipAr:
-      'تُقيّم المفاصل الوجيهية اليسرى والبرزخ الفقري عند تدوير الجذع 45 درجة يساراً.',
+      'تصوير اليد PA يتطلب 50–60 kVp و 2–4 mAs مع تفريق الأصابع وتحديد اليد اليمين أو اليسار.',
   },
   {
     id: 'hand_oblique',
-    titleAr: 'أشعة اليد والرسغ المائلة (Oblique 45°)',
-    titleEn: 'Hand & Scaphoid (45° Oblique)',
+    titleAr: 'اليد المائلة (Hand Oblique)',
+    titleEn: 'Hand Oblique (45°)',
     region: 'hand',
-    regionLabelAr: 'اليد والرسغ',
+    regionLabelAr: 'اليد',
+    sideRequired: true,
     modality: 'XRAY',
     modalityLabelAr: 'أشعة سينية',
     recommendedProjection: 'OBLIQUE',
     projectionLabelAr: 'مائل (Oblique 45°)',
     recommendedPosture: 'TABLE_LPO',
     postureLabelAr: 'مائل 45° (LPO)',
-    kvpRange: [48, 60],
-    masRange: [2, 5],
+    kvpRange: [50, 60],
+    masRange: [2, 4],
     baseFee: 17,
     imagePath: REGION_SCAN_IMAGES.hand,
     clinicalTipAr:
-      'الوضع المائل 45 درجة يفصل عظام المشط والزورقي دون تداخل لإظهار الكسور المائلة.',
+      'الإسقاط المائل لليد يفصل عظام المشط والزورقي عند 50–60 kVp و 2–4 mAs مع تحديد الطرف.',
+  },
+
+  // ================= PELVIS, SACRUM & LOWER LIMB =================
+  {
+    id: 'pelvis_ap',
+    titleAr: 'الحوض (Pelvis AP)',
+    titleEn: 'Pelvis AP',
+    region: 'pelvis',
+    regionLabelAr: 'الحوض',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [75, 85],
+    masRange: [15, 30],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.pelvis,
+    clinicalTipAr:
+      'الحوض AP بوضعية Supine يتطلب 75–85 kVp و 15–30 mAs مع تدوير القدمين 15° للداخل.',
   },
   {
-    id: 'knee_lat_right',
-    titleAr: 'أشعة الركبة الجانبية اليمنى (نائم يمين)',
-    titleEn: 'Right Knee Joint (Right Lateral)',
+    id: 'sacrum_coccyx_ap',
+    titleAr: 'العجز والعصعص (Sacrum/Coccyx)',
+    titleEn: 'Sacrum & Coccyx AP',
+    region: 'sacrum_coccyx',
+    regionLabelAr: 'العجز والعصعص',
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [75, 85],
+    masRange: [15, 30],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.sacrum_coccyx,
+    clinicalTipAr:
+      'تصوير العجز والعصعص يتطلب 75–85 kVp و 15–30 mAs مع إفراغ المثانة قبل الفحص.',
+  },
+  {
+    id: 'hip_ap',
+    titleAr: 'مفصل الورك (Hip)',
+    titleEn: 'Hip Joint AP',
+    region: 'hip',
+    regionLabelAr: 'مفصل الورك',
+    sideRequired: true,
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [75, 85],
+    masRange: [15, 30],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.hip,
+    clinicalTipAr:
+      'مفصل الورك يحتاج 75–85 kVp و 15–30 mAs مع تحديد الورك المطلوب (الأيمن أو الأيسر).',
+  },
+  {
+    id: 'femur_ap',
+    titleAr: 'عظمة الفخذ (Femur)',
+    titleEn: 'Femur AP',
+    region: 'femur',
+    regionLabelAr: 'عظمة الفخذ',
+    sideRequired: true,
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [70, 80],
+    masRange: [10, 20],
+    baseFee: 16,
+    imagePath: REGION_SCAN_IMAGES.femur,
+    clinicalTipAr:
+      'تصوير عظمة الفخذ القوية يتطلب 70–80 kVp و 10–20 mAs مع تحديد الفخذ اليمين أو اليسار.',
+  },
+  {
+    id: 'knee_ap',
+    titleAr: 'مفصل الركبة (Knee AP)',
+    titleEn: 'Knee Joint AP',
     region: 'knee',
-    regionLabelAr: 'الركبة',
+    regionLabelAr: 'مفصل الركبة',
+    sideRequired: true,
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [60, 70],
+    masRange: [5, 10],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.knee,
+    clinicalTipAr:
+      'مفصل الركبة يلتزم بـ 60–70 kVp و 5–10 mAs مع التأكد من تحديد الركبة اليمنى أو اليسرى.',
+  },
+  {
+    id: 'knee_lat_left',
+    titleAr: 'مفصل الركبة الجانبي (Knee Lateral)',
+    titleEn: 'Knee Joint Lateral',
+    region: 'knee',
+    regionLabelAr: 'مفصل الركبة',
+    sideRequired: true,
     modality: 'XRAY',
     modalityLabelAr: 'أشعة سينية',
     recommendedProjection: 'LATERAL',
     projectionLabelAr: 'جانبي (Lateral)',
-    recommendedPosture: 'TABLE_RIGHT_LAT',
-    postureLabelAr: 'نائم جانبياً · يمين',
-    kvpRange: [58, 70],
+    recommendedPosture: 'TABLE_LEFT_LAT',
+    postureLabelAr: 'نائم جانبياً · يسار',
+    kvpRange: [60, 70],
     masRange: [5, 10],
     baseFee: 16,
     imagePath: REGION_SCAN_IMAGES.knee,
     clinicalTipAr:
-      'استلقاء على الجانب الأيمن مع ثني خفيف للركبة اليمنى لإبراز الرضفة والفضاء خلف الرضفة.',
+      'الوضع الجانبي للركبة مع ثني خفيف عند 60–70 kVp و 5–10 mAs مع تحديد الركبة المطلوبة.',
   },
   {
-    id: 'knee_oblique',
-    titleAr: 'أشعة الركبة المائلة (طاولة مائل RPO)',
-    titleEn: 'Knee Tibial Plateau (45° Oblique)',
-    region: 'knee',
-    regionLabelAr: 'الركبة',
+    id: 'tibia_fibula_ap',
+    titleAr: 'عظمة الساق (Tibia/Fibula)',
+    titleEn: 'Tibia & Fibula AP',
+    region: 'tibia_fibula',
+    regionLabelAr: 'عظمة الساق',
+    sideRequired: true,
     modality: 'XRAY',
     modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'OBLIQUE',
-    projectionLabelAr: 'مائل (Oblique 45°)',
-    recommendedPosture: 'TABLE_RPO',
-    postureLabelAr: 'طاولة مائل RPO 45°',
-    kvpRange: [60, 72],
-    masRange: [6, 12],
-    baseFee: 18,
-    imagePath: REGION_SCAN_IMAGES.knee,
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [60, 70],
+    masRange: [5, 10],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.tibia_fibula,
     clinicalTipAr:
-      'الإسقاط المائل 45 درجة يكشف رأس الشظية والهضبة الظنبوبية الوحشية بوضوح تام.',
+      'تصوير عظمي الساق (الظنبوب والشظية) عند 60–70 kVp و 5–10 mAs مع تحديد الساق اليمين أو اليسار.',
   },
   {
-    id: 'pelvis_oblique',
-    titleAr: 'أشعة الورك والحُق المائلة (Judet Oblique)',
-    titleEn: 'Acetabulum & Hip (Judet RPO Oblique)',
-    region: 'pelvis',
-    regionLabelAr: 'الحوض والورك',
+    id: 'ankle_ap',
+    titleAr: 'مفصل الكاحل (Ankle)',
+    titleEn: 'Ankle Joint AP',
+    region: 'ankle',
+    regionLabelAr: 'مفصل الكاحل',
+    sideRequired: true,
     modality: 'XRAY',
     modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'OBLIQUE',
-    projectionLabelAr: 'مائل (Oblique 45°)',
-    recommendedPosture: 'TABLE_RPO',
-    postureLabelAr: 'طاولة مائل خلفي يمين RPO',
-    kvpRange: [76, 88],
-    masRange: [22, 34],
-    baseFee: 19,
-    imagePath: REGION_SCAN_IMAGES.pelvis,
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [55, 65],
+    masRange: [3, 6],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.ankle,
     clinicalTipAr:
-      'وضعية جوديت المائلة (45 درجة) تبرز العمود الأمامي والخلفي للحُق الوركي لتقييم شروخ الورك.',
+      'الكاحل يتطلب 55–65 kVp و 3–6 mAs لإبراز الكعبين ومفصل الكاحل مع تحديد الجهة.',
   },
   {
-    id: 'skull_oblique',
-    titleAr: 'أشعة الجمجمة والخشاء المائلة (واقف LAO)',
-    titleEn: 'Skull & Mastoid Process (Erect LAO)',
-    region: 'head',
-    regionLabelAr: 'الرأس',
+    id: 'foot_ap',
+    titleAr: 'القدم (Foot)',
+    titleEn: 'Foot AP / Dorsoplantar',
+    region: 'foot',
+    regionLabelAr: 'القدم',
+    sideRequired: true,
     modality: 'XRAY',
     modalityLabelAr: 'أشعة سينية',
-    recommendedProjection: 'OBLIQUE',
-    projectionLabelAr: 'مائل (Oblique 45°)',
-    recommendedPosture: 'ERECT_LAO',
-    postureLabelAr: 'واقف مائل أيسر LAO',
-    kvpRange: [70, 82],
-    masRange: [14, 22],
-    baseFee: 18,
-    imagePath: REGION_SCAN_IMAGES.head,
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [50, 60],
+    masRange: [2, 4],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.foot,
     clinicalTipAr:
-      'تدوير الرأس 45 درجة بالوضع المائل يظهر الجيوب الفكية وخلايا الخشاء بوضوح دون تراكب.',
+      'عظام مشط القدم والرصغ تحتاج جرعة لطيفة: 50–60 kVp و 2–4 mAs مع تحديد القدم المطلوبة.',
   },
+  {
+    id: 'toes_ap',
+    titleAr: 'أصابع القدم (Toes)',
+    titleEn: 'Toes AP',
+    region: 'toes',
+    regionLabelAr: 'أصابع القدم',
+    sideRequired: true,
+    modality: 'XRAY',
+    modalityLabelAr: 'أشعة سينية',
+    recommendedProjection: 'AP',
+    projectionLabelAr: 'أمامي-خلفي (AP)',
+    recommendedPosture: 'SUPINE',
+    postureLabelAr: 'على الظهر (Supine)',
+    kvpRange: [50, 55],
+    masRange: [2, 3],
+    baseFee: 15,
+    imagePath: REGION_SCAN_IMAGES.toes,
+    clinicalTipAr:
+      'سلاميات أصابع القدم رفيعة جداً وتحتاج أقل جرعة: 50–55 kVp و 2–3 mAs مع تحديد القدم (يمين/يسار).',
+  },
+
+  // ================= CT & MRI (SHOP UPGRADES) =================
   {
     id: 'ct_chest',
     titleAr: 'أشعة مقطعية للصدر (CT Chest)',
@@ -844,7 +1229,7 @@ export const EXAMS: ExamProtocol[] = [
     titleAr: 'أشعة مقطعية للدماغ والجمجمة (CT Brain)',
     titleEn: 'Head / Brain CT Scan',
     region: 'head',
-    regionLabelAr: 'الرأس',
+    regionLabelAr: 'الجمجمة',
     modality: 'CT',
     modalityLabelAr: 'أشعة مقطعية CT',
     recommendedProjection: 'AXIAL',
@@ -882,7 +1267,7 @@ export const EXAMS: ExamProtocol[] = [
     titleAr: 'أشعة مقطعية للفقرات العنقية (CT Cervical)',
     titleEn: 'Cervical Spine CT',
     region: 'cervical',
-    regionLabelAr: 'الرقبة',
+    regionLabelAr: 'الفقرات العنقية',
     modality: 'CT',
     modalityLabelAr: 'أشعة مقطعية CT',
     recommendedProjection: 'AXIAL',
@@ -901,7 +1286,7 @@ export const EXAMS: ExamProtocol[] = [
     titleAr: 'رنين مغناطيسي للعمود الفقري (MRI Lumbar)',
     titleEn: 'Lumbar Spine MRI',
     region: 'lumbar',
-    regionLabelAr: 'أسفل الظهر',
+    regionLabelAr: 'الفقرات القطنية',
     modality: 'MRI',
     modalityLabelAr: 'رنين مغناطيسي MRI',
     recommendedProjection: 'SAGITTAL',
@@ -920,7 +1305,8 @@ export const EXAMS: ExamProtocol[] = [
     titleAr: 'رنين مغناطيسي لمفصل الركبة (MRI Knee)',
     titleEn: 'Knee Ligaments & Meniscus MRI',
     region: 'knee',
-    regionLabelAr: 'الركبة',
+    regionLabelAr: 'مفصل الركبة',
+    sideRequired: true,
     modality: 'MRI',
     modalityLabelAr: 'رنين مغناطيسي MRI',
     recommendedProjection: 'SAGITTAL',
@@ -939,7 +1325,7 @@ export const EXAMS: ExamProtocol[] = [
     titleAr: 'رنين مغناطيسي للدماغ (MRI Brain)',
     titleEn: 'Brain MRI Protocol',
     region: 'head',
-    regionLabelAr: 'الرأس',
+    regionLabelAr: 'الجمجمة',
     modality: 'MRI',
     modalityLabelAr: 'رنين مغناطيسي MRI',
     recommendedProjection: 'SAGITTAL',
@@ -958,7 +1344,7 @@ export const EXAMS: ExamProtocol[] = [
     titleAr: 'رنين مغناطيسي للفقرات العنقية (MRI Cervical)',
     titleEn: 'Cervical Spine MRI',
     region: 'cervical',
-    regionLabelAr: 'الرقبة',
+    regionLabelAr: 'الفقرات العنقية',
     modality: 'MRI',
     modalityLabelAr: 'رنين مغناطيسي MRI',
     recommendedProjection: 'SAGITTAL',
@@ -1296,82 +1682,86 @@ const FEMALE_NAMES = [
   'نجلاء فؤاد',
 ];
 
+const PEDIATRIC_MALE_NAMES = [
+  'الطفل آدم علي',
+  'الطفل زين حسن',
+  'الطفل تيم خالد',
+  'الطفل حمزة طارق',
+  'الطفل أنس محمود',
+  'الطفل ريان سعد',
+];
+
+const PEDIATRIC_FEMALE_NAMES = [
+  'الطفلة جود أحمد',
+  'الطفلة لينا عمر',
+  'الطفلة شام إبراهيم',
+  'الطفلة تالا ناصر',
+  'الطفلة ملك عادل',
+  'الطفلة غزل فؤاد',
+];
+
 const EXAM_SCENARIOS: Record<
   string,
   {complaints: string[]; findings: string[]}
 > = {
-  chest_pa: {
+  skull_ap: {
     complaints: [
-      'سعال مستمر وضيق خفيف بالتنفس منذ أسبوع',
-      'فحص صدر روتيني قبل العمل',
-      'ألم صدري خفيف بعد نزلة برد حادة',
+      'صداع جبهي متكرر واحتقان في الجيوب الأنفية',
+      'ضربة خفيفة على الرأس تستدعي الاطمئنان',
     ],
     findings: [
-      'الرئتان صافيتان وحجم القلب ضمن الحدود الطبيعية',
-      'التهاب شعبي خفيف في الفص السفلي الأيمن',
-      'تكثف رئوي بسيط يستدعي المتابعة الدوائية',
+      'عظام القحف سليمة وخالية من الشروخ',
+      'تهوية طبيعية للجيوب الأنفية وعدم وجود انخساف قحفي',
     ],
   },
-  chest_ap_supine: {
+  skull_supine: {
     complaints: [
-      'ألم صدري مع دوار شديد يتعذر معه الوقوف',
-      'فحص صدر طارئ بوضع الاستلقاء على الظهر',
+      'مريض مصاب بدوار بعد سقوط ويتعذر وقوفه لتصوير الرأس',
+      'فحص جمجمة طارئ بوضع الاستلقاء على الظهر',
     ],
     findings: [
-      'توسع وعائي خفيف مع صفاء الحقول الرئوية',
-      'ظل القلب طبيعي ضمن إسقاط AP مع ارتشاح قاعدي بسيط',
+      'لا توجد كسور خطية أو منخسفة في عظام القحف',
+      'سلامة العظام الجبهية والجدارية بالكامل',
     ],
   },
-  chest_lat_left: {
+  skull_lat: {
     complaints: [
-      'متابعة التهاب رئوي في الفص السفلي يتطلب تصويراً جانبياً',
-      'فحص تكميلي للصدر بالوضع الواقف الجانبي الأيسر',
+      'تقييم الجيب الوتدي والسرج التركي بسبب صداع مزمن',
+      'فحص جانبي للجمجمة بعد رضّة جانبية خفيفة',
     ],
     findings: [
-      'الزاوية الضلعية الحجابية الخلفية صافية وخالية من الارتشاح',
-      'عتامة محدودة خلف القلب تستدعي المتابعة',
+      'جدران القحف منتظمة والسرج التركي ضمن الحجم الطبيعي',
+      'تهوية طبيعية للجيوب الوتدية وخلايا الخشاء',
     ],
   },
-  chest_lat_right: {
+  facial_bones_pa: {
     complaints: [
-      'ألم جانبي بالجهة اليمنى من الصدر مع سعال جاف',
-      'متابعة التهاب الفص الأيمن للرئة بالوضع الجانبي الأيمن',
+      'تورم في الوجنة وألم تحت العين بعد ارتطام مباشر',
+      'اشتباه بكسر في عظم الوجنة أو الجيب الفكي',
     ],
     findings: [
-      'صفاء الفصوص الرئوية اليمنى وسلامة الحجاب الحاجز الأيمن',
-      'تكثف التهابي محدود في الفص الأوسط الأيمن',
+      'عظام الوجنة والحجاج سليمة ومتناظرة دون كسور مزاحة',
+      'كثافة مخاطية خفيفة في الجيب الفكي دون كسر حجاجي',
     ],
   },
-  chest_decubitus_right: {
+  nasal_bones_lat: {
     complaints: [
-      'اشتباه بانصباب جنبي في الرئة اليمنى يستدعي التصوير بوضع الاستلقاء الجانبي الأيمن',
-      'ألم بالصدر مع صعوبة الوقوف الطويل أثناء الفحص',
+      'تورم ونزيف أنفي بعد اصطدام مباشر بالأنف',
+      'اشتباه بشرخ في عظم الأنف مع اعوجاج ظاهري خفيف',
     ],
     findings: [
-      'عدم وجود سوائل حرة متحركة في الجنب الأيمن',
-      'طبقة ارتشاح جنبي بسيطة واضحة بالوضع الجانبي الأيمن',
+      'سلامة العظم الأنفي دون شروخ مزاحة',
+      'كسر خطي غير مزاح في الطرف البعيد لعظم الأنف',
     ],
   },
-  chest_decubitus_left: {
+  soft_tissue_neck_lat: {
     complaints: [
-      'تقييم سائل جنبي محتمل في الجهة اليسرى بوضع الاستلقاء الجانبي الأيسر',
-      'ضيق تنفس عند الاستلقاء مع ألم صدري أيسر',
+      'صعوبة بلع وبحة مفاجئة مع شعور بغصة في الحلق',
+      'تقييم مجرى الهواء العلوي وتورم الأنسجة الرخوة للعنق',
     ],
     findings: [
-      'تبدد السائل الحر بوضوح في الجانب الأيسر دون استرواح',
-      'الجنب الأيسر صافٍ دون انصباب ملحوظ',
-    ],
-  },
-  cervical_lat: {
-    complaints: [
-      'تيبس وألم في الرقبة يمتد إلى الكتف',
-      'تنميل في الأصابع بعد حادث سير بسيط',
-      'آلام مزمنة في الفقرات العنقية بسبب العمل المكتبي',
-    ],
-    findings: [
-      'استقامة طبيعية للفقرات العنقية C1-C7 دون كسور',
-      'تضيق طفيف في المسافة الغضروفية بين C5 و C6',
-      'تشنج عضلي مع تقوّس طفيف في الانحناء العنقي',
+      'مجرى الهواء الرغامي سالك ومنتظم مع سلامة لسان المزمار',
+      'تضخم خفيف في النسيج اللمفي خلف البلعوم دون أجسام غريبة',
     ],
   },
   cervical_ap: {
@@ -1381,19 +1771,57 @@ const EXAM_SCENARIOS: Record<
     ],
     findings: [
       'اصطفاف سليم لأجسام الفقرات العنقية والمفاصل الوجيهية',
-      'نتوءات عظمية خفيفة عند المفصل العنقـي C5-C6',
+      'نتوءات عظمية خفيفة عند المفصل العنقي C5-C6',
+    ],
+  },
+  cervical_lat: {
+    complaints: [
+      'تيبس وألم في الرقبة يمتد إلى الكتف',
+      'تنميل في الأصابع بعد حادث سير بسيط',
+    ],
+    findings: [
+      'استقامة طبيعية للفقرات العنقية C1-C7 دون كسور',
+      'تشنج عضلي مع تقوّس طفيف في الانحناء العنقي',
+    ],
+  },
+  cervical_oblique_lao: {
+    complaints: [
+      'تنميل وخدر في الذراع يشتبه معه بتضيق الثقوب العصبية العنقية',
+      'فحص مائل 45° لتقييم مخارج الأعصاب في الرقبة',
+    ],
+    findings: [
+      'الثقوب بين الفقرات العنقية مفتوحة ومنتظمة',
+      'تضيق طفيف في الثقب العصبي C5-C6',
+    ],
+  },
+  thoracic_ap: {
+    complaints: [
+      'ألم بين لوحي الكتف يزداد مع التنفس العميق والحركة',
+      'فحص أمامي للفقرات الصدرية T1–T12 بعد سقوط على الظهر',
+    ],
+    findings: [
+      'أجسام الفقرات الصدرية متناظرة وسليمة الارتفاع دون انضغاط',
+      'انحناء صدري خفيف ضمن الحدود الطبيعية',
+    ],
+  },
+  thoracic_lat: {
+    complaints: [
+      'تحدب وألم متزايد في منتصف الظهر يستدعي تصويراً جانبياً للفقرات الصدرية',
+      'اشتباه بانضغاط أمامي في إحدى الفقرات الصدرية الوسطى',
+    ],
+    findings: [
+      'انتظام ارتفاع أجسام الفقرات الصدرية والمسافات الغضروفية جانبياً',
+      'انضغاط طفيف مستقر في الحافة الأمامية للفقرة T8',
     ],
   },
   lumbar_ap: {
     complaints: [
       'ألم شديد أسفل الظهر بعد رفع جسم ثقيل',
       'ألم قطني مزمن مع إشعاع خفيف للساق',
-      'فحص متابعة للفقرات القطنية',
     ],
     findings: [
       'الفقرات القطنية L1-L5 سليمة ومنتظمة الاصطفاف',
       'بداية خشونة وتضيق خفيف بين L4-L5',
-      'التواء عضلي قطني دون إصابات عظمية',
     ],
   },
   lumbar_lat_left: {
@@ -1419,54 +1847,220 @@ const EXAM_SCENARIOS: Record<
   lumbar_erect_pa: {
     complaints: [
       'مراجعة تقييم الجنف وانحناء العمود الفقري أثناء الوقوف',
-      'عدم تساوي الكتفين وآلام ظهر مزمنة لدى الشاب',
+      'عدم تساوي الكتفين وآلام ظهر مزمنة',
     ],
     findings: [
       'انحناء جانبي طفيف في العمود القطني بنسبة 8 درجات',
       'استقامة متزنة للمحور الفقري أثناء التحميل القائم',
     ],
   },
-  spine_prone: {
+  lumbar_oblique_rpo: {
     complaints: [
-      'تقييم انحناء العمود الفقري بوضعية الاستلقاء على البطن (Prone)',
-      'ألم في منتصف الظهر بعد مجهود بدني',
+      'ألم أسفل الظهر يزداد عند الميل للخلف مع اشتباه بانحلال الفقار',
+      'فحص مائل RPO لتقييم البرزخ الفقري القطني',
     ],
     findings: [
-      'الفقرات الصدرية والقطنية متناسقة دون انحراف جانبي ملحوظ',
-      'التواء عضلي في عضلات الظهر الوسطى',
+      'سلامة البرزخ الفقري (علامة الكلب الأسكتلندي طبيعية)',
+      'تضيق طفيف بالمفاصل الوجيهية اليمنى',
+    ],
+  },
+  chest_pa: {
+    complaints: [
+      'سعال مستمر وضيق خفيف بالتنفس منذ أسبوع',
+      'فحص صدر روتيني قبل العمل أو المدرسة',
+    ],
+    findings: [
+      'الرئتان صافيتان وحجم القلب ضمن الحدود الطبيعية',
+      'التهاب شعبي خفيف في الفص السفلي يستدعي المتابعة',
+    ],
+  },
+  chest_ap_supine: {
+    complaints: [
+      'ألم صدري مع دوار شديد يتعذر معه الوقوف',
+      'فحص صدر طارئ بوضع الاستلقاء على الظهر',
+    ],
+    findings: [
+      'توسع وعائي خفيف مع صفاء الحقول الرئوية',
+      'ظل القلب طبيعي ضمن إسقاط AP دون ارتشاح حاد',
+    ],
+  },
+  chest_ap_erect: {
+    complaints: [
+      'فحص صدر واقف بمواجهة الأنبوب (Erect AP) لضيق النفس',
+      'ألم صدري مع تفضيل الوقوف المستند للخلف',
+    ],
+    findings: [
+      'الحقول الرئوية نظيفة والزاويتان الحجابيتان حادتان',
+      'ظل القلب مستقر مع احتقان شعبي خفيف',
+    ],
+  },
+  chest_lat_left: {
+    complaints: [
+      'متابعة التهاب رئوي في الفص السفلي يتطلب تصويراً جانبياً',
+      'فحص تكميلي للصدر بالوضع الواقف الجانبي الأيسر',
+    ],
+    findings: [
+      'الزاوية الضلعية الحجابية الخلفية صافية وخالية من الارتشاح',
+      'عتامة محدودة خلف القلب تستدعي المتابعة',
+    ],
+  },
+  chest_lat_right: {
+    complaints: [
+      'ألم جانبي بالجهة اليمنى من الصدر مع سعال جاف',
+      'متابعة التهاب الفص الأيمن للرئة بالوضع الجانبي الأيمن',
+    ],
+    findings: [
+      'صفاء الفصوص الرئوية اليمنى وسلامة الحجاب الحاجز الأيمن',
+      'تكثف التهابي محدود في الفص الأوسط الأيمن',
+    ],
+  },
+  ribs_ap: {
+    complaints: [
+      'ألم موضعي حاد في القفص الصدري يزداد عند التنفس أو السعال بعد ارتطام',
+      'اشتباه بشرخ ضلعي بعد سقوط على جانب القفص الصدري',
+    ],
+    findings: [
+      'الأقواس الضلعية سليمة دون كسور مزاحة أو استرواح صدري',
+      'شرخ شعري مستقر في الضلع السابع يلتئم بالراحة',
+    ],
+  },
+  abdomen_ap: {
+    complaints: [
+      'مغص بطني حاد وانتفاخ مع ألم بالخاصرة',
+      'أشعة KUB للبطن لاستبعاد الحصوات البولية أو انسداد الأمعاء',
+    ],
+    findings: [
+      'توزع طبيعي للغازات المعوية دون سويات سائلة هوائية أو حصوات ظليلة',
+      'حصوة كلوية صغيرة ظليلة للأشعة في الحالب تستدعي المتابعة',
+    ],
+  },
+  shoulder_ap: {
+    complaints: [
+      'ألم وتيبس في مفصل الكتف عند رفع الذراع بعد سقوط',
+      'اشتباه بخلع أو كسر في رأس عظمة العضد ومفصل الكتف',
+    ],
+    findings: [
+      'رأس العضد متموضع بشكل طبيعي داخل الجوف الحقاني للكتف',
+      'التهاب وتكلس طفيف في وتر العضلة فوق الشوكية',
+    ],
+  },
+  clavicle_ap: {
+    complaints: [
+      'ألم وتورم فوق عظمة الترقوة بعد سقوط على الكتف',
+      'اشتباه بكسر في منتصف الترقوة مع صعوبة تحريك الذراع',
+    ],
+    findings: [
+      'سلامة عظمة الترقوة والمفصلين الأخرمي والقصي الترقوي',
+      'كسر غير مزاح في الثلث الأوسط للترقوة يتطلب حمالة ذراع',
+    ],
+  },
+  humerus_ap: {
+    complaints: [
+      'ألم وتورم في منتصف العضد بعد رضّ رياضي',
+      'تقييم استقامة عظمة العضد بعد السقوط على الذراع',
+    ],
+    findings: [
+      'استقامة سليمة لعظمة العضد وخلوها من الكسور',
+      'التئام عظمي سليم دون انزياح زاوي',
+    ],
+  },
+  elbow_ap: {
+    complaints: [
+      'ألم وتحدد حركة مفصل الكوع بعد ارتطام مباشر',
+      'تورم حول المرفق عند ثني وبسط الذراع',
+    ],
+    findings: [
+      'انتظام رأس الكعبرة ولقمتي العضد دون كسور أو انصباب مفصلي',
+      'شرخ خطي دقيق في رأس الكعبرة يعالج تحفظياً',
+    ],
+  },
+  forearm_ap: {
+    complaints: [
+      'ألم حاد وتورم في الساعد بعد السقوط على اليد الممدودة',
+      'فحص عظمي الكعبرة والزند لاستبعاد كسر عود الثقاب أو الشرخ',
+    ],
+    findings: [
+      'عظمتا الكعبرة والزند سليمتان ومستقيمتان بالكامل',
+      'كسر شرخي بسيط في منتصف عظمة الزند دون انزياح',
+    ],
+  },
+  wrist_pa: {
+    complaints: [
+      'ألم وتورم في مفصل الرسغ بعد التواء قوي أثناء اللعب',
+      'ألم في منشقة الرسغ يشتبه معه بإصابة العظم الزورقي',
+    ],
+    findings: [
+      'صفوف العظام الرسغية منتظمة وخالية من الكسور',
+      'وذمة أنسجة رخوة حول الرسغ مع سلامة الكعبرة البعيدة',
     ],
   },
   hand_pa: {
     complaints: [
-      'تورم في الرسغ والأصابع بعد سقوط أثناء الرياضة',
+      'تورم في اليد والأصابع بعد سقوط أثناء الرياضة',
       'ألم حاد في عظمة المشط عند تحريك الإبهام',
-      'الاشتباه برضّ في سلاميات اليد اليمنى',
     ],
     findings: [
-      'عظام اليد والرسغ سليمة دون كسور واضحة',
+      'عظام اليد والسلاميات سليمة دون كسور واضحة',
       'كسر شعري دقيق في المشط الرابع يتطلب جبيرة',
-      'تورم أنسجة رخوة مع سلامة المفاصل',
     ],
   },
-  hand_lat: {
+  hand_oblique: {
     complaints: [
-      'التواء حاد في مفصل الرسغ مع صعوبة ثني الأصابع',
-      'تأكد من عدم وجود انزياح عظمي بعد سقوط على اليد',
+      'ألم في العظم الزورقي وعظام المشط بعد التواء الرسغ',
+      'تورم في ظاهر اليد يستدعي تصويراً مائلاً 45°',
     ],
     findings: [
-      'انتظام العظام الرسغية دون خلع هلالي أو انزياح',
-      'انزياح ظهري طفيف يستدعي التجبير والمتابعة',
+      'سلامة العظم الزورقي وعظام المشط دون شروخ خفية',
+      'شرخ دقيق في رأس المشط الخامس',
+    ],
+  },
+  pelvis_ap: {
+    complaints: [
+      'ألم واسع في عظام الحوض بعد تعثر وسقوط',
+      'تقييم تناسق حلقة الحوض والمفصلين الحرقفيين العجزيين',
+    ],
+    findings: [
+      'حلقة الحوض سليمة ومتناظرة دون كسور في الشعبتين العانيتين',
+      'بداية تكلس بسيط في حافة الحُق الوركي',
+    ],
+  },
+  sacrum_coccyx_ap: {
+    complaints: [
+      'ألم حاد أسفل العصعص بعد الجلوس القوي أو السقوط على المؤخرة',
+      'تقييم فقرات العجز والعصعص بسبب ألم مستمر عند الجلوس',
+    ],
+    findings: [
+      'استقامة عظم العجز والعصعص دون كسور أو انخلاع أمامي',
+      'انحناء طفيف في نهاية العصعص ناتج عن كدمة رضية',
+    ],
+  },
+  hip_ap: {
+    complaints: [
+      'ألم عميق في مفصل الورك يشتد عند المشي أو تدوير الساق',
+      'اشتباه بإصابة عنق الفخذ أو المفصل الحرقفي الفخذي',
+    ],
+    findings: [
+      'رأس وعنق عظم الفخذ سليمان مع مسافة مفصلية طبيعية للورك',
+      'خشونة متوسطة في مفصل الورك مع تضيق غضروفي طفيف',
+    ],
+  },
+  femur_ap: {
+    complaints: [
+      'ألم شديد في الفخذ بعد حادث رياضي أو سقوط',
+      'تقييم سلامة جسم عظمة الفخذ واستقامتها',
+    ],
+    findings: [
+      'جسم عظمة الفخذ سليم ومتجانس الكثافة دون شروخ',
+      'كدمة عظمية حول الثلث السفلي للفخذ دون كسر قشري',
     ],
   },
   knee_ap: {
     complaints: [
       'ألم وتيبس في مفصل الركبة عند صعود الدرج',
-      'إصابة التواء في الركبة أثناء مباراة كرة قدم',
-      'طقطقة وألم متكرر في المفصل',
+      'إصابة التواء في الركبة أثناء اللعب أو الجري',
     ],
     findings: [
       'المسافة المفصلية للركبة متناسقة وسليمة',
-      'بداية احتكاك غضروفي خفيف في الجانب الأنسي',
       'ارتشاح بسيط داخل المفصل دون كسور عظمية',
     ],
   },
@@ -1480,168 +2074,44 @@ const EXAM_SCENARIOS: Record<
       'ارتشاح بسيط فوق الرضفة دون كسور عظمية',
     ],
   },
-  knee_erect_ap: {
+  tibia_fibula_ap: {
     complaints: [
-      'خشونة مزمنة في الركبتين وألم يزداد عند الوقوف الطويل',
-      'تقييم تآكل الغضروف المفصلي تحت وزن الجسم',
+      'ألم وتورم في الساق بعد ارتطام مباشر أو جهد رياضي طويل',
+      'فحص عظمي الساق (الظنبوب والشظية) لاستبعاد الشرخ الإجهادي',
     ],
     findings: [
-      'تضيق متوسط في الحيز المفصلي الأنسي أثناء التحميل',
-      'مسافة غضروفية جيدة مع مناقير عظمية طفيفة',
+      'الظنبوب والشظية سليمان بالكامل دون شروخ إجهادية',
+      'التئام عظمي جيد في منتصف جسم عظمة الظنبوب',
     ],
   },
-  pelvis_ap: {
+  ankle_ap: {
     complaints: [
-      'ألم في مفصل الورك الأيمن بعد تعثر في المنزل',
-      'تقييم تناسق عظام الحوض',
-      'وجع عميق في منطقة الورك عند المشي',
+      'التواء الكاحل مع تورم حول الكعب الوحشي وصعوبة المشي',
+      'اشتباه بكسر في الكعب الإنسي أو الوحشي بعد تعثر',
     ],
     findings: [
-      'عظام الحوض ومفصلا الورك متناظران وسليمان',
-      'بداية تكلس بسيط في مفصل الورك الأيمن',
-      'لا توجد شروخ عظمية في عنق الفخذ',
+      'نقرة الكاحل منتظمة وسلامة الكعبين الإنسي والوحشي',
+      'تورم أنسجة رخوة ناتج عن التواء أربطة الكاحل دون كسور',
     ],
   },
-  pelvis_prone: {
+  foot_ap: {
     complaints: [
-      'ألم مزمن في المفصل العجزي الحرقفي وأسفل الظهر',
-      'اشتباه التهاب في المفاصل العجزية الخلفية',
+      'ألم في منتصف القدم بعد سقوط جسم ثقيل أو التواء المشط',
+      'تورم في ظهر القدم وصعوبة الوقوف على أصابع القدم',
     ],
     findings: [
-      'المفصلان العجزيان الحرقفيان منتظمان وخاليان من التصلب',
-      'بداية تصلب خفيف في المفصل العجزي الحرقفي الأيمن',
+      'عظام مشط القدم والرصغ سليمة ومنتظمة التمفصل',
+      'شرخ غير مزاح في قاعدة عظمة المشط الخامس',
     ],
   },
-  skull_ap: {
+  toes_ap: {
     complaints: [
-      'صداع جبهي متكرر واحتقان في الجيوب الأنفية',
-      'ضربة خفيفة على الرأس تستدعي الاطمئنان',
-      'ألم ضاغط حول العينين والأنف',
+      'ارتطام مباشر لأصابع القدم مع تورم وألم حاد في الإبهام أو السلاميات',
+      'اشتباه بكسر في سلاميات أصابع القدم',
     ],
     findings: [
-      'عظام القحف سليمة وخالية من الشروخ',
-      'عتامة خفيفة توحي بالتهاب الجيوب الفكية',
-      'تجاويف الجيوب الأنفية مهواة بشكل طبيعي',
-    ],
-  },
-  skull_lat: {
-    complaints: [
-      'تقييم الجيب الوتدي والسرج التركي بسبب صداع مزمن',
-      'فحص جانبي للجمجمة بعد رضّة جانبية خفيفة',
-    ],
-    findings: [
-      'جدران القحف منتظمة والسرج التركي ضمن الحجم الطبيعي',
-      'تهوية طبيعية للجيوب الوتدية وخلايا الخشاء',
-    ],
-  },
-  skull_supine: {
-    complaints: [
-      'مريض مصاب بدوار بعد سقوط ويتعذر وقوفه لتصوير الرأس',
-      'فحص جمجمة طارئ بوضع الاستلقاء على الظهر',
-    ],
-    findings: [
-      'لا توجد كسور خطية أو منخسفة في عظام القحف',
-      'سلامة العظام الجبهية والجدارية بالكامل',
-    ],
-  },
-  chest_ap_erect: {
-    complaints: [
-      'فحص صدر واقف بمواجهة الأنبوب (Erect AP) لضيق النفس',
-      'ألم صدري مع تفضيل الوقوف المستند للخلف',
-    ],
-    findings: [
-      'الحقول الرئوية نظيفة والزاويتان الحجابيتان حادتان',
-      'ظل القلب مستقر مع احتقان شعبي خفيف',
-    ],
-  },
-  chest_oblique_rao: {
-    complaints: [
-      'ألم حاد في الأضلاع اليمنى بعد ارتطام رياضي يتطلب تصويراً مائلاً',
-      'اشتباه بشرخ في الأضلاع الجانبية اليمنى',
-    ],
-    findings: [
-      'سلامة الأقواس الضلعية دون شروخ مزاحة',
-      'شرخ شعري بسيط في الضلع السابع الأيمن',
-    ],
-  },
-  cervical_oblique_lao: {
-    complaints: [
-      'تنميل وخدر في الذراع يشتبه معه بتضيق الثقوب العصبية العنقية',
-      'فحص مائل 45° لتقييم مخارج الأعصاب في الرقبة',
-    ],
-    findings: [
-      'الثقوب بين الفقرات العنقية مفتوحة ومنتظمة',
-      'تضيق طفيف في الثقب العصبي C5-C6 الأيمن',
-    ],
-  },
-  lumbar_oblique_rpo: {
-    complaints: [
-      'ألم أسفل الظهر يزداد عند الميل للخلف مع اشتباه بانحلال الفقار',
-      'فحص مائل RPO لتقييم البرزخ الفقري القطني',
-    ],
-    findings: [
-      'سلامة البرزخ الفقري (علامة الكلب الأسكتلندي طبيعية)',
-      'تضيق طفيف بالمفاصل الوجيهية اليمنى',
-    ],
-  },
-  lumbar_oblique_lpo: {
-    complaints: [
-      'ألم مزمن بالجهة اليسرى لأسفل الظهر يتطلب تصويراً مائلاً LPO',
-      'تقييم المفاصل الوجيهية القطنية اليسرى',
-    ],
-    findings: [
-      'انتظام المفاصل الوجيهية اليسرى وعدم وجود انزلاق فقاري',
-      'خشونة بسيطة بالمفاصل الخلفية L4-L5',
-    ],
-  },
-  hand_oblique: {
-    complaints: [
-      'ألم في العظم الزورقي وعظام المشط بعد التواء الرسغ',
-      'تورم في ظاهر اليد يستدعي تصويراً مائلاً 45°',
-    ],
-    findings: [
-      'سلامة العظم الزورقي وعظام المشط دون شروخ خفية',
-      'شرخ دقيق في رأس المشط الخامس',
-    ],
-  },
-  knee_lat_right: {
-    complaints: [
-      'تورم في الركبة اليمنى وألم عند ثنيها',
-      'متابعة موضع الرضفة في الركبة اليمنى بالوضع الجانبي',
-    ],
-    findings: [
-      'اصطفاف سليم للرضفة اليمنى وخلو المفصل من الارتشاح',
-      'التهاب بسيط في الوتر الرضفي دون كسور',
-    ],
-  },
-  knee_oblique: {
-    complaints: [
-      'إصابة في جانب الركبة أثناء الجري مع ألم عند رأس الشظية',
-      'تقييم الهضبة الظنبوبية بزاوية مائلة 45°',
-    ],
-    findings: [
-      'سلامة الهضبة الظنبوبية ورأس الشظية',
-      'كدمة عظمية خفيفة دون انخساف مفصلي',
-    ],
-  },
-  pelvis_oblique: {
-    complaints: [
-      'ألم عميق في الحُق الوركي بعد سقوط على جانب الحوض',
-      'فحص مائل للورك لتقييم حواف الحُق وعنق الفخذ',
-    ],
-    findings: [
-      'انتظام الحُق الوركي ورأس الفخذ دون شروخ',
-      'تضيق خفيف في المسافة المفصلية للورك',
-    ],
-  },
-  skull_oblique: {
-    complaints: [
-      'ألم خلف الأذن مع التهاب متكرر في الجيوب وخلايا الخشاء',
-      'تقييم مائل لعظم الوجنة والخشاء',
-    ],
-    findings: [
-      'تهوية سليمة لخلايا الخشاء والجيوب الأنفية',
-      'سماكة مخاطية بسيطة في الجيب الفكي الأيسر',
+      'سلاميات أصابع القدم سليمة ومصطفة بشكل طبيعي',
+      'كسر خطي مستقر في السلامية القريبة للإصبع الصغير',
     ],
   },
   ct_chest: {
@@ -1716,7 +2186,7 @@ const EXAM_SCENARIOS: Record<
   },
   mri_cervical: {
     complaints: [
-      'تنميل متكرر وضعف في الذراع الأيمن يشتبه بانضغاط عصبي عنقي',
+      'تنميل متكرر وضعف في الذراع يشتبه بانضغاط عصبي عنقي',
       'تقييم الحبل الشوكي والغضاريف العنقية بالرنين',
     ],
     findings: [
@@ -1725,6 +2195,119 @@ const EXAM_SCENARIOS: Record<
     ],
   },
 };
+
+export function isPediatricPatientAge(age?: number): boolean {
+  return typeof age === 'number' && age > 0 && age < 14;
+}
+
+const roundHalfMas = (val: number): number =>
+  Math.max(0.5, Math.round(val * 2) / 2);
+
+/**
+ * Exact pediatric clinical kVp & mAs protocol lookup matching reference tables.
+ */
+export const PEDIATRIC_EXAM_RANGES: Record<
+  string,
+  {kvpRange: [number, number]; masRange: [number, number]}
+> = {
+  skull_ap: {kvpRange: [60, 70], masRange: [1, 3]},
+  skull_supine: {kvpRange: [60, 70], masRange: [1, 3]},
+  skull_lat: {kvpRange: [55, 65], masRange: [1, 2]},
+  facial_bones_pa: {kvpRange: [55, 65], masRange: [1, 2]},
+  nasal_bones_lat: {kvpRange: [50, 55], masRange: [0.5, 1]},
+  soft_tissue_neck_lat: {kvpRange: [55, 65], masRange: [1, 3]},
+  cervical_ap: {kvpRange: [55, 65], masRange: [1, 3]},
+  cervical_lat: {kvpRange: [55, 65], masRange: [1, 3]},
+  cervical_oblique_lao: {kvpRange: [55, 65], masRange: [1, 3]},
+  thoracic_ap: {kvpRange: [60, 70], masRange: [2, 4]},
+  thoracic_lat: {kvpRange: [65, 75], masRange: [3, 6]},
+  lumbar_ap: {kvpRange: [60, 70], masRange: [2, 5]},
+  lumbar_erect_pa: {kvpRange: [60, 70], masRange: [2, 5]},
+  lumbar_oblique_rpo: {kvpRange: [60, 70], masRange: [2, 5]},
+  lumbar_lat_left: {kvpRange: [65, 75], masRange: [3, 7]},
+  lumbar_lat_right: {kvpRange: [65, 75], masRange: [3, 7]},
+  chest_pa: {kvpRange: [60, 80], masRange: [0.5, 2]},
+  chest_ap_supine: {kvpRange: [55, 75], masRange: [0.5, 2]},
+  chest_ap_erect: {kvpRange: [55, 75], masRange: [0.5, 2]},
+  chest_lat_left: {kvpRange: [65, 85], masRange: [1, 3]},
+  chest_lat_right: {kvpRange: [65, 85], masRange: [1, 3]},
+  ribs_ap: {kvpRange: [55, 65], masRange: [1, 3]},
+  abdomen_ap: {kvpRange: [55, 70], masRange: [1, 4]},
+  shoulder_ap: {kvpRange: [55, 65], masRange: [1, 3]},
+  clavicle_ap: {kvpRange: [55, 65], masRange: [1, 3]},
+  humerus_ap: {kvpRange: [50, 65], masRange: [1, 3]},
+  elbow_ap: {kvpRange: [45, 60], masRange: [0.5, 2]},
+  forearm_ap: {kvpRange: [45, 60], masRange: [0.5, 2]},
+  wrist_pa: {kvpRange: [45, 55], masRange: [0.5, 1.5]},
+  hand_pa: {kvpRange: [45, 55], masRange: [0.5, 1.5]},
+  hand_oblique: {kvpRange: [45, 55], masRange: [0.5, 1.5]},
+  pelvis_ap: {kvpRange: [60, 70], masRange: [1, 4]},
+  sacrum_coccyx_ap: {kvpRange: [60, 70], masRange: [2, 4]},
+  hip_ap: {kvpRange: [60, 70], masRange: [1, 4]},
+  femur_ap: {kvpRange: [55, 70], masRange: [1, 4]},
+  knee_ap: {kvpRange: [50, 65], masRange: [1, 3]},
+  knee_lat_left: {kvpRange: [50, 65], masRange: [1, 3]},
+  tibia_fibula_ap: {kvpRange: [50, 65], masRange: [1, 3]},
+  ankle_ap: {kvpRange: [45, 60], masRange: [0.5, 2]},
+  foot_ap: {kvpRange: [45, 55], masRange: [0.5, 1.5]},
+  toes_ap: {kvpRange: [45, 55], masRange: [0.5, 1]},
+};
+
+/**
+ * Returns calibrated exposure ranges based on patient age group:
+ * Adults (>=14 yrs): exact adult protocol table ranges.
+ * Pediatrics (<14 yrs): exact pediatric protocol table ranges.
+ */
+export function getEffectiveExamRanges(
+  exam: ExamProtocol,
+  patientAge?: number
+): {
+  kvpRange: [number, number];
+  masRange: [number, number];
+  isPediatric: boolean;
+} {
+  if (!isPediatricPatientAge(patientAge)) {
+    return {
+      kvpRange: exam.kvpRange,
+      masRange: exam.masRange,
+      isPediatric: false,
+    };
+  }
+
+  const exactPediatric = PEDIATRIC_EXAM_RANGES[exam.id];
+  if (exactPediatric) {
+    return {
+      kvpRange: exactPediatric.kvpRange,
+      masRange: exactPediatric.masRange,
+      isPediatric: true,
+    };
+  }
+
+  const [minK, maxK] = exam.kvpRange;
+  const [minM, maxM] = exam.masRange;
+
+  if (exam.modality !== 'XRAY') {
+    const pMinM = roundHalfMas(minM * 0.55);
+    const pMaxM = Math.max(pMinM + 2, roundHalfMas(maxM * 0.55));
+    return {
+      kvpRange: [Math.max(55, minK - 15), Math.max(65, maxK - 15)],
+      masRange: [pMinM, pMaxM],
+      isPediatric: true,
+    };
+  }
+
+  const kvpDrop = maxK >= 75 ? 12 : maxK >= 65 ? 8 : 5;
+  const pMinK = Math.max(45, minK - kvpDrop);
+  const pMaxK = Math.max(pMinK + 5, maxK - kvpDrop);
+  const pMinM = roundHalfMas(minM * 0.45);
+  const pMaxM = Math.max(pMinM + 0.5, roundHalfMas(maxM * 0.45));
+
+  return {
+    kvpRange: [pMinK, pMaxK],
+    masRange: [pMinM, pMaxM],
+    isPediatric: true,
+  };
+}
 
 export function getClinicRank(totalRevenue: number): ClinicRank {
   let current = CLINIC_RANKS[0];
@@ -1769,9 +2352,18 @@ export function generatePatient(ownedUpgrades: UpgradeId[]): PatientCase {
   const exam =
     availableExams[Math.floor(Math.random() * availableExams.length)];
   const isFemale = Math.random() > 0.5;
-  const namesPool = isFemale ? FEMALE_NAMES : MALE_NAMES;
+  const isPediatric = Math.random() < 0.35;
+  const namesPool = isPediatric
+    ? isFemale
+      ? PEDIATRIC_FEMALE_NAMES
+      : PEDIATRIC_MALE_NAMES
+    : isFemale
+      ? FEMALE_NAMES
+      : MALE_NAMES;
   const nameAr = namesPool[Math.floor(Math.random() * namesPool.length)];
-  const age = Math.floor(Math.random() * 52) + 18;
+  const age = isPediatric
+    ? Math.floor(Math.random() * 10) + 4 // 4 to 13 years
+    : Math.floor(Math.random() * 52) + 18; // 18 to 69 years
   const avatarPath = pickAvatarForPatient(isFemale ? 'F' : 'M', age);
   const scenario = EXAM_SCENARIOS[exam.id] || EXAM_SCENARIOS.chest_pa;
   const complaintAr =
@@ -1781,14 +2373,23 @@ export function generatePatient(ownedUpgrades: UpgradeId[]): PatientCase {
   const findingAr =
     scenario.findings[Math.floor(Math.random() * scenario.findings.length)];
 
+  const needsSide = Boolean(exam.sideRequired || isBilateralRegion(exam.region));
+  const requestedSide: BodySide = needsSide
+    ? Math.random() < 0.5
+      ? 'RIGHT'
+      : 'LEFT'
+    : 'NONE';
+
   return {
     id: `pt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     nameAr,
     age,
+    isPediatric,
     gender: isFemale ? 'F' : 'M',
     avatarPath,
     complaintAr,
     examId: exam.id,
+    requestedSide,
     findingAr,
     isUrgent: Math.random() < 0.22,
     arrivedAt: Date.now(),
@@ -1798,6 +2399,9 @@ export function generatePatient(ownedUpgrades: UpgradeId[]): PatientCase {
 export function evaluateExposure(params: {
   exam: ExamProtocol;
   selectedRegion: BodyRegion;
+  selectedSide?: BodySide;
+  requestedSide?: BodySide;
+  patientAge?: number;
   selectedProjection: ProjectionType;
   selectedPosture: PatientPosture;
   kvp: number;
@@ -1809,6 +2413,9 @@ export function evaluateExposure(params: {
   const {
     exam,
     selectedRegion,
+    selectedSide = 'NONE',
+    requestedSide = 'NONE',
+    patientAge,
     selectedProjection,
     selectedPosture,
     kvp,
@@ -1844,8 +2451,33 @@ export function evaluateExposure(params: {
       success: false,
       reasonCode: 'WRONG_REGION',
       titleAr: 'تصوير منطقة خاطئة!',
-      feedbackAr: `المريض طلب ${exam.titleAr} (${exam.regionLabelAr})، لكنك وجّهت جهاز الأشعة إلى ${REGION_LABELS_AR[selectedRegion]}. تم استهلاك الفيلم وتحتاج لإعادة التصوير.`,
+      feedbackAr: `المريض طلب ${exam.titleEn} (${formatRegionWithSide(exam.region, requestedSide, 'ar', true)})، لكنك وجّهت جهاز الأشعة إلى ${REGION_LABELS_AR[selectedRegion]}. تم استهلاك الفيلم وتحتاج لإعادة التصوير.`,
       targetRegionScanned: selectedRegion,
+      targetSideScanned: selectedSide,
+      exposureDelta: 0,
+      baseEarned: 0,
+      safetyBonus: 0,
+      qualityBonus: 0,
+      totalEarned: 0,
+      filmConsumed,
+    };
+  }
+
+  if (
+    isBilateralRegion(exam.region) &&
+    requestedSide !== 'NONE' &&
+    selectedSide !== requestedSide
+  ) {
+    const reqSideLabel = SIDE_SHORT_I18N.ar[requestedSide];
+    const selSideLabel =
+      selectedSide !== 'NONE' ? SIDE_SHORT_I18N.ar[selectedSide] : 'غير محدد';
+    return {
+      success: false,
+      reasonCode: 'WRONG_SIDE',
+      titleAr: 'تحديد طرف خاطئ (يمين / يسار)!',
+      feedbackAr: `الطلب السريري هو «${formatRegionWithSide(exam.region, requestedSide, 'ar', true)}» (${reqSideLabel})، لكنك حددت ${selSideLabel}. اختر الجهة الصحيحة على جسم المريض أو من زر الجهة وأعد التصوير.`,
+      targetRegionScanned: selectedRegion,
+      targetSideScanned: selectedSide,
       exposureDelta: 0,
       baseEarned: 0,
       safetyBonus: 0,
@@ -1862,6 +2494,7 @@ export function evaluateExposure(params: {
       titleAr: 'وضعية المريض غير مطابقة!',
       feedbackAr: `الوضعية المطلوبة لهذا الفحص هي: ${POSTURE_LABELS_AR[exam.recommendedPosture]}، بينما الوضعية الحالية هي ${POSTURE_LABELS_AR[selectedPosture]}. عدّل وضعية المريض في المشهد ثلاثي الأبعاد وأعد التصوير.`,
       targetRegionScanned: selectedRegion,
+      targetSideScanned: selectedSide,
       exposureDelta: 0,
       baseEarned: 0,
       safetyBonus: 0,
@@ -1878,6 +2511,7 @@ export function evaluateExposure(params: {
       titleAr: 'وضعية إسقاط غير مطابقة',
       feedbackAr: `البروتوكول المطلوب هو ${exam.projectionLabelAr}. يُرجى تعديل وضعية التصوير وإعادة المحاولة.`,
       targetRegionScanned: selectedRegion,
+      targetSideScanned: selectedSide,
       exposureDelta: 0,
       baseEarned: 0,
       safetyBonus: 0,
@@ -1887,33 +2521,54 @@ export function evaluateExposure(params: {
     };
   }
 
-  const [minKvp, maxKvp] = exam.kvpRange;
-  const [minMas, maxMas] = exam.masRange;
+  const {
+    kvpRange: [minKvp, maxKvp],
+    masRange: [minMas, maxMas],
+    isPediatric,
+  } = getEffectiveExamRanges(exam, patientAge);
+
+  const scaleFactor = Math.min(1, Math.max(0.24, maxMas / 12));
   const kvpMargin =
-    6 +
-    (hasImmobilization ? 3 : 0) +
+    (maxKvp - minKvp <= 6 ? 4 : 6) +
+    (hasImmobilization ? 2 : 0) +
     (hasBuckyGrid ? 1 : 0) +
     (hasAecSensor ? 2 : 0);
-  const masLowMargin =
-    3 + (hasImmobilization ? 2 : 0) + (hasAecSensor ? 1 : 0);
-  const masHighMargin =
-    5 +
-    (hasImmobilization ? 3 : 0) +
-    (hasBuckyGrid ? 1 : 0) +
-    (hasAecSensor ? 2 : 0);
+  const masLowMargin = Math.max(
+    0.5,
+    Number(
+      ((3 + (hasImmobilization ? 1.5 : 0) + (hasAecSensor ? 1 : 0)) * scaleFactor).toFixed(1)
+    )
+  );
+  const masHighMargin = Math.max(
+    1.0,
+    Number(
+      (
+        (5 +
+          (hasImmobilization ? 2 : 0) +
+          (hasBuckyGrid ? 1 : 0) +
+          (hasAecSensor ? 1.5 : 0)) *
+        scaleFactor
+      ).toFixed(1)
+    )
+  );
 
   const kvpTooLow = kvp < minKvp - kvpMargin;
   const kvpTooHigh = kvp > maxKvp + kvpMargin;
-  const masTooLow = mas < Math.max(1, minMas - masLowMargin);
+  const masTooLow = mas < Math.max(0.25, minMas - masLowMargin);
   const masTooHigh = mas > maxMas + masHighMargin;
+
+  const rangeHintAr = isPediatric
+    ? `(نطاق الأطفال: ${minKvp}–${maxKvp} kVp و ${minMas}–${maxMas} mAs)`
+    : `(${minKvp}–${maxKvp} kVp و ${minMas}–${maxMas} mAs)`;
 
   if (kvpTooLow || masTooLow) {
     return {
       success: false,
       reasonCode: 'UNDEREXPOSED',
       titleAr: 'تعريض ضعيف (صورة باهتة)',
-      feedbackAr: `قيم التعريض (${kvp} kVp · ${mas} mAs) أقل من اللازم؛ لم تخترق الأشعة الأنسجة بشكل كافٍ. ارفع الإعدادات إلى النطاق الموصى به (${minKvp}–${maxKvp} kVp و ${minMas}–${maxMas} mAs).`,
+      feedbackAr: `قيم التعريض (${kvp} kVp · ${mas} mAs) أقل من اللازم؛ لم تخترق الأشعة الأنسجة بشكل كافٍ. ارفع الإعدادات إلى النطاق الموصى به ${rangeHintAr}.`,
       targetRegionScanned: selectedRegion,
+      targetSideScanned: selectedSide,
       exposureDelta: -1,
       baseEarned: 0,
       safetyBonus: 0,
@@ -1927,9 +2582,14 @@ export function evaluateExposure(params: {
     return {
       success: false,
       reasonCode: 'OVEREXPOSED',
-      titleAr: 'تعريض زائد (فيلم محترق)',
-      feedbackAr: `قيم التعريض (${kvp} kVp · ${mas} mAs) مرتفعة جداً مما أدى لاسوداد الفيلم وفقدان التفاصيل. التزم بنطاق (${minKvp}–${maxKvp} kVp و ${minMas}–${maxMas} mAs).`,
+      titleAr: isPediatric
+        ? 'جرعة عالية على طفل (فيلم محترق)!'
+        : 'تعريض زائد (فيلم محترق)',
+      feedbackAr: isPediatric
+        ? `انتبه! المريض طفل (${patientAge} سنة) ويتطلب جرعة منخفضة، بينما القيم المستخدمة (${kvp} kVp · ${mas} mAs) مرتفعة جداً. التزم بنطاق ${rangeHintAr}.`
+        : `قيم التعريض (${kvp} kVp · ${mas} mAs) مرتفعة جداً مما أدى لاسوداد الفيلم وفقدان التفاصيل. التزم بنطاق ${rangeHintAr}.`,
       targetRegionScanned: selectedRegion,
+      targetSideScanned: selectedSide,
       exposureDelta: 1,
       baseEarned: 0,
       safetyBonus: 0,
@@ -1970,6 +2630,7 @@ export function evaluateExposure(params: {
       ? 'تباين العظام والأنسجة مثالي بفضل كتم النفس وتحسينات العيادة الفعالة.'
       : 'تباين العظام والأنسجة مثالي للتشخيص الطبي. يمكنك الآن اعتماد النتيجة وتحصيل الرسوم.',
     targetRegionScanned: selectedRegion,
+    targetSideScanned: selectedSide,
     exposureDelta: 0,
     baseEarned,
     safetyBonus,

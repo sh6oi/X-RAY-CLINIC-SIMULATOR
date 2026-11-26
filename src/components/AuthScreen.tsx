@@ -128,15 +128,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   return (
     <div className="min-h-full bg-[#0B111A] text-slate-100 flex flex-col">
       {/* Top Bar */}
-      <header className="border-b border-slate-800/90 bg-[#0D1520]">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-8">
-          <div className="flex items-center gap-2.5 shrink-0">
+      <header className="hud-auth-header border-b border-slate-800/90 bg-[#0D1520]">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-8">
+          <div className="flex items-center gap-2 shrink-0">
             <img
               src="./pwa-192x192.png"
               alt="X-Ray Clinic Simulator"
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg object-cover border border-amber-400/50 shadow-sm shrink-0"
+              className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg object-cover border border-amber-400/50 shadow-sm shrink-0"
             />
-            <span className="text-sm sm:text-lg font-display font-bold text-white whitespace-nowrap shrink-0">
+            <span className="text-xs sm:text-lg font-display font-bold text-white whitespace-nowrap shrink-0">
               {isAr
                 ? 'عيادة الأشعة التخصصية'
                 : 'Specialized Radiology Clinic'}
@@ -157,12 +157,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               {isAr ? 'محاكاة ثلاثية الأبعاد' : '3D Clinic Simulation'}
             </span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <PWAInstallButton />
             <button
               type="button"
               onClick={toggleLang}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 font-bold text-[11px] sm:text-xs whitespace-nowrap cursor-pointer transition-colors"
             >
               <Languages className="w-3.5 h-3.5 shrink-0" />
               <span>{isAr ? 'English' : 'العربية'}</span>
@@ -172,7 +172,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               onClick={() =>
                 switchMode(mode === 'LOGIN' ? 'REGISTER' : 'LOGIN')
               }
-              className="px-3 sm:px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs whitespace-nowrap cursor-pointer transition-colors"
+              className="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-[11px] sm:text-xs whitespace-nowrap cursor-pointer transition-colors"
             >
               {mode === 'LOGIN'
                 ? isAr
@@ -186,10 +186,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </div>
       </header>
 
-      <main className="flex-1 flex items-center py-3 sm:py-5 px-3 sm:px-6">
-        <div className="max-w-6xl mx-auto w-full grid grid-cols-1 min-[600px]:grid-cols-12 gap-4 sm:gap-6 items-stretch">
+      <main className="hud-auth-main flex-1 flex items-center py-2.5 sm:py-5 px-2.5 sm:px-6">
+        <div className="hud-auth-grid max-w-6xl mx-auto w-full grid grid-cols-1 min-[600px]:grid-cols-12 gap-3 sm:gap-6 items-stretch">
           {/* Form Column */}
-          <div className="min-[600px]:col-span-6 lg:col-span-5 rounded-2xl border border-slate-800 bg-[#111A27] p-4 sm:p-6 flex flex-col justify-between gap-4">
+          <div className="hud-auth-card min-[600px]:col-span-6 lg:col-span-5 rounded-2xl border border-slate-800 bg-[#111A27] p-3.5 sm:p-6 flex flex-col justify-between gap-3">
             <div className="space-y-4 sm:space-y-5">
               <div className="space-y-1.5 sm:space-y-2">
                 <h1 className="text-xl sm:text-3xl font-display font-bold text-white [text-wrap:balance]">
@@ -429,7 +429,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </div>
 
           {/* Visual Showcase Column */}
-          <div className="min-[600px]:col-span-6 lg:col-span-7 rounded-2xl border border-slate-800 bg-[#0E1622] overflow-hidden flex flex-col justify-between">
+          <div className="hud-auth-hero min-[600px]:col-span-6 lg:col-span-7 rounded-2xl border border-slate-800 bg-[#0E1622] overflow-hidden flex flex-col justify-between">
             <div className="relative flex-1 min-h-[160px] sm:min-h-[210px] bg-slate-900 overflow-hidden">
               {!heroError ? (
                 <img
