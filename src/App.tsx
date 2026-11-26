@@ -274,13 +274,27 @@ export default function App() {
   // Toast message
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Mobile landscape / portrait orientation helper
+  // Mobile landscape-only orientation lock & portrait blocker
+  const checkIsPortraitPhone = useCallback((): boolean => {
+    if (typeof window === 'undefined') return false;
+    if (window.innerHeight <= window.innerWidth) return false;
+    const isCoarsePointer =
+      window.matchMedia?.('(pointer: coarse)')?.matches ||
+      navigator.maxTouchPoints > 0;
+    return (
+      (isCoarsePointer && window.innerWidth <= 920) ||
+      window.innerWidth <= 680
+    );
+  }, []);
+
   const [isPortraitPhone, setIsPortraitPhone] = useState<boolean>(() =>
-    typeof window !== 'undefined'
-      ? window.innerHeight > window.innerWidth && window.innerWidth <= 680
+    typeof window !== 'undefined' && window.innerHeight > window.innerWidth
+      ? ((window.matchMedia?.('(pointer: coarse)')?.matches ||
+          navigator.maxTouchPoints > 0) &&
+          window.innerWidth <= 920) ||
+        window.innerWidth <= 680
       : false
   );
-  const [portraitDismissed, setPortraitDismissed] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const getDefaultJoystickConfig = (): JoystickConfig => ({
@@ -368,14 +382,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const tryLockLandscape = () => {
+      const orientation = screen.orientation as
+        | (ScreenOrientation & {lock?: (type: string) => Promise<void>})
+        | undefined;
+      void orientation?.lock?.('landscape')?.catch(() => {});
+    };
     const checkViewport = () => {
-      const portrait =
-        window.innerHeight > window.innerWidth && window.innerWidth <= 680;
+      const portrait = checkIsPortraitPhone();
       setIsPortraitPhone(portrait);
-      if (!portrait) setPortraitDismissed(false);
+      tryLockLandscape();
     };
     const onFullscreenChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
+      if (document.fullscreenElement) {
+        tryLockLandscape();
+      }
     };
     checkViewport();
     window.addEventListener('resize', checkViewport);
@@ -386,7 +408,7 @@ export default function App() {
       window.removeEventListener('orientationchange', checkViewport);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
     };
-  }, []);
+  }, [checkIsPortraitPhone]);
 
   const handleToggleLandscapeFullscreen = async () => {
     try {
@@ -643,7 +665,15 @@ export default function App() {
   // Assistant Radiographer passive income loop
   const hasAssistant = save.ownedUpgrades.includes('assistant_tech');
   useEffect(() => {
-    if (screenMode !== 'PLAYING' || !hasAssistant || !techProfile) return;
+    if (
+      screenMode !== 'PLAYING' ||
+      !hasAssistant ||
+      !techProfile ||
+      appUpdate.updateAvailable ||
+      isPortraitPhone
+    ) {
+      return;
+    }
     const interval = window.setInterval(() => {
       commitSaveUpdate((prev) => {
         if (prev.dayCompletedAwaitingNext) return prev;
@@ -658,7 +688,14 @@ export default function App() {
       });
     }, 7500);
     return () => window.clearInterval(interval);
-  }, [screenMode, hasAssistant, techProfile, commitSaveUpdate]);
+  }, [
+    screenMode,
+    hasAssistant,
+    techProfile,
+    appUpdate.updateAvailable,
+    isPortraitPhone,
+    commitSaveUpdate,
+  ]);
 
   const hasWaitingRoom = save.ownedUpgrades.includes('waiting_room');
   const maxQueueSize = hasWaitingRoom ? 6 : 3;
@@ -1850,19 +1887,69 @@ export default function App() {
     }
   };
 
+  const landscapeOnlyOverlay = isPortraitPhone ? (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[110] bg-[#060B13] flex items-center justify-center p-5"
+    >
+      <div className="w-full max-w-sm rounded-2xl border-2 border-cyan-500/70 bg-[#0B1422] p-6 text-center space-y-4 shadow-[0_24px_80px_rgba(0,0,0,0.9)]">
+        <div className="w-16 h-16 mx-auto rounded-2xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center">
+          <Smartphone className="w-8 h-8 text-cyan-300 -rotate-90 animate-pulse" />
+        </div>
+
+        <div className="space-y-1.5">
+          <h2 className="text-lg font-display font-bold text-white">
+            {isAr ? 'اللعبة تعمل بالعرض فقط' : 'Landscape Mode Required'}
+          </h2>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            {isAr
+              ? 'يرجى تدوير الهاتف بالوضع الأفقي (بالعرض) لفتح اللعبة واللعب — لا يمكن تشغيل اللعبة بالوضع الطولي.'
+              : 'Please rotate your phone to landscape (horizontal) orientation — this game runs in landscape mode only.'}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void handleToggleLandscapeFullscreen()}
+          className="w-full py-2.5 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+        >
+          <RotateCcw className="w-4 h-4 shrink-0" />
+          <span>
+            {isAr
+              ? 'تدوير تلقائي بالعرض وملء الشاشة'
+              : 'Switch to Landscape Fullscreen'}
+          </span>
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  const mandatoryUpdateOverlay = (
+    <UpdateNotificationBanner
+      visible={appUpdate.isBannerVisible}
+      remoteVersion={appUpdate.remoteVersion}
+      onUpdateNow={appUpdate.applyUpdate}
+    />
+  );
+
   // =========================================================================
   // RENDER: AUTH LOADING CHECK
   // =========================================================================
   if (authChecking) {
     return (
-      <div className="min-h-screen bg-[#09111C] text-slate-100 flex flex-col items-center justify-center gap-4">
-        <div className="w-10 h-10 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
-        <p className="text-sm text-slate-300">
-          {isAr
-            ? 'جاري استرجاع حساب تقني الأشعة وتجهيز الغرفة...'
-            : 'Restoring radiographer account & preparing 3D suite...'}
-        </p>
-      </div>
+      <>
+        <div className="min-h-screen bg-[#09111C] text-slate-100 flex flex-col items-center justify-center gap-4">
+          <div className="w-10 h-10 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
+          <p className="text-sm text-slate-300">
+            {isAr
+              ? 'جاري استرجاع حساب تقني الأشعة وتجهيز الغرفة...'
+              : 'Restoring radiographer account & preparing 3D suite...'}
+          </p>
+        </div>
+        {landscapeOnlyOverlay}
+        {mandatoryUpdateOverlay}
+      </>
     );
   }
 
@@ -1872,16 +1959,12 @@ export default function App() {
   if (screenMode === 'AUTH' || !techProfile) {
     return (
       <>
-        <UpdateNotificationBanner
-          visible={appUpdate.isBannerVisible}
-          remoteVersion={appUpdate.remoteVersion}
-          onUpdateNow={appUpdate.applyUpdate}
-          onDismiss={appUpdate.dismissBanner}
-        />
         <AuthScreen
           initialSave={INITIAL_SAVE}
           onAuthenticated={handleAuthenticated}
         />
+        {landscapeOnlyOverlay}
+        {mandatoryUpdateOverlay}
       </>
     );
   }
@@ -1962,7 +2045,8 @@ export default function App() {
           designerPopupOpen ||
           controlsModalOpen ||
           daySummaryOpen ||
-          (isPortraitPhone && !portraitDismissed)
+          isPortraitPhone ||
+          appUpdate.updateAvailable
         }
         ownedUpgrades={save.ownedUpgrades}
         joystickRef={joystickRef}
@@ -2839,13 +2923,8 @@ export default function App() {
         }}
       />
 
-      {/* GAME UPDATE AVAILABLE BANNER */}
-      <UpdateNotificationBanner
-        visible={appUpdate.isBannerVisible}
-        remoteVersion={appUpdate.remoteVersion}
-        onUpdateNow={appUpdate.applyUpdate}
-        onDismiss={appUpdate.dismissBanner}
-      />
+      {/* MANDATORY GAME UPDATE MODAL (NON-DISMISSIBLE) */}
+      {mandatoryUpdateOverlay}
 
       {/* END OF DAY FINANCIAL REPORT & NEW DAY MODAL */}
       <DaySummaryModal
@@ -2865,52 +2944,8 @@ export default function App() {
         onClose={() => setDesignerPopupOpen(false)}
       />
 
-      {/* MOBILE PORTRAIT -> LANDSCAPE GUIDANCE OVERLAY */}
-      {isPortraitPhone && !portraitDismissed && (
-        <div className="fixed inset-0 z-[80] bg-[#060B13]/96 flex items-center justify-center p-5">
-          <div className="w-full max-w-sm rounded-2xl border border-cyan-600/60 bg-[#0B1422] p-6 text-center space-y-4 shadow-2xl">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center">
-              <Smartphone className="w-8 h-8 text-cyan-300 -rotate-90" />
-            </div>
-
-            <div className="space-y-1.5">
-              <h2 className="text-lg font-display font-bold text-white">
-                {isAr
-                  ? 'يرجى تدوير الهاتف بالعرض'
-                  : 'Rotate Phone to Landscape'}
-              </h2>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                {isAr
-                  ? 'تم تصميم هذه اللعبة بحجم وتنسيق يناسب الهواتف بالوضع الأفقي (بالعرض) لوضوح غرفة الأشعة وسهولة التحكم.'
-                  : 'This 3D simulator is designed for horizontal (landscape) phone play for optimal room view and thumb controls.'}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => void handleToggleLandscapeFullscreen()}
-                className="w-full py-2.5 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
-              >
-                <RotateCcw className="w-4 h-4 shrink-0" />
-                <span>
-                  {isAr
-                    ? 'تشغيل بالعرض وملء الشاشة'
-                    : 'Enter Landscape Fullscreen'}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPortraitDismissed(true)}
-                className="w-full py-2 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer transition-colors"
-              >
-                {isAr ? 'متابعة على الوضع الحالي' : 'Continue Anyway'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* STRICT LANDSCAPE-ONLY OVERLAY FOR ALL PHONES */}
+      {landscapeOnlyOverlay}
     </div>
   );
 }

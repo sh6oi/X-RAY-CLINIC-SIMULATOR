@@ -22,9 +22,9 @@ export interface AppUpdateState {
   dismissBanner: () => void;
 }
 
-const CHECK_INTERVAL_MS = 90_000;
-const INITIAL_DELAY_MS = 4_500;
-const MIN_FOCUS_INTERVAL_MS = 30_000;
+const CHECK_INTERVAL_MS = 45_000;
+const INITIAL_DELAY_MS = 1_500;
+const MIN_FOCUS_INTERVAL_MS = 10_000;
 
 export function useAppUpdate(): AppUpdateState {
   const currentVersion =
@@ -39,13 +39,12 @@ export function useAppUpdate(): AppUpdateState {
   const [lastOutcome, setLastOutcome] = useState<UpdateCheckOutcome | null>(
     null
   );
-  const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
 
   const lastFetchTimestampRef = useRef<number>(0);
   const checkingRef = useRef<boolean>(false);
 
   const checkForUpdates = useCallback(
-    async (manual = false): Promise<UpdateCheckOutcome> => {
+    async (_manual = false): Promise<UpdateCheckOutcome> => {
       if (checkingRef.current) {
         return remoteVersion && remoteVersion !== currentVersion
           ? 'update'
@@ -56,6 +55,13 @@ export function useAppUpdate(): AppUpdateState {
       setChecking(true);
 
       try {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker
+            .getRegistrations()
+            .then((regs) => Promise.all(regs.map((r) => r.update())))
+            .catch(() => {});
+        }
+
         const res = await fetch(`./version.json?t=${Date.now()}`, {
           cache: 'no-store',
           headers: {
@@ -87,9 +93,6 @@ export function useAppUpdate(): AppUpdateState {
         );
 
         if (serverVer !== currentVersion) {
-          if (manual) {
-            setDismissedVersion(null);
-          }
           setLastOutcome('update');
           return 'update';
         }
@@ -109,6 +112,15 @@ export function useAppUpdate(): AppUpdateState {
 
   const applyUpdate = useCallback(async () => {
     try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((reg) => reg.unregister()));
+      }
+    } catch {
+      // Ignore service worker unregister errors
+    }
+
+    try {
       if ('caches' in window) {
         const keys = await window.caches.keys();
         await Promise.all(keys.map((key) => window.caches.delete(key)));
@@ -127,10 +139,8 @@ export function useAppUpdate(): AppUpdateState {
   }, []);
 
   const dismissBanner = useCallback(() => {
-    if (remoteVersion) {
-      setDismissedVersion(remoteVersion);
-    }
-  }, [remoteVersion]);
+    // Updates are mandatory and cannot be dismissed.
+  }, []);
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => {
@@ -165,8 +175,7 @@ export function useAppUpdate(): AppUpdateState {
 
   const updateAvailable =
     remoteVersion !== null && remoteVersion !== currentVersion;
-  const isBannerVisible =
-    updateAvailable && dismissedVersion !== remoteVersion;
+  const isBannerVisible = updateAvailable;
 
   return {
     currentVersion,

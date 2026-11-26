@@ -40,7 +40,7 @@ export default defineConfig(() => {
           theme_color: '#070C14',
           background_color: '#070C14',
           display: 'standalone',
-          orientation: 'any',
+          orientation: 'landscape',
           start_url: './',
           scope: './',
           icons: [
