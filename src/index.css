@@ -218,6 +218,17 @@ input[type="range"].radiology-slider::-moz-range-thumb {
   .hud-pc-content {
     padding: 8px 12px !important;
   }
+  .hud-posture-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .hud-posture-card {
+    min-height: 54px !important;
+    padding: 6px !important;
+  }
+  .hud-posture-svg {
+    width: 58px !important;
+    height: 42px !important;
+  }
 }
 
 /* Even tighter sizing for ultra-short phones (<= 390px tall in landscape) */
@@ -462,4 +473,26 @@ html.force-landscape-stage .hud-joystick-ring {
 html.force-landscape-stage .hud-joystick-knob {
   width: 30px !important;
   height: 30px !important;
+}
+
+html.force-landscape-stage .stage-scroll-area {
+  touch-action: none !important;
+}
+
+html.force-landscape-stage .stage-scroll-area input[type="range"] {
+  touch-action: pan-x !important;
+}
+
+html.force-landscape-stage .hud-posture-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+html.force-landscape-stage .hud-posture-card {
+  min-height: 54px !important;
+  padding: 6px !important;
+}
+
+html.force-landscape-stage .hud-posture-svg {
+  width: 58px !important;
+  height: 42px !important;
 }

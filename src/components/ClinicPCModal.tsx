@@ -22,6 +22,7 @@ import {PatientLogView} from './PatientLogView';
 import {ShopView} from './ShopView';
 import {ProtocolsView} from './ProtocolsView';
 import {useLanguage} from '../i18n/translations';
+import {useStageScroll} from '../hooks/useStageScroll';
 
 interface ClinicPCModalProps {
   isOpen: boolean;
@@ -84,6 +85,7 @@ export const ClinicPCModal: React.FC<ClinicPCModalProps> = ({
 }) => {
   const {lang} = useLanguage();
   const isAr = lang === 'ar';
+  const {scrollRef, scrollHandlers} = useStageScroll<HTMLDivElement>(isOpen);
 
   if (!isOpen) return null;
 
@@ -167,7 +169,11 @@ export const ClinicPCModal: React.FC<ClinicPCModalProps> = ({
         </div>
 
         {/* Workstation Content */}
-        <div className="hud-pc-content flex-1 overflow-y-auto p-3 sm:p-5">
+        <div
+          ref={scrollRef}
+          {...scrollHandlers}
+          className="hud-pc-content stage-scroll-area flex-1 overflow-y-auto p-3 sm:p-5"
+        >
           {activeTab === 'IMAGE' && (
             <div>
               {isDeveloping ? (

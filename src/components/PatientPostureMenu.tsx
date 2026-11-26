@@ -1,5 +1,12 @@
-import React, {useEffect} from 'react';
-import {Check, Shield, UserCheck, X} from 'lucide-react';
+import React, {useEffect, useRef, useState} from 'react';
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Shield,
+  UserCheck,
+  X,
+} from 'lucide-react';
 import type {BodyRegion, Language, PatientPosture} from '../types/radiology';
 import {
   POSTURE_LABELS_I18N,
@@ -7,6 +14,7 @@ import {
   REGION_LABELS_I18N,
   useLanguage,
 } from '../i18n/translations';
+import {useStageScroll} from '../hooks/useStageScroll';
 
 interface PatientPostureMenuProps {
   isOpen: boolean;
@@ -154,7 +162,7 @@ const PostureIllustration: React.FC<{
   return (
     <svg
       viewBox="0 0 88 64"
-      className="w-[74px] h-[54px] sm:w-[82px] sm:h-[58px] shrink-0 rounded-xl bg-[#070E18] border border-slate-800/90"
+      className="hud-posture-svg w-[66px] h-[48px] sm:w-[78px] sm:h-[56px] shrink-0 rounded-xl bg-[#070E18] border border-slate-800/90"
       aria-hidden="true"
     >
       <rect x="2" y="2" width="84" height="60" rx="9" fill="#070E18" />
@@ -357,6 +365,22 @@ export const PatientPostureMenu: React.FC<PatientPostureMenuProps> = ({
   const {lang} = useLanguage();
   const isAr = lang === 'ar';
 
+  const {
+    scrollRef,
+    metrics,
+    updateMetrics,
+    startHoldScroll,
+    stopHoldScroll,
+    handleHoldButtonClick,
+    scrollHandlers,
+  } = useStageScroll<HTMLDivElement>(isOpen);
+
+  const erectSectionRef = useRef<HTMLDivElement | null>(null);
+  const tableSectionRef = useRef<HTMLDivElement | null>(null);
+  const [activeSection, setActiveSection] = useState<'ERECT' | 'TABLE'>(() =>
+    selectedPosture.startsWith('ERECT_') ? 'ERECT' : 'TABLE'
+  );
+
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -366,14 +390,60 @@ export const PatientPostureMenu: React.FC<PatientPostureMenuProps> = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const isErect = selectedPosture.startsWith('ERECT_');
+    setActiveSection(isErect ? 'ERECT' : 'TABLE');
+    const raf = requestAnimationFrame(() => {
+      const container = scrollRef.current;
+      if (!container) return;
+      if (!isErect && tableSectionRef.current) {
+        container.scrollTop = Math.max(0, tableSectionRef.current.offsetTop - 8);
+      } else {
+        container.scrollTop = 0;
+      }
+      updateMetrics();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isOpen, selectedPosture, scrollRef, updateMetrics]);
+
   if (!isOpen) return null;
 
-  const renderGroup = (title: string, postures: PatientPosture[]) => (
-    <div className="space-y-2">
+  const scrollToSection = (section: 'ERECT' | 'TABLE') => {
+    const container = scrollRef.current;
+    if (!container) return;
+    setActiveSection(section);
+    if (section === 'ERECT') {
+      container.scrollTo({top: 0, behavior: 'smooth'});
+      return;
+    }
+    const target = tableSectionRef.current;
+    if (target) {
+      container.scrollTo({
+        top: Math.max(0, target.offsetTop - 8),
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  const handleListScroll = () => {
+    const container = scrollRef.current;
+    const tableEl = tableSectionRef.current;
+    if (!container || !tableEl) return;
+    const midpoint = container.scrollTop + container.clientHeight * 0.35;
+    setActiveSection(midpoint >= tableEl.offsetTop ? 'TABLE' : 'ERECT');
+  };
+
+  const renderGroup = (
+    title: string,
+    postures: PatientPosture[],
+    sectionRef: React.RefObject<HTMLDivElement | null>
+  ) => (
+    <div ref={sectionRef} className="space-y-1.5">
       <div className="text-[11px] font-bold text-cyan-300 tracking-wide px-0.5">
         {title}
       </div>
-      <div className="grid grid-cols-1 min-[500px]:grid-cols-2 gap-2">
+      <div className="hud-posture-grid grid grid-cols-1 min-[500px]:grid-cols-2 gap-1.5 sm:gap-2">
         {postures.map((posture) => {
           const active = selectedPosture === posture;
           return (
@@ -384,7 +454,7 @@ export const PatientPostureMenu: React.FC<PatientPostureMenuProps> = ({
                 onSelectPosture(posture);
                 onClose();
               }}
-              className={`min-h-[68px] flex items-center gap-2.5 p-2 rounded-xl border text-start cursor-pointer transition-colors ${
+              className={`hud-posture-card min-h-[60px] flex items-center gap-2 p-1.5 sm:p-2 rounded-xl border text-start cursor-pointer transition-colors ${
                 active
                   ? 'border-cyan-400 bg-cyan-500/15 shadow-[0_0_16px_rgba(34,211,238,0.18)]'
                   : 'border-slate-800 bg-[#0D1726] hover:border-slate-600 hover:bg-slate-800/85'
@@ -392,9 +462,9 @@ export const PatientPostureMenu: React.FC<PatientPostureMenuProps> = ({
             >
               <PostureIllustration posture={posture} active={active} />
               <div className="min-w-0 flex-1 space-y-0.5">
-                <div className="flex items-center justify-between gap-1.5">
+                <div className="flex items-center justify-between gap-1">
                   <span
-                    className={`text-xs sm:text-[13px] font-bold leading-snug ${
+                    className={`text-[11.5px] sm:text-[13px] font-bold leading-snug ${
                       active ? 'text-cyan-200' : 'text-slate-100'
                     }`}
                   >
@@ -404,10 +474,10 @@ export const PatientPostureMenu: React.FC<PatientPostureMenuProps> = ({
                     <Check className="w-4 h-4 text-cyan-400 shrink-0" />
                   )}
                 </div>
-                <div className="text-[10.5px] sm:text-[11px] text-slate-400 leading-snug">
+                <div className="text-[10px] sm:text-[11px] text-slate-400 leading-snug truncate">
                   {POSTURE_LABELS_I18N[lang][posture]}
                 </div>
-                <div className="text-[10px] text-slate-500 leading-tight">
+                <div className="text-[9.5px] text-slate-500 leading-tight line-clamp-1">
                   {POSTURE_SUB_I18N[lang][posture]}
                 </div>
               </div>
@@ -418,31 +488,31 @@ export const PatientPostureMenu: React.FC<PatientPostureMenuProps> = ({
     </div>
   );
 
+  const thumbTopPct = metrics.progress * (100 - metrics.thumbRatio * 100);
+
   return (
     <div
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-40 bg-slate-950/60 flex items-center justify-center p-2 sm:p-4"
+      className="fixed inset-0 z-40 bg-slate-950/60 flex items-center justify-center p-1.5 sm:p-4"
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={isAr ? 'قائمة وضعيات المريض' : 'Patient Posture Menu'}
-        className="hud-posture-window w-full max-w-[640px] max-h-[calc(100dvh-1rem)] sm:max-h-[min(86dvh,640px)] flex flex-col rounded-2xl border border-slate-700/85 bg-[#08101C]/98 shadow-[0_24px_64px_rgba(0,0,0,0.9)] overflow-hidden"
+        className="hud-posture-window w-full max-w-[660px] max-h-[calc(100dvh-0.75rem)] sm:max-h-[min(88dvh,640px)] flex flex-col rounded-2xl border border-slate-700/85 bg-[#08101C]/98 shadow-[0_24px_64px_rgba(0,0,0,0.9)] overflow-hidden"
       >
         {/* Header */}
-        <div className="shrink-0 px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-800 bg-[#0B1525] flex items-center justify-between gap-2">
+        <div className="shrink-0 px-3 py-2 sm:px-4 sm:py-2.5 border-b border-slate-800 bg-[#0B1525] flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <UserCheck className="w-4 h-4 text-cyan-400 shrink-0" />
-              <h2 className="font-display text-sm sm:text-base font-extrabold text-white">
-                {isAr
-                  ? 'وضعيات تصوير المريض'
-                  : 'Patient Positioning'}
+              <h2 className="font-display text-xs sm:text-base font-extrabold text-white">
+                {isAr ? 'وضعيات تصوير المريض' : 'Patient Positioning'}
               </h2>
             </div>
-            <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 leading-snug">
+            <p className="text-[10.5px] sm:text-xs text-slate-300 mt-0.5 leading-snug truncate">
               {isAr ? 'المنطقة المحددة: ' : 'Targeted Region: '}
               <span className="font-bold text-cyan-300">
                 {REGION_LABELS_I18N[lang][selectedRegion]}
@@ -460,7 +530,7 @@ export const PatientPostureMenu: React.FC<PatientPostureMenuProps> = ({
               <button
                 type="button"
                 onClick={onToggleShield}
-                className={`min-h-[36px] flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border cursor-pointer transition-colors ${
+                className={`min-h-[34px] flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border cursor-pointer transition-colors ${
                   shieldUsed
                     ? 'bg-emerald-500/20 border-emerald-500/70 text-emerald-300'
                     : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
@@ -483,40 +553,127 @@ export const PatientPostureMenu: React.FC<PatientPostureMenuProps> = ({
               type="button"
               onClick={onClose}
               aria-label={isAr ? 'إغلاق القائمة' : 'Close menu'}
-              className="min-w-[38px] min-h-[38px] flex items-center justify-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors"
+              className="min-w-[34px] min-h-[34px] flex items-center justify-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Vertically Scrollable Posture List */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-3 sm:p-4 space-y-4">
-          {renderGroup(
-            isAr
-              ? 'واقف أمام الحامل الجداري (Wall Bucky · Erect)'
-              : 'Standing · Wall Bucky (Erect)',
-            ERECT_POSTURES
-          )}
-          {renderGroup(
-            isAr
-              ? 'مستلقٍ على طاولة الأشعة (X-Ray Table)'
-              : 'Lying Down · X-Ray Table',
-            TABLE_POSTURES
+        {/* Quick Section Jump Tabs */}
+        <div className="shrink-0 px-3 py-1.5 bg-[#091321] border-b border-slate-800/80 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => scrollToSection('ERECT')}
+            className={`flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-bold border cursor-pointer transition-colors ${
+              activeSection === 'ERECT'
+                ? 'bg-cyan-500/20 border-cyan-400/70 text-cyan-200'
+                : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {isAr
+              ? 'واقف (Wall Bucky · 6)'
+              : 'Standing · Wall Bucky (6)'}
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection('TABLE')}
+            className={`flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-bold border cursor-pointer transition-colors ${
+              activeSection === 'TABLE'
+                ? 'bg-cyan-500/20 border-cyan-400/70 text-cyan-200'
+                : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {isAr
+              ? 'مستلقٍ على الطاولة (Table · 6)'
+              : 'Lying Down · Table (6)'}
+          </button>
+        </div>
+
+        {/* Scrollable Posture List + Visible Scroll Indicator */}
+        <div className="relative flex-1 min-h-0 flex">
+          <div
+            ref={scrollRef}
+            onScroll={handleListScroll}
+            {...scrollHandlers}
+            className="relative stage-scroll-area flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-3.5 space-y-3 select-none"
+          >
+            {renderGroup(
+              isAr
+                ? 'واقف أمام الحامل الجداري (Wall Bucky · Erect)'
+                : 'Standing · Wall Bucky (Erect)',
+              ERECT_POSTURES,
+              erectSectionRef
+            )}
+            {renderGroup(
+              isAr
+                ? 'مستلقٍ على طاولة الأشعة (X-Ray Table)'
+                : 'Lying Down · X-Ray Table',
+              TABLE_POSTURES,
+              tableSectionRef
+            )}
+          </div>
+
+          {/* Visual Scroll Track Indicator */}
+          {metrics.hasOverflow && (
+            <div className="w-2.5 shrink-0 py-2 px-0.5 bg-[#070E18] border-s border-slate-800/70 flex flex-col">
+              <div className="relative flex-1 w-full rounded-full bg-slate-800/70 overflow-hidden">
+                <div
+                  className="absolute inset-x-0 rounded-full bg-cyan-400/80 transition-[top] duration-75"
+                  style={{
+                    height: `${Math.round(metrics.thumbRatio * 100)}%`,
+                    top: `${Math.round(thumbTopPct)}%`,
+                  }}
+                />
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Compact Footer */}
-        <div className="shrink-0 px-3.5 py-2 border-t border-slate-800/90 bg-[#070E18] flex items-center justify-between gap-2 text-[11px] text-slate-400">
-          <span>
+        {/* Footer with Effortless Up / Down Tap-or-Hold Scroll Buttons */}
+        <div className="shrink-0 px-2.5 sm:px-3.5 py-1.5 sm:py-2 border-t border-slate-800/90 bg-[#070E18] flex items-center justify-between gap-2 text-[11px] text-slate-300">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={!metrics.canScrollUp}
+              onPointerDown={() => startHoldScroll(-1)}
+              onPointerUp={stopHoldScroll}
+              onPointerLeave={stopHoldScroll}
+              onPointerCancel={stopHoldScroll}
+              onClick={() => handleHoldButtonClick(-1, 175)}
+              aria-label={isAr ? 'الصعود للأعلى' : 'Scroll up'}
+              className="min-h-[34px] flex items-center gap-1 px-3 py-1 rounded-xl bg-slate-800 hover:bg-cyan-500/20 border border-slate-700 hover:border-cyan-500/60 text-slate-100 font-bold cursor-pointer transition-colors disabled:opacity-35 disabled:cursor-default"
+            >
+              <ChevronUp className="w-4 h-4 text-cyan-300 shrink-0" />
+              <span>{isAr ? 'للأعلى' : 'Up'}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={!metrics.canScrollDown}
+              onPointerDown={() => startHoldScroll(1)}
+              onPointerUp={stopHoldScroll}
+              onPointerLeave={stopHoldScroll}
+              onPointerCancel={stopHoldScroll}
+              onClick={() => handleHoldButtonClick(1, 175)}
+              aria-label={isAr ? 'النزول للأسفل' : 'Scroll down'}
+              className="min-h-[34px] flex items-center gap-1 px-3 py-1 rounded-xl bg-slate-800 hover:bg-cyan-500/20 border border-slate-700 hover:border-cyan-500/60 text-slate-100 font-bold cursor-pointer transition-colors disabled:opacity-35 disabled:cursor-default"
+            >
+              <ChevronDown className="w-4 h-4 text-cyan-300 shrink-0" />
+              <span>{isAr ? 'للأسفل' : 'Down'}</span>
+            </button>
+          </div>
+
+          <span className="hidden sm:inline text-slate-400">
             {isAr
-              ? 'حرّك القائمة للأعلى والأسفل واختر الوضعية المناسبة'
-              : 'Scroll up & down to select the required posture'}
+              ? 'اسحب للأعلى والأسفل أو اضغط أزرار التحريك'
+              : 'Swipe up/down or use the scroll buttons'}
           </span>
+
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold cursor-pointer transition-colors shrink-0"
+            className="min-h-[34px] px-3.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold cursor-pointer transition-colors shrink-0"
           >
             {isAr ? 'إغلاق' : 'Close'}
           </button>

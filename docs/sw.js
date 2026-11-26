@@ -87,7 +87,7 @@ define(['./workbox-43e44e5a'], (function (workbox) { 'use strict';
     "revision": "63c1f1303ec2e4436dee1e74eb3c3806"
   }, {
     "url": "index.html",
-    "revision": "81836b69d5f5992003aa1baa70bdde42"
+    "revision": "5994d70d014372fd2c2c345138a8269e"
   }, {
     "url": "favicon.ico",
     "revision": "c2dd3c7ef1f4c338ae9999a7a2d15725"
@@ -104,16 +104,19 @@ define(['./workbox-43e44e5a'], (function (workbox) { 'use strict';
     "url": "assets/workbox-window.prod.es5-Bd17z0YL.js",
     "revision": null
   }, {
-    "url": "assets/index-NAhi7zEF.js",
+    "url": "assets/index-Bc3s-i9X.css",
     "revision": null
   }, {
-    "url": "assets/index-D8_eDryt.css",
+    "url": "assets/index-BT5i3z2b.js",
     "revision": null
   }, {
     "url": "assets/aistudio/image_7ba5c804.png",
     "revision": null
   }, {
     "url": "assets/aistudio/image_5da34c3c.png",
+    "revision": null
+  }, {
+    "url": "assets/aistudio/image_4b854da1.png",
     "revision": null
   }, {
     "url": "assets/aistudio/image_40da1391.png",

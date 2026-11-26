@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type {DaySummaryRecord} from '../types/radiology';
 import {useLanguage} from '../i18n/translations';
+import {useStageScroll} from '../hooks/useStageScroll';
 
 interface DaySummaryModalProps {
   isOpen: boolean;
@@ -35,6 +36,9 @@ export const DaySummaryModal: React.FC<DaySummaryModalProps> = ({
 }) => {
   const {lang} = useLanguage();
   const isAr = lang === 'ar';
+  const {scrollRef, scrollHandlers} = useStageScroll<HTMLDivElement>(
+    isOpen && Boolean(summary)
+  );
 
   if (!isOpen || !summary) return null;
 
@@ -46,7 +50,11 @@ export const DaySummaryModal: React.FC<DaySummaryModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[75] bg-[#04080F]/92 flex items-center justify-center p-2.5 sm:p-4">
-      <div className="hud-modal-scroll w-full max-w-xl max-h-[94dvh] overflow-y-auto rounded-2xl border border-cyan-500/60 bg-[#0A1320] text-slate-100 shadow-2xl p-4 sm:p-6 space-y-4">
+      <div
+        ref={scrollRef}
+        {...scrollHandlers}
+        className="hud-modal-scroll stage-scroll-area w-full max-w-xl max-h-[94dvh] overflow-y-auto rounded-2xl border border-cyan-500/60 bg-[#0A1320] text-slate-100 shadow-2xl p-4 sm:p-6 space-y-4"
+      >
         {/* Header */}
         <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
           <div className="flex items-center gap-3">
