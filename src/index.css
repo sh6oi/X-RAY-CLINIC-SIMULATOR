@@ -191,9 +191,6 @@ input[type="range"].radiology-slider::-moz-range-thumb {
     padding: 2px 0 !important;
     font-size: 9.5px !important;
   }
-  .hud-console-proj-box {
-    padding: 5px 8px !important;
-  }
   .hud-console-expose {
     padding: 6px 10px !important;
     font-size: 11px !important;

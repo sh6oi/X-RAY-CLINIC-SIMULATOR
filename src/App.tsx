@@ -37,6 +37,7 @@ import type {
   CompletedCase,
   DaySummaryRecord,
   JoystickConfig,
+  Modality,
   PatientCase,
   PatientPosture,
   ProjectionType,
@@ -747,12 +748,33 @@ export default function App() {
   const cassetteReady =
     hasDR || isBoreScan || cassetteState === requiredCassetteSlot;
 
-  const availableProjections: ProjectionType[] = useMemo(() => {
-    const base: ProjectionType[] = ['PA', 'AP', 'LATERAL', 'OBLIQUE'];
-    if (save.ownedUpgrades.includes('ct_scanner')) base.push('AXIAL');
-    if (save.ownedUpgrades.includes('mri_suite')) base.push('SAGITTAL');
-    return base;
-  }, [save.ownedUpgrades]);
+  const deriveProjectionFromState = (
+    posture: PatientPosture,
+    region: BodyRegion,
+    modality: Modality
+  ): ProjectionType => {
+    if (modality === 'CT') return 'AXIAL';
+    if (modality === 'MRI') return 'SAGITTAL';
+    if (posture === 'ERECT_PA' || posture === 'PRONE') return 'PA';
+    if (posture === 'ERECT_AP') return 'AP';
+    if (
+      posture === 'ERECT_LEFT_LAT' ||
+      posture === 'ERECT_RIGHT_LAT' ||
+      posture === 'TABLE_LEFT_LAT' ||
+      posture === 'TABLE_RIGHT_LAT'
+    ) {
+      return 'LATERAL';
+    }
+    if (
+      posture === 'ERECT_RAO' ||
+      posture === 'ERECT_LAO' ||
+      posture === 'TABLE_RPO' ||
+      posture === 'TABLE_LPO'
+    ) {
+      return 'OBLIQUE';
+    }
+    return region === 'hand' ? 'PA' : 'AP';
+  };
 
   const registerPatientMovement = () => {
     moveCountRef.current += 1;
@@ -845,6 +867,13 @@ export default function App() {
       registerPatientMovement();
     }
     setSelectedRegion(region);
+    setSelectedProjection(
+      deriveProjectionFromState(
+        selectedPosture,
+        region,
+        requestedExam.modality
+      )
+    );
     soundFx.playPurchase();
     showToast(
       isAr
@@ -892,83 +921,13 @@ export default function App() {
       );
     }
 
-    if (isBoreScan) return;
-    if (posture === 'ERECT_PA' || posture === 'PRONE') {
-      setSelectedProjection('PA');
-    } else if (posture === 'ERECT_AP') {
-      setSelectedProjection('AP');
-    } else if (
-      posture === 'ERECT_LEFT_LAT' ||
-      posture === 'ERECT_RIGHT_LAT' ||
-      posture === 'TABLE_LEFT_LAT' ||
-      posture === 'TABLE_RIGHT_LAT'
-    ) {
-      setSelectedProjection('LATERAL');
-    } else if (
-      posture === 'ERECT_RAO' ||
-      posture === 'ERECT_LAO' ||
-      posture === 'TABLE_RPO' ||
-      posture === 'TABLE_LPO'
-    ) {
-      setSelectedProjection('OBLIQUE');
-    } else if (
-      posture === 'SUPINE' &&
-      (selectedProjection === 'LATERAL' || selectedProjection === 'OBLIQUE')
-    ) {
-      setSelectedProjection('AP');
-    }
-  };
-
-  const handleSelectProjection = (proj: ProjectionType) => {
-    setSelectedProjection(proj);
-    if (proj === 'AXIAL' || proj === 'SAGITTAL') {
-      setSelectedPosture('SUPINE');
-      return;
-    }
-    if (proj === 'LATERAL') {
-      if (isErect) {
-        if (
-          selectedPosture !== 'ERECT_LEFT_LAT' &&
-          selectedPosture !== 'ERECT_RIGHT_LAT'
-        ) {
-          setSelectedPosture('ERECT_LEFT_LAT');
-        }
-      } else if (
-        selectedPosture !== 'TABLE_LEFT_LAT' &&
-        selectedPosture !== 'TABLE_RIGHT_LAT'
-      ) {
-        setSelectedPosture('TABLE_LEFT_LAT');
-      }
-    } else if (proj === 'OBLIQUE') {
-      if (isErect) {
-        if (
-          selectedPosture !== 'ERECT_RAO' &&
-          selectedPosture !== 'ERECT_LAO'
-        ) {
-          setSelectedPosture('ERECT_RAO');
-        }
-      } else if (
-        selectedPosture !== 'TABLE_RPO' &&
-        selectedPosture !== 'TABLE_LPO'
-      ) {
-        setSelectedPosture('TABLE_RPO');
-      }
-    } else if (proj === 'PA') {
-      if (isErect) setSelectedPosture('ERECT_PA');
-      else if (
-        selectedPosture === 'TABLE_LEFT_LAT' ||
-        selectedPosture === 'TABLE_RIGHT_LAT' ||
-        selectedPosture === 'TABLE_RPO' ||
-        selectedPosture === 'TABLE_LPO'
-      ) {
-        setSelectedPosture('PRONE');
-      }
-    } else if (proj === 'AP') {
-      if (isErect) setSelectedPosture('ERECT_AP');
-      else if (selectedPosture !== 'SUPINE') {
-        setSelectedPosture('SUPINE');
-      }
-    }
+    setSelectedProjection(
+      deriveProjectionFromState(
+        posture,
+        selectedRegion,
+        requestedExam.modality
+      )
+    );
   };
 
   const handleToggleDoorAndBooth = () => {
@@ -1488,15 +1447,21 @@ export default function App() {
       return;
     }
 
+    const effectiveProjection = deriveProjectionFromState(
+      selectedPosture,
+      selectedRegion,
+      requestedExam.modality
+    );
     soundFx.playExpose();
     setIsExposing(true);
+    setSelectedProjection(effectiveProjection);
     setCapturedPosture(selectedPosture);
-    setCapturedProjection(selectedProjection);
+    setCapturedProjection(effectiveProjection);
 
     const evaluation = evaluateExposure({
       exam: requestedExam,
       selectedRegion,
-      selectedProjection,
+      selectedProjection: effectiveProjection,
       selectedPosture,
       kvp,
       mas,
@@ -2329,9 +2294,6 @@ export default function App() {
           mas={mas}
           onChangeKvp={setKvp}
           onChangeMas={setMas}
-          selectedProjection={selectedProjection}
-          availableProjections={availableProjections}
-          onSelectProjection={handleSelectProjection}
           selectedRegion={selectedRegion}
           doorClosed={doorClosed}
           cassetteReady={cassetteReady}
@@ -2343,7 +2305,6 @@ export default function App() {
           onRequestBreathHold={handleRequestBreathHold}
           hasProtocolAssist={hasProtocolAssist}
           hasDosimeter={hasDosimeter}
-          hasTubeCooler={hasTubeCooler}
           kvpRange={requestedExam.kvpRange}
           masRange={requestedExam.masRange}
           onAutoCalibrate={handleAutoCalibrate}

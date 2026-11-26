@@ -12,21 +12,14 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
-import type {BodyRegion, ProjectionType} from '../types/radiology';
-import {
-  PROJECTION_LABELS_I18N,
-  REGION_LABELS_I18N,
-  useLanguage,
-} from '../i18n/translations';
+import type {BodyRegion} from '../types/radiology';
+import {REGION_LABELS_I18N, useLanguage} from '../i18n/translations';
 
 interface ExposureConsolePanelProps {
   kvp: number;
   mas: number;
   onChangeKvp: (val: number) => void;
   onChangeMas: (val: number) => void;
-  selectedProjection: ProjectionType;
-  availableProjections: ProjectionType[];
-  onSelectProjection: (proj: ProjectionType) => void;
   selectedRegion: BodyRegion;
   doorClosed: boolean;
   cassetteReady: boolean;
@@ -38,7 +31,6 @@ interface ExposureConsolePanelProps {
   onRequestBreathHold: () => void;
   hasProtocolAssist: boolean;
   hasDosimeter: boolean;
-  hasTubeCooler: boolean;
   kvpRange: [number, number];
   masRange: [number, number];
   onAutoCalibrate: () => void;
@@ -54,9 +46,6 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
   mas,
   onChangeKvp,
   onChangeMas,
-  selectedProjection,
-  availableProjections,
-  onSelectProjection,
   selectedRegion,
   doorClosed,
   cassetteReady,
@@ -68,7 +57,6 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
   onRequestBreathHold,
   hasProtocolAssist,
   hasDosimeter,
-  hasTubeCooler,
   kvpRange,
   masRange,
   onAutoCalibrate,
@@ -84,15 +72,6 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
   const locked = isExposing || isDeveloping || caseApproved || crPendingScan;
   const readyToFire = doorClosed && cassetteReady && !locked;
 
-  const approxDoseMs = Math.max(
-    4,
-    Math.round(mas * (hasTubeCooler ? 2.1 : 3.5))
-  );
-  const rawHu = Math.round((kvp / 130) * 32 + (mas / 50) * 28);
-  const tubeHeatPct = Math.min(
-    92,
-    hasTubeCooler ? Math.round(rawHu * 0.5) : rawHu
-  );
   const doseOptimal =
     kvp >= kvpRange[0] &&
     kvp <= kvpRange[1] &&
@@ -318,57 +297,24 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
         </div>
       </div>
 
-      {/* Telemetry Mini Bar + Projection Tactile Keypad */}
-      <div className="hud-console-proj-box rounded-xl border border-slate-800 bg-[#070D17] p-2.5 space-y-2">
-        <div className="flex items-center justify-between text-[11px] gap-2">
-          <span className="text-slate-400 truncate">
-            {isAr ? 'الإسقاط: ' : 'View: '}
-            <strong className="text-cyan-300">
-              {PROJECTION_LABELS_I18N[lang][selectedProjection]}
-            </strong>
-          </span>
-          <span className="font-mono-num text-[10px] text-slate-400 shrink-0">
-            {approxDoseMs} ms · HU {tubeHeatPct}%
+      {hasDosimeter && (
+        <div
+          className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold flex items-center justify-between gap-2 ${
+            doseOptimal
+              ? 'border-emerald-600/60 bg-emerald-950/35 text-emerald-300'
+              : 'border-amber-600/60 bg-amber-950/35 text-amber-300'
+          }`}
+        >
+          <span>{isAr ? 'مقياس الجرعة:' : 'Dosimeter:'}</span>
+          <span className="truncate">
+            {doseOptimal
+              ? isAr
+                ? 'مثالي للبروتوكول ✓'
+                : 'Optimal ✓'
+              : `${kvpRange[0]}–${kvpRange[1]} kVp / ${masRange[0]}–${masRange[1]} mAs`}
           </span>
         </div>
-
-        {hasDosimeter && (
-          <div
-            className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold flex items-center justify-between gap-2 ${
-              doseOptimal
-                ? 'border-emerald-600/60 bg-emerald-950/35 text-emerald-300'
-                : 'border-amber-600/60 bg-amber-950/35 text-amber-300'
-            }`}
-          >
-            <span>{isAr ? 'مقياس الجرعة:' : 'Dosimeter:'}</span>
-            <span className="truncate">
-              {doseOptimal
-                ? isAr
-                  ? 'مثالي للبروتوكول ✓'
-                  : 'Optimal ✓'
-                : `${kvpRange[0]}–${kvpRange[1]} kVp / ${masRange[0]}–${masRange[1]} mAs`}
-            </span>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-1.5">
-          {availableProjections.map((proj) => (
-            <button
-              key={proj}
-              type="button"
-              onClick={() => onSelectProjection(proj)}
-              disabled={locked}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-mono-num font-bold cursor-pointer border transition-colors ${
-                selectedProjection === proj
-                  ? 'bg-cyan-500 border-cyan-300 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.35)]'
-                  : 'bg-[#101A28] border-slate-700 text-slate-300 hover:border-slate-500'
-              }`}
-            >
-              {proj}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Intercom Speaker (Chest exams only) + Protocol Assist */}
       {(isChestExam || hasProtocolAssist) && (
