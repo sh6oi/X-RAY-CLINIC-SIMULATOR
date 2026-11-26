@@ -238,3 +238,228 @@ input[type="range"].radiology-slider::-moz-range-thumb {
     padding-left: max(10px, env(safe-area-inset-left)) !important;
   }
 }
+
+.app-landscape-stage {
+  width: 100%;
+  min-height: 100dvh;
+}
+
+/* Direct landscape rotation when opened on portrait phones (zero rotation prompt) */
+html.force-landscape-stage,
+html.force-landscape-stage body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+html.force-landscape-stage .app-landscape-stage {
+  position: fixed;
+  top: 0;
+  left: 100vw;
+  width: 100dvh;
+  height: 100vw;
+  min-height: 0;
+  transform: rotate(90deg);
+  transform-origin: top left;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+html.force-landscape-stage .hud-play-root {
+  height: 100% !important;
+}
+
+html.force-landscape-stage .auth-check-screen {
+  min-height: 100% !important;
+}
+
+html.force-landscape-stage .hud-header-bar {
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-start !important;
+  padding: 4px 8px 0 8px !important;
+  gap: 6px !important;
+}
+
+html.force-landscape-stage .hud-telemetry-card {
+  padding: 4px 8px !important;
+  gap: 6px !important;
+  width: auto !important;
+  border-radius: 10px !important;
+}
+
+html.force-landscape-stage .hud-telemetry-card button {
+  padding: 3px 6px !important;
+  font-size: 10px !important;
+}
+
+html.force-landscape-stage .hud-patient-card {
+  padding: 4px 8px !important;
+  gap: 6px !important;
+  width: auto !important;
+  max-width: min(350px, 47dvh) !important;
+  border-radius: 10px !important;
+}
+
+html.force-landscape-stage .hud-patient-avatar {
+  width: 28px !important;
+  height: 28px !important;
+}
+
+html.force-landscape-stage .hud-patient-meta {
+  font-size: 9.5px !important;
+  line-height: 1.28 !important;
+}
+
+html.force-landscape-stage .hud-credit-badge {
+  top: 46px !important;
+  bottom: auto !important;
+  left: 8px !important;
+  right: auto !important;
+  padding: 3px 8px !important;
+  font-size: 9.5px !important;
+  max-width: 36dvh !important;
+  border-radius: 8px !important;
+}
+
+html.force-landscape-stage .hud-toast {
+  top: 46px !important;
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  max-width: 56dvh !important;
+}
+
+html.force-landscape-stage .hud-low-films {
+  top: 46px !important;
+  right: 8px !important;
+  padding: 3px 8px !important;
+  font-size: 10px !important;
+}
+
+html.force-landscape-stage .hud-hover-label {
+  top: 46px !important;
+  padding: 4px 10px !important;
+  font-size: 10.5px !important;
+}
+
+html.force-landscape-stage .hud-speech-bubble {
+  min-width: 155px !important;
+  max-width: min(250px, 38dvh) !important;
+}
+
+html.force-landscape-stage .hud-speech-card {
+  padding: 6px 10px !important;
+  border-width: 2px !important;
+  border-radius: 12px !important;
+}
+
+html.force-landscape-stage .hud-speech-tag {
+  font-size: 9px !important;
+  padding: 1px 6px !important;
+  margin-bottom: 2px !important;
+}
+
+html.force-landscape-stage .hud-speech-text {
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+}
+
+html.force-landscape-stage .hud-console-panel {
+  top: 46px !important;
+  bottom: 50px !important;
+  right: 8px !important;
+  left: auto !important;
+  width: min(335px, 47dvh) !important;
+  max-height: calc(100vw - 98px) !important;
+  padding: 7px 9px !important;
+  border-radius: 12px !important;
+}
+
+html.force-landscape-stage .hud-console-panel > * + * {
+  margin-top: 6px !important;
+}
+
+html.force-landscape-stage .hud-console-header {
+  padding-bottom: 4px !important;
+}
+
+html.force-landscape-stage .hud-console-interlock {
+  font-size: 9.5px !important;
+  gap: 4px !important;
+}
+
+html.force-landscape-stage .hud-console-interlock > div {
+  padding: 3px 6px !important;
+}
+
+html.force-landscape-stage .hud-console-lcd {
+  padding: 6px 8px !important;
+}
+
+html.force-landscape-stage .hud-console-val {
+  font-size: 17px !important;
+  line-height: 1.1 !important;
+}
+
+html.force-landscape-stage .hud-console-step {
+  padding: 2px 0 !important;
+  font-size: 9.5px !important;
+}
+
+html.force-landscape-stage .hud-console-expose {
+  padding: 6px 10px !important;
+  font-size: 11px !important;
+}
+
+html.force-landscape-stage .hud-bottom-dock {
+  padding-top: 0 !important;
+  padding-bottom: 6px !important;
+  gap: 4px !important;
+}
+
+html.force-landscape-stage .hud-action-bar {
+  padding: 4px 8px !important;
+  gap: 5px !important;
+  border-radius: 12px !important;
+}
+
+html.force-landscape-stage .hud-action-bar button {
+  padding: 5px 9px !important;
+  font-size: 10.5px !important;
+}
+
+html.force-landscape-stage .hud-pc-header {
+  flex-direction: row !important;
+  align-items: center !important;
+  padding: 6px 12px !important;
+  gap: 8px !important;
+}
+
+html.force-landscape-stage .hud-pc-content {
+  padding: 8px 12px !important;
+}
+
+html.force-landscape-stage .hud-pc-window {
+  height: calc(100vw - 12px) !important;
+  max-height: calc(100vw - 12px) !important;
+}
+
+html.force-landscape-stage .hud-posture-window,
+html.force-landscape-stage .hud-modal-scroll {
+  max-height: calc(100vw - 16px) !important;
+}
+
+html.force-landscape-stage .hud-joystick-wrap {
+  bottom: 10px !important;
+}
+
+html.force-landscape-stage .hud-joystick-ring {
+  width: 72px !important;
+  height: 72px !important;
+}
+
+html.force-landscape-stage .hud-joystick-knob {
+  width: 30px !important;
+  height: 30px !important;
+}

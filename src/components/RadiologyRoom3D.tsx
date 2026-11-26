@@ -13,6 +13,7 @@ import type {
 } from '../types/radiology';
 import {CLINIC_ROOM_IMAGE} from '../data/radiologyData';
 import {REGION_LABELS_I18N} from '../i18n/translations';
+import {getElementStageRect, toStagePoint} from '../utils/stageViewport';
 
 export type SceneTargetAction =
   | {type: 'REGION'; region: BodyRegion}
@@ -6539,9 +6540,10 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     };
 
     const getIntersects = (clientX: number, clientY: number) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      _pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      _pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      const rect = getElementStageRect(renderer.domElement);
+      const pt = toStagePoint(clientX, clientY);
+      _pointerNdc.x = ((pt.x - rect.left) / rect.width) * 2 - 1;
+      _pointerNdc.y = -((pt.y - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(_pointerNdc, camera);
       return raycaster.intersectObjects(interactiveMeshes, false);
     };
@@ -6564,8 +6566,9 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (activeDragPointerId !== null) return;
       activeDragPointerId = e.pointerId;
-      pointerDownPos = {x: e.clientX, y: e.clientY};
-      lastDragPos = {x: e.clientX, y: e.clientY};
+      const downStagePt = toStagePoint(e.clientX, e.clientY);
+      pointerDownPos = {x: downStagePt.x, y: downStagePt.y};
+      lastDragPos = {x: downStagePt.x, y: downStagePt.y};
       dragMaxDist = 0;
       longPressFired = false;
       clearLongPressTimer();
@@ -6732,12 +6735,13 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
 
     const onPointerMove = (e: PointerEvent) => {
       if (activeDragPointerId === e.pointerId) {
-        const dx = e.clientX - lastDragPos.x;
-        const dy = e.clientY - lastDragPos.y;
-        lastDragPos = {x: e.clientX, y: e.clientY};
+        const movePt = toStagePoint(e.clientX, e.clientY);
+        const dx = movePt.x - lastDragPos.x;
+        const dy = movePt.y - lastDragPos.y;
+        lastDragPos = {x: movePt.x, y: movePt.y};
         dragMaxDist = Math.max(
           dragMaxDist,
-          Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y)
+          Math.hypot(movePt.x - pointerDownPos.x, movePt.y - pointerDownPos.y)
         );
         if (dragMaxDist > 8) {
           clearLongPressTimer();

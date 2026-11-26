@@ -2,6 +2,7 @@ import React, {useRef, useState} from 'react';
 import {Move} from 'lucide-react';
 import {useLanguage} from '../i18n/translations';
 import type {JoystickSize} from '../types/radiology';
+import {getElementStageRect, toStagePoint} from '../utils/stageViewport';
 
 interface VirtualJoystickProps {
   joystickRef: React.MutableRefObject<{x: number; y: number}>;
@@ -55,14 +56,14 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
   const getDynamicMaxRadius = () => {
     const el = baseRef.current;
     if (!el) return 42;
-    const w = el.getBoundingClientRect().width;
+    const w = getElementStageRect(el).width;
     return w > 0 ? Math.max(22, w * 0.42) : 42;
   };
 
-  const updateFromClient = (clientX: number, clientY: number) => {
+  const updateFromStagePoint = (stageX: number, stageY: number) => {
     const maxRadius = getDynamicMaxRadius();
-    let dx = clientX - originRef.current.x;
-    let dy = clientY - originRef.current.y;
+    let dx = stageX - originRef.current.x;
+    let dy = stageY - originRef.current.y;
     const dist = Math.hypot(dx, dy);
 
     if (dist > maxRadius) {
@@ -70,8 +71,8 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
       dy = (dy / dist) * maxRadius;
       // Gently pull origin along if thumb slides past edge so direction reversals stay instant
       originRef.current = {
-        x: clientX - dx,
-        y: clientY - dy,
+        x: stageX - dx,
+        y: stageY - dy,
       };
     }
 
@@ -112,14 +113,16 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
       // Ignore unsupported capture
     }
 
+    const pt = toStagePoint(e.clientX, e.clientY);
+
     // Anchor relative to thumb down point (clamped cleanly inside ring) so initial tap never jolts
     const el = baseRef.current;
     if (el) {
-      const rect = el.getBoundingClientRect();
+      const rect = getElementStageRect(el);
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      const offsetX = e.clientX - cx;
-      const offsetY = e.clientY - cy;
+      const offsetX = pt.x - cx;
+      const offsetY = pt.y - cy;
       const clampOff = Math.hypot(offsetX, offsetY);
       if (clampOff > 18) {
         originRef.current = {
@@ -127,10 +130,10 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
           y: cy + (offsetY / clampOff) * 18,
         };
       } else {
-        originRef.current = {x: e.clientX, y: e.clientY};
+        originRef.current = {x: pt.x, y: pt.y};
       }
     } else {
-      originRef.current = {x: e.clientX, y: e.clientY};
+      originRef.current = {x: pt.x, y: pt.y};
     }
 
     setIsDragging(true);
@@ -142,7 +145,8 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
     if (disabled || activePointerIdRef.current !== e.pointerId) return;
     e.preventDefault();
     e.stopPropagation();
-    updateFromClient(e.clientX, e.clientY);
+    const pt = toStagePoint(e.clientX, e.clientY);
+    updateFromStagePoint(pt.x, pt.y);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {

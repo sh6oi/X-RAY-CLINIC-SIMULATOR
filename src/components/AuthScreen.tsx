@@ -126,7 +126,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   };
 
   return (
-    <div className="min-h-dvh bg-[#0B111A] text-slate-100 flex flex-col">
+    <div className="min-h-full bg-[#0B111A] text-slate-100 flex flex-col">
       {/* Top Bar */}
       <header className="border-b border-slate-800/90 bg-[#0D1520]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-8">

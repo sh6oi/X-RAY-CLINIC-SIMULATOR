@@ -429,7 +429,7 @@ export const PatientPostureMenu: React.FC<PatientPostureMenuProps> = ({
         role="dialog"
         aria-modal="true"
         aria-label={isAr ? 'قائمة وضعيات المريض' : 'Patient Posture Menu'}
-        className="w-full max-w-[640px] max-h-[calc(100dvh-1rem)] sm:max-h-[min(86dvh,640px)] flex flex-col rounded-2xl border border-slate-700/85 bg-[#08101C]/98 shadow-[0_24px_64px_rgba(0,0,0,0.9)] overflow-hidden"
+        className="hud-posture-window w-full max-w-[640px] max-h-[calc(100dvh-1rem)] sm:max-h-[min(86dvh,640px)] flex flex-col rounded-2xl border border-slate-700/85 bg-[#08101C]/98 shadow-[0_24px_64px_rgba(0,0,0,0.9)] overflow-hidden"
       >
         {/* Header */}
         <div className="shrink-0 px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-800 bg-[#0B1525] flex items-center justify-between gap-2">

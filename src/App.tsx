@@ -23,7 +23,6 @@ import {
   ScanLine,
   Shield,
   Sliders,
-  Smartphone,
   Sun,
   UserCheck,
   Volume2,
@@ -98,6 +97,7 @@ import {VirtualJoystick} from './components/VirtualJoystick';
 import {DesignerCredit} from './components/DesignerCredit';
 import {useAppUpdate} from './hooks/useAppUpdate';
 import {soundFx} from './utils/soundFx';
+import {getStageDimensions, toStagePoint} from './utils/stageViewport';
 
 function rollDailyTargetPatients(ownedUpgrades: UpgradeId[]): number {
   const hasWaitingRoom = ownedUpgrades.includes('waiting_room');
@@ -274,7 +274,7 @@ export default function App() {
   // Toast message
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Mobile landscape-only orientation lock & portrait blocker
+  // Mobile automatic direct-landscape detection (rotates stage seamlessly if phone is held vertically)
   const checkIsPortraitPhone = useCallback((): boolean => {
     if (typeof window === 'undefined') return false;
     if (window.innerHeight <= window.innerWidth) return false;
@@ -287,14 +287,18 @@ export default function App() {
     );
   }, []);
 
-  const [isPortraitPhone, setIsPortraitPhone] = useState<boolean>(() =>
-    typeof window !== 'undefined' && window.innerHeight > window.innerWidth
-      ? ((window.matchMedia?.('(pointer: coarse)')?.matches ||
-          navigator.maxTouchPoints > 0) &&
-          window.innerWidth <= 920) ||
-        window.innerWidth <= 680
-      : false
-  );
+  if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+    const initialPortrait =
+      window.innerHeight > window.innerWidth &&
+      (((window.matchMedia?.('(pointer: coarse)')?.matches ||
+        navigator.maxTouchPoints > 0) &&
+        window.innerWidth <= 920) ||
+        window.innerWidth <= 680);
+    document.documentElement.classList.toggle(
+      'force-landscape-stage',
+      initialPortrait
+    );
+  }
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const getDefaultJoystickConfig = (): JoystickConfig => ({
@@ -390,7 +394,10 @@ export default function App() {
     };
     const checkViewport = () => {
       const portrait = checkIsPortraitPhone();
-      setIsPortraitPhone(portrait);
+      document.documentElement.classList.toggle(
+        'force-landscape-stage',
+        portrait
+      );
       tryLockLandscape();
     };
     const onFullscreenChange = () => {
@@ -404,6 +411,7 @@ export default function App() {
     window.addEventListener('orientationchange', checkViewport);
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => {
+      document.documentElement.classList.remove('force-landscape-stage');
       window.removeEventListener('resize', checkViewport);
       window.removeEventListener('orientationchange', checkViewport);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
@@ -669,8 +677,7 @@ export default function App() {
       screenMode !== 'PLAYING' ||
       !hasAssistant ||
       !techProfile ||
-      appUpdate.updateAvailable ||
-      isPortraitPhone
+      appUpdate.updateAvailable
     ) {
       return;
     }
@@ -693,7 +700,6 @@ export default function App() {
     hasAssistant,
     techProfile,
     appUpdate.updateAvailable,
-    isPortraitPhone,
     commitSaveUpdate,
   ]);
 
@@ -1887,44 +1893,6 @@ export default function App() {
     }
   };
 
-  const landscapeOnlyOverlay = isPortraitPhone ? (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-[110] bg-[#060B13] flex items-center justify-center p-5"
-    >
-      <div className="w-full max-w-sm rounded-2xl border-2 border-cyan-500/70 bg-[#0B1422] p-6 text-center space-y-4 shadow-[0_24px_80px_rgba(0,0,0,0.9)]">
-        <div className="w-16 h-16 mx-auto rounded-2xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center">
-          <Smartphone className="w-8 h-8 text-cyan-300 -rotate-90 animate-pulse" />
-        </div>
-
-        <div className="space-y-1.5">
-          <h2 className="text-lg font-display font-bold text-white">
-            {isAr ? 'اللعبة تعمل بالعرض فقط' : 'Landscape Mode Required'}
-          </h2>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            {isAr
-              ? 'يرجى تدوير الهاتف بالوضع الأفقي (بالعرض) لفتح اللعبة واللعب — لا يمكن تشغيل اللعبة بالوضع الطولي.'
-              : 'Please rotate your phone to landscape (horizontal) orientation — this game runs in landscape mode only.'}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => void handleToggleLandscapeFullscreen()}
-          className="w-full py-2.5 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
-        >
-          <RotateCcw className="w-4 h-4 shrink-0" />
-          <span>
-            {isAr
-              ? 'تدوير تلقائي بالعرض وملء الشاشة'
-              : 'Switch to Landscape Fullscreen'}
-          </span>
-        </button>
-      </div>
-    </div>
-  ) : null;
-
   const mandatoryUpdateOverlay = (
     <UpdateNotificationBanner
       visible={appUpdate.isBannerVisible}
@@ -1938,8 +1906,8 @@ export default function App() {
   // =========================================================================
   if (authChecking) {
     return (
-      <>
-        <div className="min-h-screen bg-[#09111C] text-slate-100 flex flex-col items-center justify-center gap-4">
+      <div className="app-landscape-stage">
+        <div className="auth-check-screen min-h-dvh bg-[#09111C] text-slate-100 flex flex-col items-center justify-center gap-4">
           <div className="w-10 h-10 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
           <p className="text-sm text-slate-300">
             {isAr
@@ -1947,9 +1915,8 @@ export default function App() {
               : 'Restoring radiographer account & preparing 3D suite...'}
           </p>
         </div>
-        {landscapeOnlyOverlay}
         {mandatoryUpdateOverlay}
-      </>
+      </div>
     );
   }
 
@@ -1958,14 +1925,13 @@ export default function App() {
   // =========================================================================
   if (screenMode === 'AUTH' || !techProfile) {
     return (
-      <>
+      <div className="app-landscape-stage">
         <AuthScreen
           initialSave={INITIAL_SAVE}
           onAuthenticated={handleAuthenticated}
         />
-        {landscapeOnlyOverlay}
         {mandatoryUpdateOverlay}
-      </>
+      </div>
     );
   }
 
@@ -2014,40 +1980,38 @@ export default function App() {
                     : 'Cassette in Wall Bucky';
 
   return (
-    <div
-      className="relative w-screen h-dvh overflow-hidden bg-[#09111C] text-slate-100 select-none"
-    >
-      {/* FULL-SCREEN 3D RADIOLOGY CLINIC */}
-      <RadiologyRoom3D
-        patient={activePatient}
-        waitingPatients={queue
-          .filter((p) => p.id !== activePatient?.id)
-          .slice(0, 4)}
-        requestedExam={requestedExam}
-        selectedRegion={selectedRegion}
-        selectedPosture={selectedPosture}
-        techLocation={techLocation}
-        doorClosed={doorClosed}
-        ctDoorOpen={ctDoorOpen}
-        mriDoorOpen={mriDoorOpen}
-        cassetteState={cassetteState}
-        crExposedPending={crExposedPending}
-        isDeveloping={isDeveloping}
-        hasDR={hasDR}
-        shieldUsed={hasLeadShield && shieldUsed}
-        patientPrepped={effectiveBreathHeld}
-        isExposing={isExposing}
-        patientSpeech={patientSpeech}
-        language={lang}
-        brightness={brightness}
-        paused={
-          pcOpen ||
-          designerPopupOpen ||
-          controlsModalOpen ||
-          daySummaryOpen ||
-          isPortraitPhone ||
-          appUpdate.updateAvailable
-        }
+    <div className="app-landscape-stage">
+      <div className="hud-play-root relative w-full h-dvh overflow-hidden bg-[#09111C] text-slate-100 select-none">
+        {/* FULL-SCREEN 3D RADIOLOGY CLINIC */}
+        <RadiologyRoom3D
+          patient={activePatient}
+          waitingPatients={queue
+            .filter((p) => p.id !== activePatient?.id)
+            .slice(0, 4)}
+          requestedExam={requestedExam}
+          selectedRegion={selectedRegion}
+          selectedPosture={selectedPosture}
+          techLocation={techLocation}
+          doorClosed={doorClosed}
+          ctDoorOpen={ctDoorOpen}
+          mriDoorOpen={mriDoorOpen}
+          cassetteState={cassetteState}
+          crExposedPending={crExposedPending}
+          isDeveloping={isDeveloping}
+          hasDR={hasDR}
+          shieldUsed={hasLeadShield && shieldUsed}
+          patientPrepped={effectiveBreathHeld}
+          isExposing={isExposing}
+          patientSpeech={patientSpeech}
+          language={lang}
+          brightness={brightness}
+          paused={
+            pcOpen ||
+            designerPopupOpen ||
+            controlsModalOpen ||
+            daySummaryOpen ||
+            appUpdate.updateAvailable
+          }
         ownedUpgrades={save.ownedUpgrades}
         joystickRef={joystickRef}
         onTechZoneChange={handleTechZoneChange}
@@ -2445,26 +2409,30 @@ export default function App() {
         <div
           onPointerDown={(e) => {
             if ((e.target as HTMLElement).closest('button')) return;
+            const pt = toStagePoint(e.clientX, e.clientY);
+            const dim = getStageDimensions();
             const nx = Math.min(
               0.92,
-              Math.max(0.08, e.clientX / (window.innerWidth || 1))
+              Math.max(0.08, pt.x / (dim.width || 1))
             );
             const ny = Math.min(
               0.88,
-              Math.max(0.16, e.clientY / (window.innerHeight || 1))
+              Math.max(0.16, pt.y / (dim.height || 1))
             );
             setDraftJoystickCoords({x: nx, y: ny});
           }}
           onPointerMove={(e) => {
             if (e.buttons === 0 && e.pointerType === 'mouse') return;
             if ((e.target as HTMLElement).closest('button')) return;
+            const pt = toStagePoint(e.clientX, e.clientY);
+            const dim = getStageDimensions();
             const nx = Math.min(
               0.92,
-              Math.max(0.08, e.clientX / (window.innerWidth || 1))
+              Math.max(0.08, pt.x / (dim.width || 1))
             );
             const ny = Math.min(
               0.88,
-              Math.max(0.16, e.clientY / (window.innerHeight || 1))
+              Math.max(0.16, pt.y / (dim.height || 1))
             );
             setDraftJoystickCoords({x: nx, y: ny});
           }}
@@ -2943,9 +2911,7 @@ export default function App() {
         patientsMilestone={designerMilestoneCount}
         onClose={() => setDesignerPopupOpen(false)}
       />
-
-      {/* STRICT LANDSCAPE-ONLY OVERLAY FOR ALL PHONES */}
-      {landscapeOnlyOverlay}
+      </div>
     </div>
   );
 }

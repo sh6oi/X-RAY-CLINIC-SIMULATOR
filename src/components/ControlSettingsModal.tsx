@@ -82,7 +82,7 @@ export const ControlSettingsModal: React.FC<ControlSettingsModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl max-h-[92dvh] overflow-y-auto rounded-2xl border border-cyan-600/60 bg-[#0A1320] text-slate-100 shadow-2xl p-4 sm:p-5 space-y-4"
+        className="hud-modal-scroll w-full max-w-xl max-h-[92dvh] overflow-y-auto rounded-2xl border border-cyan-600/60 bg-[#0A1320] text-slate-100 shadow-2xl p-4 sm:p-5 space-y-4"
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
