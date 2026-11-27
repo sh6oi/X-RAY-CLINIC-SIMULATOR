@@ -53,7 +53,7 @@ export const DaySummaryModal: React.FC<DaySummaryModalProps> = ({
       <div
         ref={scrollRef}
         {...scrollHandlers}
-        className="hud-modal-scroll stage-scroll-area w-full max-w-xl max-h-[94dvh] overflow-y-auto rounded-2xl border border-cyan-500/60 bg-[#0A1320] text-slate-100 shadow-2xl p-4 sm:p-6 space-y-4"
+        className="hud-modal-scroll stage-scroll-area w-full max-w-xl max-h-[calc(var(--stage-h,100vh)*0.94)] overflow-y-auto rounded-2xl border border-cyan-500/60 bg-[#0A1320] text-slate-100 shadow-2xl p-4 sm:p-6 space-y-4"
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3.5">

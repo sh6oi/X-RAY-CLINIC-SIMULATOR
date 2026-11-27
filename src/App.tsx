@@ -104,7 +104,11 @@ import {VirtualJoystick} from './components/VirtualJoystick';
 import {DesignerCredit} from './components/DesignerCredit';
 import {useAppUpdate} from './hooks/useAppUpdate';
 import {soundFx} from './utils/soundFx';
-import {getStageDimensions, toStagePoint} from './utils/stageViewport';
+import {
+  getStageDimensions,
+  syncStageViewport,
+  toStagePoint,
+} from './utils/stageViewport';
 
 function rollDailyTargetPatients(ownedUpgrades: UpgradeId[]): number {
   const hasWaitingRoom = ownedUpgrades.includes('waiting_room');
@@ -306,32 +310,6 @@ export default function App() {
 
   // Toast message
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-
-  // Mobile automatic direct-landscape detection (rotates stage seamlessly if phone is held vertically)
-  const checkIsPortraitPhone = useCallback((): boolean => {
-    if (typeof window === 'undefined') return false;
-    if (window.innerHeight <= window.innerWidth) return false;
-    const isCoarsePointer =
-      window.matchMedia?.('(pointer: coarse)')?.matches ||
-      navigator.maxTouchPoints > 0;
-    return (
-      (isCoarsePointer && window.innerWidth <= 920) ||
-      window.innerWidth <= 680
-    );
-  }, []);
-
-  if (typeof document !== 'undefined' && typeof window !== 'undefined') {
-    const initialPortrait =
-      window.innerHeight > window.innerWidth &&
-      (((window.matchMedia?.('(pointer: coarse)')?.matches ||
-        navigator.maxTouchPoints > 0) &&
-        window.innerWidth <= 920) ||
-        window.innerWidth <= 680);
-    document.documentElement.classList.toggle(
-      'force-landscape-stage',
-      initialPortrait
-    );
-  }
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const getDefaultJoystickConfig = (): JoystickConfig => ({
@@ -426,30 +404,32 @@ export default function App() {
       void orientation?.lock?.('landscape')?.catch(() => {});
     };
     const checkViewport = () => {
-      const portrait = checkIsPortraitPhone();
-      document.documentElement.classList.toggle(
-        'force-landscape-stage',
-        portrait
-      );
+      syncStageViewport();
       tryLockLandscape();
     };
     const onFullscreenChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
-      if (document.fullscreenElement) {
-        tryLockLandscape();
-      }
+      checkViewport();
+    };
+    const onFocusShift = () => {
+      window.setTimeout(checkViewport, 80);
     };
     checkViewport();
     window.addEventListener('resize', checkViewport);
     window.addEventListener('orientationchange', checkViewport);
+    window.visualViewport?.addEventListener('resize', checkViewport);
     document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('focusin', onFocusShift);
+    document.addEventListener('focusout', onFocusShift);
     return () => {
-      document.documentElement.classList.remove('force-landscape-stage');
       window.removeEventListener('resize', checkViewport);
       window.removeEventListener('orientationchange', checkViewport);
+      window.visualViewport?.removeEventListener('resize', checkViewport);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('focusin', onFocusShift);
+      document.removeEventListener('focusout', onFocusShift);
     };
-  }, [checkIsPortraitPhone]);
+  }, []);
 
   const handleToggleLandscapeFullscreen = async () => {
     try {
@@ -1991,7 +1971,7 @@ export default function App() {
   if (authChecking) {
     return (
       <div className="app-landscape-stage">
-        <div className="auth-check-screen min-h-dvh bg-[#09111C] text-slate-100 flex flex-col items-center justify-center gap-4">
+        <div className="auth-check-screen min-h-[var(--stage-h,100vh)] bg-[#09111C] text-slate-100 flex flex-col items-center justify-center gap-4">
           <div className="w-10 h-10 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
           <p className="text-sm text-slate-300">
             {isAr
@@ -2065,7 +2045,7 @@ export default function App() {
 
   return (
     <div className="app-landscape-stage">
-      <div className="hud-play-root relative w-full h-dvh overflow-hidden bg-[#09111C] text-slate-100 select-none">
+      <div className="hud-play-root relative w-full h-[var(--stage-h,100vh)] overflow-hidden bg-[#09111C] text-slate-100 select-none">
         {/* FULL-SCREEN 3D RADIOLOGY CLINIC */}
         <RadiologyRoom3D
           patient={activePatient}

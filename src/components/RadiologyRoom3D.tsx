@@ -7141,7 +7141,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       }
     };
 
-    const resizeObserver = new ResizeObserver(() => {
+    const handleContainerResize = () => {
       if (!container) return;
       const w = container.clientWidth;
       const h = container.clientHeight;
@@ -7150,8 +7150,17 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(getOptimalPixelRatio());
       renderer.setSize(w, h);
-    });
-    resizeObserver.observe(container);
+    };
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(handleContainerResize)
+        : null;
+    resizeObserver?.observe(container);
+    window.addEventListener('resize', handleContainerResize);
+    window.addEventListener('orientationchange', handleContainerResize);
+    window.visualViewport?.addEventListener('resize', handleContainerResize);
+    const initResizeRaf = requestAnimationFrame(handleContainerResize);
 
     // =========================================================================
     // 10. ANIMATION LOOP (First-Person Hands, Door, Cassette, Patient & Crane)
@@ -8140,8 +8149,12 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       loopRunning = false;
       clearLongPressTimer();
       cancelAnimationFrame(frameId);
+      cancelAnimationFrame(initResizeRaf);
       clearTimeout(frameId);
-      resizeObserver.disconnect();
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', handleContainerResize);
+      window.removeEventListener('orientationchange', handleContainerResize);
+      window.visualViewport?.removeEventListener('resize', handleContainerResize);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       renderer.domElement.removeEventListener(
         'webglcontextlost',

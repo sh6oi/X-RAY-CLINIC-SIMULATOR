@@ -79,7 +79,7 @@ input[type="range"].radiology-slider::-moz-range-thumb {
 }
 
 /* Mobile landscape viewport adaptation: sized specifically for horizontal phones */
-@media (orientation: landscape) and (max-height: 560px) {
+@media (orientation: landscape) and (max-height: 580px) {
   .hud-header-bar {
     flex-direction: row !important;
     flex-wrap: nowrap !important;
@@ -163,7 +163,7 @@ input[type="range"].radiology-slider::-moz-range-thumb {
     right: max(8px, env(safe-area-inset-right)) !important;
     left: auto !important;
     width: min(335px, 47vw) !important;
-    max-height: calc(100dvh - 98px) !important;
+    max-height: calc(var(--stage-h, 100vh) - 98px) !important;
     padding: 7px 9px !important;
     border-radius: 12px !important;
   }
@@ -306,7 +306,7 @@ input[type="range"].radiology-slider::-moz-range-thumb {
     grid-column: span 6 / span 6 !important;
   }
   .hud-radiograph-box {
-    max-width: min(215px, 52dvh) !important;
+    max-width: min(215px, calc(var(--stage-h, 100vh) * 0.52)) !important;
   }
   .hud-auth-main {
     padding: 8px 12px !important;
@@ -350,32 +350,40 @@ input[type="range"].radiology-slider::-moz-range-thumb {
 
 .app-landscape-stage {
   width: 100%;
-  min-height: 100dvh;
+  min-height: var(--stage-h, 100vh);
 }
 
-/* Direct landscape rotation when opened on portrait phones (zero rotation prompt) */
+/* Direct landscape rotation when opened on portrait phones (zero rotation prompt, universal Android support) */
 html.force-landscape-stage,
-html.force-landscape-stage body {
+html.force-landscape-stage body,
+html.force-landscape-stage #root {
   width: 100%;
   height: 100%;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
 }
 
 html.force-landscape-stage .app-landscape-stage {
   position: fixed;
   top: 0;
-  left: 100vw;
-  width: 100dvh;
-  height: 100vw;
+  left: 0;
+  right: auto;
+  bottom: auto;
+  width: var(--stage-w, 100vh);
+  height: var(--stage-h, 100vw);
   min-height: 0;
-  transform: rotate(90deg);
-  transform-origin: top left;
+  -webkit-transform: translate3d(var(--viewport-w, 100vw), 0, 0) rotate(90deg);
+  transform: translate3d(var(--viewport-w, 100vw), 0, 0) rotate(90deg);
+  -webkit-transform-origin: 0 0;
+  transform-origin: 0 0;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
 html.force-landscape-stage .hud-play-root {
+  width: 100% !important;
   height: 100% !important;
 }
 
@@ -407,7 +415,7 @@ html.force-landscape-stage .hud-patient-card {
   padding: 4px 8px !important;
   gap: 6px !important;
   width: auto !important;
-  max-width: min(350px, 47dvh) !important;
+  max-width: min(350px, calc(var(--stage-w, 100vh) * 0.47)) !important;
   border-radius: 10px !important;
 }
 
@@ -428,7 +436,7 @@ html.force-landscape-stage .hud-credit-badge {
   right: auto !important;
   padding: 3px 8px !important;
   font-size: 9.5px !important;
-  max-width: 36dvh !important;
+  max-width: calc(var(--stage-w, 100vh) * 0.36) !important;
   border-radius: 8px !important;
 }
 
@@ -436,7 +444,7 @@ html.force-landscape-stage .hud-toast {
   top: 46px !important;
   padding: 4px 10px !important;
   font-size: 11px !important;
-  max-width: 56dvh !important;
+  max-width: calc(var(--stage-w, 100vh) * 0.56) !important;
 }
 
 html.force-landscape-stage .hud-low-films {
@@ -454,7 +462,7 @@ html.force-landscape-stage .hud-hover-label {
 
 html.force-landscape-stage .hud-speech-bubble {
   min-width: 155px !important;
-  max-width: min(250px, 38dvh) !important;
+  max-width: min(250px, calc(var(--stage-w, 100vh) * 0.38)) !important;
 }
 
 html.force-landscape-stage .hud-speech-card {
@@ -479,8 +487,8 @@ html.force-landscape-stage .hud-console-panel {
   bottom: 50px !important;
   right: 8px !important;
   left: auto !important;
-  width: min(335px, 47dvh) !important;
-  max-height: calc(100vw - 98px) !important;
+  width: min(335px, calc(var(--stage-w, 100vh) * 0.47)) !important;
+  max-height: calc(var(--stage-h, 100vw) - 98px) !important;
   padding: 7px 9px !important;
   border-radius: 12px !important;
 }
@@ -550,13 +558,13 @@ html.force-landscape-stage .hud-pc-content {
 }
 
 html.force-landscape-stage .hud-pc-window {
-  height: calc(100vw - 12px) !important;
-  max-height: calc(100vw - 12px) !important;
+  height: calc(var(--stage-h, 100vw) - 12px) !important;
+  max-height: calc(var(--stage-h, 100vw) - 12px) !important;
 }
 
 html.force-landscape-stage .hud-posture-window,
 html.force-landscape-stage .hud-modal-scroll {
-  max-height: calc(100vw - 16px) !important;
+  max-height: calc(var(--stage-h, 100vw) - 16px) !important;
 }
 
 html.force-landscape-stage .hud-joystick-wrap {
@@ -687,7 +695,7 @@ html.force-landscape-stage .hud-radiograph-controls {
 }
 
 html.force-landscape-stage .hud-radiograph-box {
-  max-width: min(210px, 50vw) !important;
+  max-width: min(210px, calc(var(--stage-h, 100vw) * 0.5)) !important;
 }
 
 html.force-landscape-stage .hud-auth-main {

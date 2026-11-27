@@ -85,7 +85,7 @@ export const PatientRegionMenu: React.FC<PatientRegionMenuProps> = ({
         role="dialog"
         aria-modal="true"
         aria-label={isAr ? 'تحديد المنطقة والجهة' : 'Select Region & Side'}
-        className="hud-posture-window hud-region-window w-full max-w-[720px] max-h-[calc(100dvh-0.75rem)] sm:max-h-[min(90dvh,670px)] flex flex-col rounded-2xl border border-slate-700/85 bg-[#08101C]/98 shadow-[0_24px_64px_rgba(0,0,0,0.9)] overflow-hidden"
+        className="hud-posture-window hud-region-window w-full max-w-[720px] max-h-[calc(var(--stage-h,100vh)-0.75rem)] sm:max-h-[min(calc(var(--stage-h,100vh)*0.9),670px)] flex flex-col rounded-2xl border border-slate-700/85 bg-[#08101C]/98 shadow-[0_24px_64px_rgba(0,0,0,0.9)] overflow-hidden"
       >
         {/* Header */}
         <div className="shrink-0 px-3 py-2 sm:px-4 sm:py-2.5 border-b border-slate-800 bg-[#0B1525] flex items-center justify-between gap-2">

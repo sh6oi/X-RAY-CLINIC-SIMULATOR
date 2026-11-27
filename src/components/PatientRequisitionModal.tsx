@@ -63,7 +63,7 @@ export const PatientRequisitionModal: React.FC<PatientRequisitionModalProps> = (
         role="dialog"
         aria-modal="true"
         aria-label={isAr ? 'ورقة طلب الفحص الإشعاعي' : 'Radiology Exam Requisition'}
-        className="w-full max-w-[520px] max-h-[calc(100dvh-1rem)] flex flex-col rounded-2xl border-2 border-slate-300 bg-[#FAF7EE] text-slate-900 shadow-[0_26px_70px_rgba(0,0,0,0.85)] overflow-hidden"
+        className="w-full max-w-[520px] max-h-[calc(var(--stage-h,100vh)-1rem)] flex flex-col rounded-2xl border-2 border-slate-300 bg-[#FAF7EE] text-slate-900 shadow-[0_26px_70px_rgba(0,0,0,0.85)] overflow-hidden"
       >
         {/* Top Medical Slip Header Bar */}
         <div className="shrink-0 px-4 py-3 bg-[#0E3A5D] text-white flex items-center justify-between gap-2 border-b-4 border-cyan-500">
