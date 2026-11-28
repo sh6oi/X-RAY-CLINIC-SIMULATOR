@@ -12,7 +12,7 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
-import type {BodyRegion, BodySide} from '../types/radiology';
+import type {BodyRegion, BodySide, Modality} from '../types/radiology';
 import {
   formatRegionWithSide,
   useLanguage,
@@ -21,6 +21,7 @@ import {isPediatricPatientAge} from '../data/radiologyData';
 import {useStageScroll} from '../hooks/useStageScroll';
 
 interface ExposureConsolePanelProps {
+  modality?: Modality;
   kvp: number;
   mas: number;
   onChangeKvp: (val: number) => void;
@@ -51,6 +52,7 @@ interface ExposureConsolePanelProps {
 const roundHalf = (val: number): number => Math.round(val * 2) / 2;
 
 export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
+  modality = 'XRAY',
   kvp,
   mas,
   onChangeKvp,
@@ -106,9 +108,13 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white truncate">
               <span className="truncate">
-                {isAr
-                  ? 'وحدة التحكم بالمولّد (Console)'
-                  : 'X-Ray Generator Console'}
+                {modality === 'MRI'
+                  ? isAr
+                    ? 'وحدة الموجات الراديوية (MRI RF)'
+                    : 'MRI Radiofrequency Console'
+                  : isAr
+                    ? 'وحدة التحكم بالمولّد (Console)'
+                    : 'X-Ray Generator Console'}
               </span>
               {isChild && (
                 <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-amber-200 text-[9px] font-bold shrink-0">
@@ -117,8 +123,14 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
               )}
             </div>
             <div className="text-[10px] font-mono-num text-slate-400 truncate">
-              {hasDR ? 'DR DIGITAL' : 'CR CASSETTE'} ·{' '}
-              {formatRegionWithSide(selectedRegion, selectedSide, lang, true)}
+              {modality === 'MRI'
+                ? '1.5T · 63.9 MHz RF'
+                : modality === 'CT'
+                  ? '64-SLICE CT'
+                  : hasDR
+                    ? 'DR DIGITAL'
+                    : 'CR CASSETTE'}{' '}
+              · {formatRegionWithSide(selectedRegion, selectedSide, lang, true)}
             </div>
           </div>
         </div>
@@ -179,7 +191,9 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
           }`}
         >
           {isExposing
-            ? 'X-RAY ON'
+            ? modality === 'MRI'
+              ? 'RF PULSE'
+              : 'X-RAY ON'
             : crPendingScan
               ? 'CR WAIT'
               : readyToFire
@@ -188,7 +202,45 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
         </div>
       </div>
 
-      {/* Dual Digital Recessed LCD Displays: kVp & mAs */}
+      {/* Dual Digital Recessed LCD Displays: RF (for MRI) OR kVp & mAs (for X-Ray/CT) */}
+      {modality === 'MRI' ? (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="hud-console-lcd rounded-xl border border-emerald-900/70 bg-[#050B14] shadow-[inset_0_2px_10px_rgba(0,0,0,0.85)] p-2.5 space-y-1">
+            <div className="flex items-center justify-between text-[10px] text-slate-400">
+              <span>{isAr ? 'الموجات الراديوية' : 'RF Frequency'}</span>
+              <span className="font-mono-num text-emerald-400">Larmor RF</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-1">
+              <span className="hud-console-val font-mono-num text-xl sm:text-2xl font-bold text-emerald-300">
+                63.9
+              </span>
+              <span className="font-mono-num text-[11px] font-semibold text-emerald-500">
+                MHz RF
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-400">
+              {isAr ? 'رنين مغناطيسي بدون أشعة' : 'Non-ionizing RF Waves'}
+            </div>
+          </div>
+          <div className="hud-console-lcd rounded-xl border border-cyan-900/70 bg-[#050B14] shadow-[inset_0_2px_10px_rgba(0,0,0,0.85)] p-2.5 space-y-1">
+            <div className="flex items-center justify-between text-[10px] text-slate-400">
+              <span>{isAr ? 'المجال المغناطيسي' : 'Magnetic Field'}</span>
+              <span className="font-mono-num text-cyan-400">T1 / T2</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-1">
+              <span className="hud-console-val font-mono-num text-xl sm:text-2xl font-bold text-cyan-300">
+                1.5
+              </span>
+              <span className="font-mono-num text-[11px] font-semibold text-cyan-500">
+                Tesla
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-400">
+              {isAr ? 'لا يستخدم kVp أو mAs' : 'No kVp / mAs used'}
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="grid grid-cols-2 gap-2">
         {/* kVp Hardware Module */}
         <div className="hud-console-lcd rounded-xl border border-cyan-900/70 bg-[#050B14] shadow-[inset_0_2px_10px_rgba(0,0,0,0.85)] p-2.5 space-y-1.5">
@@ -321,8 +373,9 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
           </div>
         </div>
       </div>
+      )}
 
-      {hasDosimeter && (
+      {hasDosimeter && modality !== 'MRI' && (
         <div
           className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold flex items-center justify-between gap-2 ${
             doseOptimal
@@ -404,20 +457,28 @@ export const ExposureConsolePanel: React.FC<ExposureConsolePanelProps> = ({
         <Radiation className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
         <span>
           {isExposing
-            ? isAr
-              ? 'جاري إطلاق الأشعة السينية...'
-              : 'Firing X-Ray Exposure...'
+            ? modality === 'MRI'
+              ? isAr
+                ? 'جاري إرسال الموجات الراديوية (RF)...'
+                : 'Transmitting RF Pulse...'
+              : isAr
+                ? 'جاري إطلاق الأشعة السينية...'
+                : 'Firing X-Ray Exposure...'
             : isDeveloping
               ? isAr
-                ? 'جاري قراءة الكاسيت ومعالجة الصورة...'
-                : 'Reading Cassette & Processing...'
+                ? 'جاري معالجة الصورة...'
+                : 'Processing Scan...'
               : crPendingScan
                 ? isAr
                   ? 'أحضر الكاسيت وضعْه في قارئ CR'
                   : 'Retrieve Cassette & Insert in CR Reader'
-                : isAr
-                  ? 'إطلاق الجرعة الإشعاعية (EXPOSE)'
-                  : 'TRIGGER EXPOSURE (EXPOSE)'}
+                : modality === 'MRI'
+                  ? isAr
+                    ? 'بدء المسح بالموجات الراديوية (START RF)'
+                    : 'START MRI RF SCAN'
+                  : isAr
+                    ? 'إطلاق الجرعة الإشعاعية (EXPOSE)'
+                    : 'TRIGGER EXPOSURE (EXPOSE)'}
         </span>
       </button>
     </aside>

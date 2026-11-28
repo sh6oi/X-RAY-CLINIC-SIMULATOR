@@ -1650,6 +1650,7 @@ export default function App() {
       examImagePath: requestedExam.imagePath,
       modality: requestedExam.modality,
       sideUsed: capturedSide ?? selectedSide,
+      hasFracture: activePatient.hasFracture,
       findingAr: activePatient.findingAr,
       earned: gross,
       kvpUsed: kvp,
@@ -2301,8 +2302,9 @@ export default function App() {
               <div className="text-slate-400 break-words">
                 {POSTURE_SHORT_I18N[lang][requestedExam.recommendedPosture]} ·{' '}
                 <span className="font-mono-num text-slate-300">
-                  {effectiveRanges.kvpRange[0]}–{effectiveRanges.kvpRange[1]} kVp /{' '}
-                  {effectiveRanges.masRange[0]}–{effectiveRanges.masRange[1]} mAs
+                  {requestedExam.modality === 'MRI'
+                    ? '1.5T · 63.9 MHz RF'
+                    : `${effectiveRanges.kvpRange[0]}–${effectiveRanges.kvpRange[1]} kVp / ${effectiveRanges.masRange[0]}–${effectiveRanges.masRange[1]} mAs`}
                 </span>
               </div>
             </div>
@@ -2419,6 +2421,7 @@ export default function App() {
       {/* CONTROL BOOTH HARDWARE X-RAY GENERATOR CONSOLE */}
       {techLocation === 'BOOTH' && consoleOpen && !pcOpen && (
         <ExposureConsolePanel
+          modality={requestedExam.modality}
           kvp={kvp}
           mas={mas}
           onChangeKvp={setKvp}

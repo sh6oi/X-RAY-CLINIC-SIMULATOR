@@ -14,6 +14,7 @@ import type {
 } from '../types/radiology';
 import {CLINIC_ROOM_IMAGE} from '../data/radiologyData';
 import {
+  POSTURE_SHORT_I18N,
   formatRegionWithSide,
   isBilateralRegion,
 } from '../i18n/translations';
@@ -1214,7 +1215,7 @@ function createRequisitionPaperTexture() {
 
   const redraw = (
     examTitleEn: string,
-    age: number,
+    postureLabel: string,
     side: BodySide,
     isUrgent: boolean
   ) => {
@@ -1231,35 +1232,25 @@ function createRequisitionPaperTexture() {
 
     // Clinical header band
     ctx.fillStyle = isUrgent ? '#991B1B' : '#0F4C81';
-    ctx.fillRect(10, 10, 236, 44);
+    ctx.fillRect(10, 10, 236, 42);
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
-    ctx.fillText('RADIOLOGY ORDER', 20, 32);
-    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = isUrgent ? '#FECACA' : '#BAE6FD';
-    ctx.fillText(
-      isUrgent ? 'STAT PRIORITY' : age < 14 ? 'PEDIATRIC RX' : 'CLINIC REQUISITION',
-      20,
-      48
-    );
+    ctx.fillText('RADIOLOGY ORDER', 20, 36);
 
-    // Ruled patient info strip
-    ctx.fillStyle = '#E2E8F0';
-    ctx.fillRect(16, 66, 224, 2);
     ctx.fillStyle = '#475569';
-    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
-    ctx.fillText('REQUESTED EXAM:', 18, 90);
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    ctx.fillText('EXAMINATION:', 18, 76);
 
     // Exam title box
     ctx.fillStyle = '#EFF6FF';
-    ctx.fillRect(14, 100, 228, 104);
+    ctx.fillRect(14, 86, 228, 96);
     ctx.strokeStyle = '#38BDF8';
     ctx.lineWidth = 2;
-    ctx.strokeRect(14, 100, 228, 104);
+    ctx.strokeRect(14, 86, 228, 96);
 
     // Word-wrap English exam title
     ctx.fillStyle = '#0F172A';
-    ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+    ctx.font = 'bold 19px system-ui, -apple-system, sans-serif';
     const words = examTitleEn.split(' ');
     const lines: string[] = [];
     let currentLine = '';
@@ -1274,36 +1265,37 @@ function createRequisitionPaperTexture() {
     }
     if (currentLine) lines.push(currentLine);
     lines.slice(0, 3).forEach((line, i) => {
-      ctx.fillText(line, 24, 132 + i * 26);
+      ctx.fillText(line, 24, 118 + i * 25);
     });
+
+    // Patient posture box
+    ctx.fillStyle = '#475569';
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    ctx.fillText('POSTURE:', 18, 206);
+
+    ctx.fillStyle = '#F8FAFC';
+    ctx.fillRect(14, 214, 228, 42);
+    ctx.strokeStyle = '#CBD5E1';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(14, 214, 228, 42);
+
+    ctx.fillStyle = '#0F4C81';
+    ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+    ctx.fillText(postureLabel, 22, 241, 212);
 
     // Side badge if bilateral
     if (side === 'RIGHT' || side === 'LEFT') {
       ctx.fillStyle = '#0284C7';
-      ctx.fillRect(18, 214, 118, 28);
+      ctx.fillRect(14, 268, 122, 28);
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
-      ctx.fillText(`SIDE: ${side}`, 28, 233);
+      ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+      ctx.fillText(`SIDE: ${side}`, 24, 287);
     }
-
-    // Printed prescription lines & medical stamp
-    ctx.fillStyle = '#94A3B8';
-    ctx.fillRect(18, 256, 220, 3);
-    ctx.fillRect(18, 270, 165, 3);
-
-    ctx.strokeStyle = '#0284C7';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(208, 282, 20, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = '#0284C7';
-    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-    ctx.fillText('RX', 200, 286);
 
     texture.needsUpdate = true;
   };
 
-  redraw('Chest PA', 32, 'NONE', false);
+  redraw('Chest PA', 'Erect PA', 'NONE', false);
   return {texture, redraw};
 }
 
@@ -1376,6 +1368,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     age: number;
     hasPatient: boolean;
     examTitleEn: string;
+    postureLabel: string;
     requestedSide: BodySide;
     isUrgent: boolean;
   }>({
@@ -1384,6 +1377,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     age: patient?.age ?? 32,
     hasPatient: Boolean(patient),
     examTitleEn: requestedExam.titleEn,
+    postureLabel: POSTURE_SHORT_I18N.en[requestedExam.recommendedPosture],
     requestedSide: patient?.requestedSide ?? 'NONE',
     isUrgent: Boolean(patient?.isUrgent),
   });
@@ -1503,6 +1497,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       age: patient?.age ?? 32,
       hasPatient: Boolean(patient),
       examTitleEn: requestedExam.titleEn,
+      postureLabel: POSTURE_SHORT_I18N.en[requestedExam.recommendedPosture],
       requestedSide: patient?.requestedSide ?? 'NONE',
       isUrgent: Boolean(patient?.isUrgent),
     };
@@ -1516,6 +1511,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
     patient?.requestedSide,
     patient?.isUrgent,
     requestedExam.titleEn,
+    requestedExam.recommendedPosture,
   ]);
 
   const waitingSignature = waitingPatients.map((p) => p.id).join('|');
@@ -5636,7 +5632,7 @@ export const RadiologyRoom3D: React.FC<RadiologyRoom3DProps> = ({
       if (!info.hasPatient) return;
       reqPaperAsset.redraw(
         info.examTitleEn,
-        info.age,
+        info.postureLabel,
         info.requestedSide,
         info.isUrgent
       );

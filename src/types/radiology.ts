@@ -73,6 +73,9 @@ export interface ExamProtocol {
   postureLabelAr: string;
   kvpRange: [number, number];
   masRange: [number, number];
+  rfFrequencyMhz?: number;
+  magneticFieldTesla?: number;
+  rfSequence?: string;
   baseFee: number;
   imagePath: string;
   clinicalTipAr: string;
@@ -88,6 +91,7 @@ export interface PatientCase {
   complaintAr: string;
   examId: string;
   requestedSide: BodySide;
+  hasFracture?: boolean;
   findingAr: string;
   isUrgent: boolean;
   arrivedAt: number;
@@ -124,6 +128,7 @@ export interface CompletedCase {
   examImagePath?: string;
   modality: Modality;
   sideUsed?: BodySide;
+  hasFracture?: boolean;
   findingAr: string;
   earned: number;
   kvpUsed: number;

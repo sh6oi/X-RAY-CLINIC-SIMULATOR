@@ -15,6 +15,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import type {
+  BodyRegion,
   BodySide,
   ExamProtocol,
   PatientCase,
@@ -144,6 +145,82 @@ function getEvaluationText(
   }
 }
 
+interface FractureOverlayCoords {
+  d: string;
+  haloD?: string;
+}
+
+function getCalibratedFracturePaths(
+  region: BodyRegion,
+  projection: ProjectionType
+): FractureOverlayCoords | null {
+  switch (region) {
+    case 'wrist':
+      if (projection === 'LATERAL') {
+        return {d: 'M43,62 L49,64 L54,61 L59,64', haloD: 'M42,61 L60,63'};
+      }
+      return {d: 'M32,67 L40,65 L47,68 L56,64', haloD: 'M31,66 L57,63'};
+    case 'hand':
+      if (projection === 'LATERAL') {
+        return {d: 'M44,50 L50,53 L56,49', haloD: 'M43,49 L57,49'};
+      }
+      return {d: 'M55,47 L59,49 L64,46', haloD: 'M54,46 L65,45'};
+    case 'elbow':
+      if (projection === 'LATERAL') {
+        return {d: 'M40,47 L48,44 L55,48', haloD: 'M39,46 L56,47'};
+      }
+      return {d: 'M38,42 L46,40 L53,43 L61,39', haloD: 'M37,41 L62,38'};
+    case 'shoulder':
+      return {d: 'M27,51 L34,53 L41,49', haloD: 'M26,50 L42,48'};
+    case 'ribs':
+      if (projection === 'LATERAL' || projection === 'OBLIQUE') {
+        return {d: 'M36,52 L42,50 L48,53', haloD: 'M35,51 L49,52'};
+      }
+      return {d: 'M15,49 L21,52 L27,48', haloD: 'M14,48 L28,47'};
+    case 'foot':
+      return {d: 'M58,47 L63,49 L68,46', haloD: 'M57,46 L69,45'};
+    case 'toes':
+      return {d: 'M26,33 L32,31 L38,34', haloD: 'M25,32 L39,33'};
+    case 'hip':
+      return {d: 'M46,35 L51,40 L56,44', haloD: 'M45,34 L57,43'};
+    case 'pelvis':
+      return {d: 'M33,66 L38,69 L44,65', haloD: 'M32,65 L45,64'};
+    case 'knee':
+      if (projection === 'LATERAL') {
+        return {d: 'M29,43 L36,45 L41,42', haloD: 'M28,42 L42,41'};
+      }
+      return {d: 'M36,57 L43,60 L50,57', haloD: 'M35,56 L51,56'};
+    case 'tibia_fibula':
+      // Lateral/Oblique fallback when native AP fx photo isn't used
+      return {d: 'M41,48 L48,52 L56,47', haloD: 'M40,47 L57,46'};
+    case 'forearm':
+      return {d: 'M42,47 L49,51 L57,46', haloD: 'M41,46 L58,45'};
+    case 'humerus':
+      return {d: 'M43,49 L50,52 L57,48', haloD: 'M42,48 L58,47'};
+    case 'femur':
+      return {d: 'M43,48 L50,52 L57,47', haloD: 'M42,47 L58,46'};
+    case 'ankle':
+      return {d: 'M42,57 L48,60 L56,56', haloD: 'M41,56 L57,55'};
+    case 'clavicle':
+      return {d: 'M42,44 L49,47 L56,43', haloD: 'M41,43 L57,42'};
+    case 'nasal_bones':
+      return {d: 'M28,46 L34,48 L39,45', haloD: 'M27,45 L40,44'};
+    case 'thoracic':
+      return {d: 'M47,49 L53,51 L59,48', haloD: 'M46,48 L60,47'};
+    case 'lumbar':
+      return {d: 'M43,47 L50,49 L57,46', haloD: 'M42,46 L58,45'};
+    case 'cervical':
+      return {d: 'M45,48 L50,50 L56,47', haloD: 'M44,47 L57,46'};
+    case 'head':
+    case 'facial_bones':
+      return {d: 'M32,29 L38,34 L45,31', haloD: 'M31,28 L46,30'};
+    case 'sacrum_coccyx':
+      return {d: 'M44,55 L50,57 L56,54', haloD: 'M43,54 L57,53'};
+    default:
+      return null;
+  }
+}
+
 export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
   patient,
   requestedExam,
@@ -171,6 +248,10 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
   const [zoomPct, setZoomPct] = useState(100);
   const [rotationDeg, setRotationDeg] = useState(0);
   const [flippedX, setFlippedX] = useState(false);
+  const [imgRatioEntry, setImgRatioEntry] = useState<{
+    src: string;
+    ratio: number;
+  }>({src: '', ratio: 1});
 
   // Mask Controls (Collimation Shutter Mask + DICOM Annotation Mask)
   const [shutterMaskEnabled, setShutterMaskEnabled] = useState(true);
@@ -184,7 +265,11 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
   const effectiveSide: BodySide =
     evaluation.targetSideScanned ?? actualSide ?? patient.requestedSide ?? 'NONE';
 
-  const {src: imageSrc, mirrorX: autoMirrorX} = useMemo(
+  const {
+    src: imageSrc,
+    mirrorX: autoMirrorX,
+    usesNativeFractureImage,
+  } = useMemo(
     () =>
       getRadiographImage({
         region: evaluation.targetRegionScanned,
@@ -192,6 +277,7 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
         projection: effectiveProjection,
         posture: effectivePosture,
         side: effectiveSide,
+        hasFracture: Boolean(patient.hasFracture),
       }),
     [
       evaluation.targetRegionScanned,
@@ -199,8 +285,19 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
       effectiveProjection,
       effectivePosture,
       effectiveSide,
+      patient.hasFracture,
     ]
   );
+
+  const proceduralFracturePaths =
+    requestedExam.modality === 'XRAY' &&
+    patient.hasFracture &&
+    !usesNativeFractureImage
+      ? getCalibratedFracturePaths(
+          evaluation.targetRegionScanned,
+          effectiveProjection
+        )
+      : null;
 
   const regionLabel = formatRegionWithSide(
     evaluation.targetRegionScanned,
@@ -286,7 +383,9 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
             <div className="text-[11px] text-slate-400 truncate">
               {modalityLabel} · {regionLabel} ·{' '}
               <span className="text-cyan-300 font-semibold">{postureLabel}</span> ·{' '}
-              {kvp} kVp · {mas} mAs
+              {requestedExam.modality === 'MRI'
+                ? '1.5T · 63.9 MHz RF'
+                : `${kvp} kVp · ${mas} mAs`}
             </div>
           </div>
         </div>
@@ -322,12 +421,60 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                 transform: `scale(${zoomPct / 100}) rotate(${rotationDeg}deg) scaleX(${(flippedX !== autoMirrorX) ? -1 : 1})`,
               }}
             >
-              <img
-                src={imageSrc}
-                alt={regionLabel}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-contain"
-              />
+              <div
+                className={`relative flex items-center justify-center ${
+                  (imgRatioEntry.src === imageSrc ? imgRatioEntry.ratio : 1) >= 1
+                    ? 'w-full max-h-full'
+                    : 'h-full max-w-full'
+                }`}
+                style={{
+                  aspectRatio: String(
+                    imgRatioEntry.src === imageSrc ? imgRatioEntry.ratio : 1
+                  ),
+                }}
+              >
+                <img
+                  src={imageSrc}
+                  alt={regionLabel}
+                  referrerPolicy="no-referrer"
+                  onLoad={(e) => {
+                    const {naturalWidth, naturalHeight} = e.currentTarget;
+                    if (naturalWidth && naturalHeight) {
+                      setImgRatioEntry({
+                        src: imageSrc,
+                        ratio: naturalWidth / naturalHeight,
+                      });
+                    }
+                  }}
+                  className="w-full h-full object-contain block"
+                />
+                {proceduralFracturePaths && (
+                  <svg
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    className="pointer-events-none absolute inset-0 w-full h-full"
+                  >
+                    {proceduralFracturePaths.haloD && (
+                      <path
+                        d={proceduralFracturePaths.haloD}
+                        fill="none"
+                        stroke="rgba(241, 245, 249, 0.42)"
+                        strokeWidth="1.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    )}
+                    <path
+                      d={proceduralFracturePaths.d}
+                      fill="none"
+                      stroke="#04070c"
+                      strokeWidth="0.95"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </div>
             </div>
 
             {shutterMaskEnabled && (
@@ -358,7 +505,11 @@ export const RadiographDisplay: React.FC<RadiographDisplayProps> = ({
                   <div className="truncate">{regionLabel} · {postureLabel}</div>
                 </div>
                 <div className="pointer-events-none absolute top-2 left-2 z-10 max-w-[46%] text-[9.5px] sm:text-[10.5px] font-mono-num text-cyan-200 text-left leading-snug bg-[#040912]/75 px-1.5 py-0.5 rounded">
-                  <div className="truncate">{kvp} kVp · {mas} mAs</div>
+                  <div className="truncate">
+                    {requestedExam.modality === 'MRI'
+                      ? '1.5T · 63.9 MHz RF'
+                      : `${kvp} kVp · ${mas} mAs`}
+                  </div>
                   <div className="text-[9px] sm:text-[10px] text-cyan-300 truncate">{projectionLabel}</div>
                 </div>
                 {sideMarker && (

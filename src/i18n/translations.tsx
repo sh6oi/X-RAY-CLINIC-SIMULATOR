@@ -539,7 +539,7 @@ export const UPGRADE_EN: Record<
   assistant_tech: {
     title: 'Hire Assistant Radiographer',
     description:
-      'Master tier unlocked only after serving 500 patients! Handles extra cases automatically for passive revenue.',
-    benefit: 'Unlocks at 500 patients · Passive income',
+      'Assistant Radiographer staffing option — currently unavailable for purchase (Coming Soon).',
+    benefit: 'Unavailable · Coming Soon',
   },
 };

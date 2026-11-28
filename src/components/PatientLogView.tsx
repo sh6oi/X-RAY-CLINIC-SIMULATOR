@@ -145,8 +145,14 @@ export const PatientLogView: React.FC<PatientLogViewProps> = ({
                       </div>
                     </td>
                     <td className="py-2.5 sm:py-3.5 px-3 sm:px-4 font-mono-num text-[11px] sm:text-xs text-cyan-300 whitespace-nowrap">
-                      {c.kvpUsed} kVp · {c.masUsed} mAs
-                      {c.shieldUsed ? (isAr ? ' · حماية' : ' · Shield') : ''}
+                      {c.modality === 'MRI'
+                        ? '1.5T · 63.9 MHz RF'
+                        : `${c.kvpUsed} kVp · ${c.masUsed} mAs`}
+                      {c.shieldUsed && c.modality !== 'MRI'
+                        ? isAr
+                          ? ' · حماية'
+                          : ' · Shield'
+                        : ''}
                     </td>
                     <td className="py-2.5 sm:py-3.5 px-3 sm:px-4 text-[11px] sm:text-xs text-slate-300 max-w-md">
                       {c.findingAr}

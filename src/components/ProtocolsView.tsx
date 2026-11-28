@@ -89,8 +89,8 @@ export const ProtocolsView: React.FC = () => {
           </h2>
           <p className="hud-view-sub mt-0.5 text-xs sm:text-sm text-slate-400">
             {isAr
-              ? 'المرجع القياسي لقيم الطاقة (kVp) وكمية الإشعاع (mAs) للبالغين والأطفال لجميع المناطق الـ26.'
-              : 'Clinical kVp, mAs, positioning, and side guidelines for Adults & Pediatrics across all 26 regions.'}
+              ? 'المرجع القياسي لقيم الطاقة (kVp) وكمية الإشعاع (mAs) للأشعة والمفراس، والموجات الراديوية (RF) للرنين المغناطيسي.'
+              : 'Clinical kVp/mAs for X-Ray & CT, and Radiofrequency (RF) parameters for MRI across all 26 regions.'}
           </p>
         </div>
 
@@ -254,30 +254,57 @@ export const ProtocolsView: React.FC = () => {
                       {POSTURE_SHORT_I18N[lang][exam.recommendedPosture]}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-slate-400 text-[9.5px] sm:text-[10.5px]">
-                      {isAr ? 'نطاق kVp' : 'kVp Range'}
-                    </div>
-                    <div className="mt-0.5 font-mono-num font-semibold text-white">
-                      {ranges.kvpRange[0]}–{ranges.kvpRange[1]}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-[9.5px] sm:text-[10.5px]">
-                      {isAr ? 'نطاق mAs' : 'mAs Range'}
-                    </div>
-                    <div className="mt-0.5 font-mono-num font-semibold text-white">
-                      {ranges.masRange[0]}–{ranges.masRange[1]}
-                    </div>
-                  </div>
+                  {exam.modality === 'MRI' ? (
+                    <>
+                      <div>
+                        <div className="text-slate-400 text-[9.5px] sm:text-[10.5px]">
+                          {isAr ? 'الموجات الراديوية' : 'RF Pulse'}
+                        </div>
+                        <div className="mt-0.5 font-mono-num font-semibold text-emerald-300 truncate">
+                          {exam.rfFrequencyMhz ?? 63.9} MHz
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400 text-[9.5px] sm:text-[10.5px]">
+                          {isAr ? 'المجال / التسلسل' : 'Field / Seq'}
+                        </div>
+                        <div className="mt-0.5 font-mono-num font-semibold text-white truncate">
+                          {exam.magneticFieldTesla ?? 1.5}T RF
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <div className="text-slate-400 text-[9.5px] sm:text-[10.5px]">
+                          {isAr ? 'نطاق kVp' : 'kVp Range'}
+                        </div>
+                        <div className="mt-0.5 font-mono-num font-semibold text-white">
+                          {ranges.kvpRange[0]}–{ranges.kvpRange[1]}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400 text-[9.5px] sm:text-[10.5px]">
+                          {isAr ? 'نطاق mAs' : 'mAs Range'}
+                        </div>
+                        <div className="mt-0.5 font-mono-num font-semibold text-white">
+                          {ranges.masRange[0]}–{ranges.masRange[1]}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <p className="text-[10.5px] sm:text-xs text-slate-300/90 leading-snug line-clamp-2">
-                  {isAr
-                    ? ageGroup === 'PEDIATRIC'
-                      ? `جرعة الأطفال المخفّضة: ${ranges.kvpRange[0]}–${ranges.kvpRange[1]} kVp و ${ranges.masRange[0]}–${ranges.masRange[1]} mAs. ${exam.clinicalTipAr}`
-                      : exam.clinicalTipAr
-                    : `Recommended ${POSTURE_SHORT_I18N.en[exam.recommendedPosture]} positioning at ${ranges.kvpRange[0]}–${ranges.kvpRange[1]} kVp and ${ranges.masRange[0]}–${ranges.masRange[1]} mAs.`}
+                  {exam.modality === 'MRI'
+                    ? isAr
+                      ? exam.clinicalTipAr
+                      : `MRI operates using ${exam.rfFrequencyMhz ?? 63.9} MHz Radiofrequency (RF) waves in a ${exam.magneticFieldTesla ?? 1.5}T magnetic field (no kVp or mAs X-ray radiation) — ${exam.rfSequence ?? 'T1 / T2 RF'}.`
+                    : isAr
+                      ? ageGroup === 'PEDIATRIC'
+                        ? `جرعة الأطفال المخفّضة: ${ranges.kvpRange[0]}–${ranges.kvpRange[1]} kVp و ${ranges.masRange[0]}–${ranges.masRange[1]} mAs. ${exam.clinicalTipAr}`
+                        : exam.clinicalTipAr
+                      : `Recommended ${POSTURE_SHORT_I18N.en[exam.recommendedPosture]} positioning at ${ranges.kvpRange[0]}–${ranges.kvpRange[1]} kVp and ${ranges.masRange[0]}–${ranges.masRange[1]} mAs.`}
                 </p>
               </div>
             </div>

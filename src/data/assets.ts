@@ -65,6 +65,13 @@ import xrayToesApImg from '../assets/images/xray_toes_ap_1795717166113.jpg';
 import xraySacrumCoccyxImg from '../assets/images/xray_sacrum_coccyx_1795717285201.jpg';
 import xraySacrumLatImg from '../assets/images/xray_sacrum_lat_1795718418964.jpg';
 
+import xrayTibiaFxImg from '../assets/images/xray_tibia_fx_1795827841289.jpg';
+import xrayForearmFxImg from '../assets/images/xray_forearm_fx_1795827841717.jpg';
+import xrayHumerusFxImg from '../assets/images/xray_humerus_fx_1795827841675.jpg';
+import xrayClavicleFxImg from '../assets/images/xray_clavicle_fx_1795827841656.jpg';
+import xrayFemurFxImg from '../assets/images/xray_femur_fx_1795827841773.jpg';
+import xrayAnkleFxImg from '../assets/images/xray_ankle_fx_1795827842803.jpg';
+
 import ctChestImg from '../assets/images/radiology_ct_chest_1795096862581.jpg';
 import ctHeadAxialImg from '../assets/images/ct_head_axial_1795568751069.jpg';
 
@@ -149,6 +156,12 @@ export const ASSETS = {
   xrayToesApImg,
   xraySacrumCoccyxImg,
   xraySacrumLatImg,
+  xrayTibiaFxImg,
+  xrayForearmFxImg,
+  xrayHumerusFxImg,
+  xrayClavicleFxImg,
+  xrayFemurFxImg,
+  xrayAnkleFxImg,
   ctChestImg,
   ctHeadAxialImg,
   mriLumbarImg,

@@ -2,6 +2,7 @@ import React, {useEffect} from 'react';
 import {FileText, X} from 'lucide-react';
 import type {ExamProtocol, PatientCase} from '../types/radiology';
 import {
+  POSTURE_LABELS_I18N,
   SIDE_LABELS_I18N,
   isBilateralRegion,
   useLanguage,
@@ -38,6 +39,8 @@ export const PatientRequisitionModal: React.FC<PatientRequisitionModalProps> = (
     isBilateralRegion(requestedExam.region) &&
     patient.requestedSide &&
     patient.requestedSide !== 'NONE';
+
+  const postureLabelEn = POSTURE_LABELS_I18N.en[requestedExam.recommendedPosture];
 
   return (
     <div
@@ -76,9 +79,9 @@ export const PatientRequisitionModal: React.FC<PatientRequisitionModalProps> = (
           </button>
         </div>
 
-        {/* Paper Body — Requested Exam Name Only */}
-        <div className="p-4 sm:p-6 bg-[linear-gradient(to_bottom,rgba(14,58,93,0.03)_1px,transparent_1px)] bg-[length:100%_26px]">
-          <div className="rounded-xl border-2 border-[#0E3A5D]/80 bg-[#EFF7FC] p-4 sm:p-5 space-y-2.5 shadow-sm text-center">
+        {/* Paper Body — Exam Name + Patient Posture */}
+        <div className="p-4 sm:p-5 space-y-3 bg-[linear-gradient(to_bottom,rgba(14,58,93,0.03)_1px,transparent_1px)] bg-[length:100%_26px]">
+          <div className="rounded-xl border-2 border-[#0E3A5D]/80 bg-[#EFF7FC] p-4 space-y-2 shadow-sm text-center">
             <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#0E3A5D]">
               {isAr ? 'اسم الفحص المطلوب' : 'Requested Examination'}
             </div>
@@ -100,6 +103,18 @@ export const PatientRequisitionModal: React.FC<PatientRequisitionModalProps> = (
                 </span>
               </div>
             )}
+          </div>
+
+          <div className="rounded-xl border border-slate-300 bg-white/90 px-4 py-3 text-center space-y-1">
+            <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+              {isAr ? 'وضعية المريض' : 'Patient Posture'}
+            </div>
+            <div
+              dir="ltr"
+              className="text-sm sm:text-base font-extrabold text-[#0E3A5D]"
+            >
+              {postureLabelEn}
+            </div>
           </div>
         </div>
 
